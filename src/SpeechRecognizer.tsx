@@ -1,24 +1,16 @@
-import AudioRecorder from "./audio-recorder";
 import {
-  Container,
-  AppBar,
-  Typography,
-  Toolbar,
-  Paper,
   Stack,
   Button,
-  TextField,
-  Box,
-  CssBaseline,
   Card,
-  CardContent,
   CardActions,
 } from "@mui/material";
+import {
+  KeyboardVoice
+} from "@mui/icons-material";
 import useSpeechRecognition from "./useSpeechRecognition";
 
-import KeyboardVoiceIcon from "@mui/icons-material/KeyboardVoice";
 
-export default () => {
+export default function SpechRecognizer() {
   const colors = [
     "aqua",
     "azure",
@@ -54,7 +46,7 @@ export default () => {
               onClick={() => listen()}
               disabled={listening}
             >
-              <KeyboardVoiceIcon className="me-2" />
+              <KeyboardVoice className="me-2" />
               Listen
             </Button>
             <span>{listening ? "Listening..." : "Not listening"}</span>

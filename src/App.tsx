@@ -6,22 +6,17 @@ import {
   AppBar,
   Typography,
   Toolbar,
-  Paper,
   Stack,
-  Button,
   TextField,
   Box,
-  CssBaseline,
-  Card,
-  CardContent,
-  CardActions,
+  CssBaseline
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import KeyboardVoiceIcon from "@mui/icons-material/KeyboardVoice";
 
-const appName = "ADHD Assistant";
+const appName = "ADHD Assist";
 export default function App() {
-  const [recognizedText, setRecognizedText] = React.useState(
+  const [recognizedText/*, setRecognizedText*/] = React.useState(
     "adflksjdlksdjfs\nsdfsdlkjsdflkjsdflkjsdlfkjs\n"
   );
   const defaultTheme = createTheme();
@@ -63,8 +58,8 @@ export default function App() {
             >
               I have ADHD. As my mind meanders and jumps from idea to idea in a
               vast and fanciful world of ideas, I can tell this assistant about
-              each jump. The assistant will maintain a stack of ideas that will
-              lead me back to where I started.
+              each topical jump. The assistant will maintain a stack of ideas that will
+              lead me back to where I started.  
             </Typography>
             <Stack
               sx={{ pt: 4 }}
@@ -75,6 +70,7 @@ export default function App() {
               <AudioRecorder
                 onRecordingFinished={(blob: Blob, play: () => void) => {
                   play();
+                  console.log({blob});
                   //TODO: recognizeText(blob).then(text => setRecognizedText(text));
                 }}
               />

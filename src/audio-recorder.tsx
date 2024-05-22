@@ -1,8 +1,7 @@
 import React from "react";
 import KeyboardVoiceIcon from "@mui/icons-material/KeyboardVoice";
-import FiberManualRecordIcon from "@mui/icons-material/FiberManualRecord";
 import StopIcon from "@mui/icons-material/Stop";
-import { SvgIcon, CardActions, Card, CardContent } from "@mui/material";
+import { CardActions, Card} from "@mui/material";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";

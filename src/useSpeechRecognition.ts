@@ -28,9 +28,7 @@ export default ({
       (<any>window).SpeechRecognition || (<any>window).webkitSpeechRecognition;
     const SGL =
       (<any>window).SpeechGrammarList || (<any>window).webkitSpeechGrammarList;
-    const SGE =
-      (<any>window).SpeechRecognitionEvent ||
-      (<any>window).webkitSpeechRecognitionEvent;
+    //const SGE = (<any>window).SpeechRecognitionEvent || (<any>window).webkitSpeechRecognitionEvent;
 
     const recognition: SpeechRecognition = new SR();
     const speechRecognitionList: SpeechGrammarList = new SGL();
@@ -41,7 +39,7 @@ export default ({
     recognition.interimResults = interimResults ?? false;
     recognition.maxAlternatives = maxAlternatives ?? 1;
 
-    for (let eventType of [
+    for (const eventType of [
       "error",
       "end",
       "audiostart",
@@ -54,7 +52,7 @@ export default ({
       "speechstart",
       "speechend",
     ]) {
-      recognition.addEventListener(eventType, (e) => {
+      recognition.addEventListener(eventType, () => {
         setEventLog((eventLog) => [...eventLog, eventType]);
         console.log(eventType);
       });
