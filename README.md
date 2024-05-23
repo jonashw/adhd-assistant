@@ -1,13 +1,34 @@
 # ADHD Assist
 
-AKA Logical Follower AKA Rabbit Hole Trail
+I have ADHD and I need assistance.
 
-I have ADHD. As my mind meanders and jumps from idea to idea in a
+As my mind meanders and jumps from idea to idea in a
 vast and fanciful world of ideas, I can tell this assistant about
 each topical jump. The assistant will maintain a stack of ideas that will
 lead me back to where I started.
 
+https://adhd.jonashw.dev
+
+Alternate names:
+
+- Logical Follower
+- Rabbit Hole Explorer
+- Brainstorm Belay
+- Breadcrumb Trail
+- Thread Head
+
+Use cases:
+
+- guided exposition of nested ideas (brainstorming)
+- todo-lists with dependency-aware prioritization
+- conversation aid 
+  - Why did I start talking about this particular topic?
+  - How can I finish making the point I started to make?
+
+
 My head is a balloon, filled with helium and buoyant thoughts. It has a strong tendency to float out of reach and be blown off course by the wind.
+
+![balloon head](README_files/balloon-head.png)
 
 My body is the holder of this balloon's string.  Its constant gripping leaves the arm muscles tense and sore.  It could use some assistance keeping the balloon from floating away.
 
