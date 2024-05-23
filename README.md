@@ -25,16 +25,18 @@ Use cases:
   - Why did I start talking about this particular topic?
   - How can I finish making the point I started to make?
 
+## Background
 
 My head is a balloon, filled with helium and buoyant thoughts. It has a strong tendency to float out of reach and be blown off course by the wind.
 
-![balloon head](README_files/balloon-head.png)
+![balloon head](README_files/balloon-head-and-body.png)
+
 
 My body is the holder of this balloon's string.  Its constant gripping leaves the arm muscles tense and sore.  It could use some assistance keeping the balloon from floating away.
 
-![you are here](README_files/you-are-here.png)
+### &quot;You are here.&quot;
 
-&quot;You are here.&quot;
+![you are here](README_files/you-are-here.png)
 
 Those words are marked next to an unmistakable beacon on the map of your ideas, emotions, and experiences.  All items on the map are linked with navigable relationships.  You announce every change in your mental state to your automated assistant, and it will track your progression through the landscape of your thoughts.  
 
