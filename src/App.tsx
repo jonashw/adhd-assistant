@@ -1,5 +1,3 @@
-import React from "react";
-import AudioRecorder from "./audio-recorder";
 import SpeechRecognizer from "./SpeechRecognizer";
 import {
   Container,
@@ -7,7 +5,6 @@ import {
   Typography,
   Toolbar,
   Stack,
-  TextField,
   Box,
   CssBaseline
 } from "@mui/material";
@@ -16,9 +13,6 @@ import KeyboardVoiceIcon from "@mui/icons-material/KeyboardVoice";
 
 const appName = "ADHD Assist";
 export default function App() {
-  const [recognizedText/*, setRecognizedText*/] = React.useState(
-    "adflksjdlksdjfs\nsdfsdlkjsdflkjsdflkjsdlfkjs\n"
-  );
   const defaultTheme = createTheme();
   return (
     <ThemeProvider theme={defaultTheme}>
