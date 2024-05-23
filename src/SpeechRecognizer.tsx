@@ -9,7 +9,6 @@ import {
 } from "@mui/icons-material";
 import useSpeechRecognition from "./useSpeechRecognition";
 
-
 export default function SpechRecognizer() {
   const colors = [
     "aqua",
@@ -66,7 +65,7 @@ export default function SpechRecognizer() {
                     Array(r.length)
                       .fill(undefined)
                       .map((_, i) => (
-                        <div>
+                        <div key={i}>
                           {r.item(i).transcript} (
                           {Math.floor(100 * r.item(i).confidence)}%)
                         </div>
@@ -80,4 +79,4 @@ export default function SpechRecognizer() {
       </CardActions>
     </Card>
   );
-};
+}

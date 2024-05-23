@@ -1,30 +1,26 @@
-# React + TypeScript + Vite
+# ADHD Assist
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AKA Logical Follower AKA Rabbit Hole Trail
 
-Currently, two official plugins are available:
+I have ADHD. As my mind meanders and jumps from idea to idea in a
+vast and fanciful world of ideas, I can tell this assistant about
+each topical jump. The assistant will maintain a stack of ideas that will
+lead me back to where I started.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+My head is a balloon, filled with helium and buoyant thoughts. It has a strong tendency to float out of reach and be blown off course by the wind.
 
-## Expanding the ESLint configuration
+My body is the holder of this balloon's string.  Its constant gripping leaves the arm muscles tense and sore.  It could use some assistance keeping the balloon from floating away.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+![you are here](README_files/you-are-here.png)
 
-- Configure the top-level `parserOptions` property like this:
+&quot;You are here.&quot;
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
-```
+Those words are marked next to an unmistakable beacon on the map of your ideas, emotions, and experiences.  All items on the map are linked with navigable relationships.  You announce every change in your mental state to your automated assistant, and it will track your progression through the landscape of your thoughts.  
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+![sample mind map](README_files/sample-graph.png)
+
+Sometimes (often?), it's fun to give your mind a bit more slack.  Letting it fly high can be fun.
+
+Why?
+
+Like the physical forces of buoyancy and gravity,  my mind's thoughtful forces are constant.  I enjoy many thoughts throughout my days; so many that I tend to (have to?) forget them after a time. It would be nice to have a record of my thoughts so that I could retrieve the more valuable/viable ones.  A major plus would be to use this tool for note-taking with the goal of providing written communication to coworkers.  I could express ideas in a fashion that suits me, then project the data from that model into standard English for the neurotypicals in my life.
