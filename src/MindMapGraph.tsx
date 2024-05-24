@@ -134,11 +134,13 @@ export default function MindMapGraph({
                     </Button>
                 </div>
                 {pathHome && (
-                    <Breadcrumbs separator="🠈" aria-label="breadcrumb" maxItems={4}>
+                    <Breadcrumbs separator="&larr;" aria-label="breadcrumb" maxItems={4}>
                         {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟
                                 */}
                         {[...pathHome].reverse().map((segment) => (
-                            <Button key={segment.node.id} variant="text">
+                            <Button key={segment.node.id} variant="text" onClick={() => {
+                                selectNodeId(segment.node.id);
+                            }}>
                                 {segment.node.label}
                             </Button>
                         ))}
