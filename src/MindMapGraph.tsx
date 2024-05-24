@@ -115,7 +115,7 @@ export default function MindMapGraph({
                             selectNodeId(newNode.id);
                         }}
                     >
-                        Enter a Rabbit Hole
+                        Deeper
                     </Button>
                     <Button
                         variant="contained"
