@@ -1,7 +1,7 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useContainerWidth } from "./useContainerWidth";
-import { Breadcrumbs, Button, Card} from "@mui/material";
+import { AppBar, Breadcrumbs, Button, Card, CardContent, Stack, Toolbar} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
@@ -74,20 +74,14 @@ export default function MindMapGraph({
 
     return (
         <div style={{position:'relative'}}>
-            <Card elevation={1} sx={{
-                position: 'absolute',
-                width: '100%',
-                zIndex: 1,
-            }}>
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 5
-
-                }}>
-                    <UndoRedoToolbar controller={undoController} />
+            <AppBar position="static" sx={{p:0}} enableColorOnDark>
+                <Toolbar sx={{p:0,justifyContent:'space-between'}}>
+                    <Stack sx={{p:0}} gap={0.85} direction="row" justifyContent="space-between">
+                        <UndoRedoToolbar controller={undoController} />
+                    </Stack>
                     <Button
                         variant="contained"
+                        color={"success"}
                         disabled={!selectedNode}
                         onClick={() => {
                             if (!selectedNode) {
@@ -132,74 +126,79 @@ export default function MindMapGraph({
                     >
                         Remove
                     </Button>
-                </div>
-                {pathHome && (
-                    <Breadcrumbs separator="&larr;" aria-label="breadcrumb" maxItems={4}>
-                        {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟
-                                */}
-                        {[...pathHome].reverse().map((segment) => (
-                            <Button key={segment.node.id} variant="text" onClick={() => {
-                                selectNodeId(segment.node.id);
-                            }}>
-                                {segment.node.label}
-                            </Button>
-                        ))}
-                    </Breadcrumbs>
-                )}
-            </Card>
+                </Toolbar>
+            </AppBar>
+
+            {pathHome && (
+                <Breadcrumbs separator="&larr;" aria-label="breadcrumb" maxItems={4}>
+                    {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟
+                            */}
+                    {[...pathHome].reverse().map((segment) => (
+                        <Button key={segment.node.id} variant="text" onClick={() => {
+                            selectNodeId(segment.node.id);
+                        }}>
+                            {segment.node.label}
+                        </Button>
+                    ))}
+                </Breadcrumbs>
+            )}
                     
-            <div ref={containerRef}>
-                <ForceGraph2D
-                    onNodeClick={node => selectNodeId(node.id)}
-                    enablePanInteraction={false}
-                    enableZoomInteraction={false}
-                    onEngineTick={() => {
-                        graphRef.current?.zoomToFit();
-                    }}
-                    graphData={clonedGraphData}
-                    ref={graphRef}
-                    height={height}
-                    width={availableWidth}
-                    nodeCanvasObjectMode={() => "after"}
-                    nodeColor={nodeColor}
-                    nodeRelSize={nodeRadius}
-                    nodeCanvasObject={(node, ctx, globalScale) => {
-                        fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
-                        ctx.beginPath();
-                        ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
-                        ctx.closePath();
-                        ctx.strokeStyle = 'hsl(0 0 20)';
-                        ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
-                        ctx.stroke();
-                    }}
-                    /*
-                    linkCanvasObjectMode={() => "after"}
-                    linkCanvasObject={(link,ctx,globalScale) => {
-                        ctx.save();
-                        const fontSize = 12 / globalScale;
-                        ctx.font = `${fontSize}px Sans-Serif`;
-                        ctx.textAlign = 'center';
-                        const label = link.type;
-                        const metrics = ctx.measureText(label);
-                        const h = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-                        const target = link.target! as any;
-                        const source = link.source! as any;
-                        const phi = Math.atan((target.y - source.y)/(target.x - source.x));
-                        ctx.translate(
-                            (target.x+source.x)/2,
-                            (target.y+source.y)/2 + h/2);
-                        ctx.rotate(phi);
-                        ctx.fillText(label, 0,0);
-                        ctx.restore();
-                    }}
-                    */
-                    linkDirectionalArrowLength={nodeRadius / 3}
-                    linkDirectionalArrowRelPos={() => 1}
-                    cooldownTime={1000}
-                    dagLevelDistance={25}
-                    dagMode={"radialin"}
-                />
-            </div>
+            <Card elevation={1} sx={{mt:3}}>
+                <CardContent>
+                    <div ref={containerRef}>
+                        <ForceGraph2D
+                            onNodeClick={node => selectNodeId(node.id)}
+                            enablePanInteraction={false}
+                            enableZoomInteraction={false}
+                            onEngineTick={() => {
+                                graphRef.current?.zoomToFit();
+                            }}
+                            graphData={clonedGraphData}
+                            ref={graphRef}
+                            height={height}
+                            width={availableWidth}
+                            nodeCanvasObjectMode={() => "after"}
+                            nodeColor={nodeColor}
+                            nodeRelSize={nodeRadius}
+                            nodeCanvasObject={(node, ctx, globalScale) => {
+                                fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                                ctx.beginPath();
+                                ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
+                                ctx.closePath();
+                                ctx.strokeStyle = 'hsl(0 0 20)';
+                                ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
+                                ctx.stroke();
+                            }}
+                            /*
+                            linkCanvasObjectMode={() => "after"}
+                            linkCanvasObject={(link,ctx,globalScale) => {
+                                ctx.save();
+                                const fontSize = 12 / globalScale;
+                                ctx.font = `${fontSize}px Sans-Serif`;
+                                ctx.textAlign = 'center';
+                                const label = link.type;
+                                const metrics = ctx.measureText(label);
+                                const h = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                                const target = link.target! as any;
+                                const source = link.source! as any;
+                                const phi = Math.atan((target.y - source.y)/(target.x - source.x));
+                                ctx.translate(
+                                    (target.x+source.x)/2,
+                                    (target.y+source.y)/2 + h/2);
+                                ctx.rotate(phi);
+                                ctx.fillText(label, 0,0);
+                                ctx.restore();
+                            }}
+                            */
+                            linkDirectionalArrowLength={nodeRadius / 3}
+                            linkDirectionalArrowRelPos={() => 1}
+                            cooldownTime={1000}
+                            dagLevelDistance={25}
+                            dagMode={"radialin"}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
