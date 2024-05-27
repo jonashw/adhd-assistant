@@ -1,11 +1,12 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useContainerWidth } from "./useContainerWidth";
-import { AppBar, Breadcrumbs, Button, Card, CardContent, Stack, Toolbar} from "@mui/material";
+import { AppBar, Breadcrumbs, Button, Card, CardContent, Paper, Stack, Toolbar} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
+import { useContainerHeight } from "./useContainerWidth";
 
 type GraphRefType = 
     ForceGraphMethods<
@@ -21,12 +22,13 @@ export default function MindMapGraph({
     height?: number,
     onChange: (value: MindMapGraphData) => void
 }){
+    //const {availableHeight,ontainerRef} = useContainerHeight();
     const {availableWidth,containerRef} = useContainerWidth()
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value);
     React.useEffect(() => onChange(graph),[graph, onChange]);
     const graphRef = React.useRef<GraphRefType>();
-    const [selectedNodeId, selectNodeId] = React.useState<string>();
+    const [selectedNodeId, selectNodeId] = React.useState<string>("HOME");
     const selectedNode = React.useMemo(
         () => value.nodes.find(n => n.id === selectedNodeId),
         [selectedNodeId, value]);
@@ -73,15 +75,38 @@ export default function MindMapGraph({
             : 'hsl(0 0 30)';
 
     return (
-        <div style={{position:'relative'}}>
-            <AppBar position="static" sx={{p:0}} enableColorOnDark>
-                <Toolbar sx={{p:0,justifyContent:'space-between'}}>
+        <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
+            <AppBar position="static" sx={{px:1}} enableColorOnDark>
+                <Toolbar sx={{gap:1,p:0,justifyContent:'space-between'}}>
                     <Stack sx={{p:0}} gap={0.85} direction="row" justifyContent="space-between">
                         <UndoRedoToolbar controller={undoController} />
                     </Stack>
+
+                    {selectedNode 
+                    ? selectedNode.id === "HOME"
+                    ? <div>
+
+                    </div>
+                    :
                     <Button
                         variant="contained"
-                        color={"success"}
+                        color="error"
+                        disabled={!selectedNode}
+                        onClick={() => {
+                            if (!selectedNode) {
+                                return;
+                            }
+
+                            selectNodeId("HOME");
+                            setGraph(MindMap.remove(value, selectedNode));
+                        }}
+                    >
+                        Remove
+                    </Button>
+                    : <></>}
+                    <Button
+                        variant="contained"
+                        color={"info"}
                         disabled={!selectedNode}
                         onClick={() => {
                             if (!selectedNode) {
@@ -92,45 +117,18 @@ export default function MindMapGraph({
                             if (!label) {
                                 return;
                             }
-                            const newNode: MindMapGraphNode = {
-                                id: crypto.randomUUID(),
-                                label,
-                                type: 'RabbitHole'
-                            };
-                            const updatedValue: MindMapGraphData = {
-                                nodes: [...value.nodes, newNode],
-                                links: [...value.links, {
-                                    source: newNode.id,
-                                    target: selectedNode.id,
-                                    type: 'RETURNS_TO'
-                                }]
-                            };
+                            const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
                             setGraph(updatedValue);
                             selectNodeId(newNode.id);
                         }}
                     >
                         Deeper
                     </Button>
-                    <Button
-                        variant="contained"
-                        color="warning"
-                        disabled={!selectedNode}
-                        onClick={() => {
-                            if (!selectedNode) {
-                                return;
-                            }
-
-                            selectNodeId(undefined);
-                            setGraph(MindMap.remove(value, selectedNode));
-                        }}
-                    >
-                        Remove
-                    </Button>
                 </Toolbar>
             </AppBar>
-
-            {pathHome && (
-                <Breadcrumbs separator="&larr;" aria-label="breadcrumb" maxItems={4}>
+            
+            {pathHome && pathHome.length > 1 && (
+                <Breadcrumbs separator="&larr;" aria-label="breadcrumb">
                     {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟
                             */}
                     {[...pathHome].reverse().map((segment) => (
@@ -142,63 +140,63 @@ export default function MindMapGraph({
                     ))}
                 </Breadcrumbs>
             )}
-                    
-            <Card elevation={1} sx={{mt:3}}>
-                <CardContent>
-                    <div ref={containerRef}>
-                        <ForceGraph2D
-                            onNodeClick={node => selectNodeId(node.id)}
-                            enablePanInteraction={false}
-                            enableZoomInteraction={false}
-                            onEngineTick={() => {
-                                graphRef.current?.zoomToFit();
-                            }}
-                            graphData={clonedGraphData}
-                            ref={graphRef}
-                            height={height}
-                            width={availableWidth}
-                            nodeCanvasObjectMode={() => "after"}
-                            nodeColor={nodeColor}
-                            nodeRelSize={nodeRadius}
-                            nodeCanvasObject={(node, ctx, globalScale) => {
-                                fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
-                                ctx.beginPath();
-                                ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
-                                ctx.closePath();
-                                ctx.strokeStyle = 'hsl(0 0 20)';
-                                ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
-                                ctx.stroke();
-                            }}
-                            /*
-                            linkCanvasObjectMode={() => "after"}
-                            linkCanvasObject={(link,ctx,globalScale) => {
-                                ctx.save();
-                                const fontSize = 12 / globalScale;
-                                ctx.font = `${fontSize}px Sans-Serif`;
-                                ctx.textAlign = 'center';
-                                const label = link.type;
-                                const metrics = ctx.measureText(label);
-                                const h = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
-                                const target = link.target! as any;
-                                const source = link.source! as any;
-                                const phi = Math.atan((target.y - source.y)/(target.x - source.x));
-                                ctx.translate(
-                                    (target.x+source.x)/2,
-                                    (target.y+source.y)/2 + h/2);
-                                ctx.rotate(phi);
-                                ctx.fillText(label, 0,0);
-                                ctx.restore();
-                            }}
-                            */
-                            linkDirectionalArrowLength={nodeRadius / 3}
-                            linkDirectionalArrowRelPos={() => 1}
-                            cooldownTime={1000}
-                            dagLevelDistance={25}
-                            dagMode={"radialin"}
-                        />
-                    </div>
-                </CardContent>
-            </Card>
+            <Paper elevation={0}>
+                <div ref={containerRef}>
+                    <ForceGraph2D
+                        onNodeClick={node => selectNodeId(node.id)}
+                        onBackgroundClick={() => {
+                            selectNodeId('HOME');
+                        }}
+                        enablePanInteraction={false}
+                        enableZoomInteraction={false}
+                        onEngineTick={() => {
+                            graphRef.current?.zoomToFit();
+                        }}
+                        graphData={clonedGraphData}
+                        ref={graphRef}
+                        height={height}
+                        width={availableWidth}
+                        nodeCanvasObjectMode={() => "after"}
+                        nodeColor={nodeColor}
+                        nodeRelSize={nodeRadius}
+                        nodeCanvasObject={(node, ctx, globalScale) => {
+                            fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                            ctx.beginPath();
+                            ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
+                            ctx.closePath();
+                            ctx.strokeStyle = 'hsl(0 0 20)';
+                            ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
+                            ctx.stroke();
+                        }}
+                        /*
+                        linkCanvasObjectMode={() => "after"}
+                        linkCanvasObject={(link,ctx,globalScale) => {
+                            ctx.save();
+                            const fontSize = 12 / globalScale;
+                            ctx.font = `${fontSize}px Sans-Serif`;
+                            ctx.textAlign = 'center';
+                            const label = link.type;
+                            const metrics = ctx.measureText(label);
+                            const h = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
+                            const target = link.target! as any;
+                            const source = link.source! as any;
+                            const phi = Math.atan((target.y - source.y)/(target.x - source.x));
+                            ctx.translate(
+                                (target.x+source.x)/2,
+                                (target.y+source.y)/2 + h/2);
+                            ctx.rotate(phi);
+                            ctx.fillText(label, 0,0);
+                            ctx.restore();
+                        }}
+                        */
+                        linkDirectionalArrowLength={nodeRadius / 3}
+                        linkDirectionalArrowRelPos={() => 1}
+                        cooldownTime={1000}
+                        dagLevelDistance={25}
+                        dagMode={"radialin"}
+                    />
+                </div>
+            </Paper>
         </div>
     );
 }

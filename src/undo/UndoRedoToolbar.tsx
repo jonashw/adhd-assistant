@@ -14,7 +14,7 @@ export function UndoRedoToolbar<T>({ controller }: { controller: UndoController<
             () => boolean,
             () => void
         ][]).map(([a,b,canDo,doIt]) => 
-            <Button disabled={!canDo()} onClick={doIt} variant="contained">
+            <Button disabled={!canDo()} onClick={doIt} variant="contained" color="info">
                 {typeof a === 'string' 
                     ? <Hidden smDown>{a}{space}</Hidden> 
                     : <>{a}</>

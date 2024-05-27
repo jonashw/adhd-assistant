@@ -66,6 +66,22 @@ export type PathSegment = {
 };
 
 export const MindMap = {
+    rabbitHole: (graph:MindMapGraphData, origin: string, label: string) => {
+        const newNode: MindMapGraphNode = {
+            id: crypto.randomUUID(),
+            label,
+            type: 'RabbitHole'
+        };
+        const updatedValue: MindMapGraphData = {
+            nodes: [...graph.nodes, newNode],
+            links: [...graph.links, {
+                source: newNode.id,
+                target: origin,
+                type: 'RETURNS_TO'
+            }]
+        };
+        return [updatedValue,newNode] as [MindMapGraphData,MindMapGraphNode];
+    },
     shortestPathBetween: (graph: MindMapGraphData, source: string, target: string): PathSegment[] => {
         const adjacencyList: {[sourceId: string]: {[targetId: string]: number}} = 
             groupBy(graph.links, l => l.source)
