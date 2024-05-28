@@ -1,12 +1,14 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useContainerWidth } from "./useContainerWidth";
-import { AppBar, Breadcrumbs, Button, Card, CardContent, Paper, Stack, Toolbar} from "@mui/material";
+import { AppBar, Breadcrumbs, Button, Paper, Stack, Toolbar} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
-import { useContainerHeight } from "./useContainerWidth";
+//import { useContainerHeight } from "./useContainerWidth";
+
+import {loadImgElement} from "./loadImgElement";
 
 type GraphRefType = 
     ForceGraphMethods<
@@ -35,6 +37,13 @@ export default function MindMapGraph({
     const clonedGraphData = React.useMemo(
         () => MindMap.clone(value),
         [value]);
+    const [homeImg,setHomeImg] = React.useState<HTMLImageElement>();
+
+    React.useEffect(() => {
+        //fetch('/enso-circle.jpg').then(r => r.blob())
+        loadImgElement('/yin-yang.png').then(setHomeImg);
+        //loadImgElement('/enso-circle.jpg').then(setHomeImg);
+    },[]);
 
     React.useEffect(() => {
         if(!value || !selectedNodeId){
@@ -61,18 +70,16 @@ export default function MindMapGraph({
     const nodeRadius = 15;
 
     const nodeForegroundColor = (node: MindMapGraphNode): string =>
-        node.id === selectedNodeId
-        ? 'white'
-        : node.type === 'HOME'
-            ? 'black'
-            : 'white';
+        node.type === 'HOME'
+        ? 'black'
+        : 'white';
 
     const nodeColor = (node:MindMapGraphNode) =>
-        node.id === selectedNodeId
+        node.type === 'HOME'
+        ? 'white'
+        : node.id === selectedNodeId
         ? 'hsl(220 75 50)'
-        : node.type === 'HOME'
-            ? 'white'
-            : 'hsl(0 0 30)';
+        : 'hsl(0 0 30)';
 
     return (
         <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
@@ -142,7 +149,7 @@ export default function MindMapGraph({
             )}
             <Paper elevation={0}>
                 <div ref={containerRef}>
-                    <ForceGraph2D
+                    {homeImg && <ForceGraph2D
                         onNodeClick={node => selectNodeId(node.id)}
                         onBackgroundClick={() => {
                             selectNodeId('HOME');
@@ -160,7 +167,21 @@ export default function MindMapGraph({
                         nodeColor={nodeColor}
                         nodeRelSize={nodeRadius}
                         nodeCanvasObject={(node, ctx, globalScale) => {
-                            fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                            if(node.id === 'HOME'){
+                                //
+                                ctx.save();
+                                ctx.translate(-nodeRadius/2,-nodeRadius/2);
+                                ctx.globalCompositeOperation = "darken";
+                                ctx.drawImage(
+                                    homeImg,
+                                    0,0,
+                                    homeImg.width, homeImg.height,
+                                    0,0,
+                                    nodeRadius, nodeRadius);
+                                ctx.restore();
+                            } else {
+                                fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                            }
                             ctx.beginPath();
                             ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                             ctx.closePath();
@@ -194,7 +215,7 @@ export default function MindMapGraph({
                         cooldownTime={1000}
                         dagLevelDistance={25}
                         dagMode={"radialin"}
-                    />
+                    />}
                 </div>
             </Paper>
         </div>

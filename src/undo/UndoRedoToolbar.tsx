@@ -13,8 +13,8 @@ export function UndoRedoToolbar<T>({ controller }: { controller: UndoController<
             React.JSX.Element|string,
             () => boolean,
             () => void
-        ][]).map(([a,b,canDo,doIt]) => 
-            <Button disabled={!canDo()} onClick={doIt} variant="contained" color="info">
+        ][]).map(([a,b,canDo,doIt],i) => 
+            <Button disabled={!canDo()} onClick={doIt} variant="contained" color="info" key={i}>
                 {typeof a === 'string' 
                     ? <Hidden smDown>{a}{space}</Hidden> 
                     : <>{a}</>
