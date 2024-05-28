@@ -1,7 +1,7 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useContainerWidth } from "./useContainerWidth";
-import { AppBar, Breadcrumbs, Button, Paper, Stack, Toolbar} from "@mui/material";
+import { AppBar, Fab, Breadcrumbs, Button, Paper, Stack, Toolbar} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
@@ -105,26 +105,7 @@ export default function MindMapGraph({
                         Remove
                     </Button>
                     : <></>}
-                    <Button
-                        variant="contained"
-                        color={"info"}
-                        disabled={!selectedNode}
-                        onClick={() => {
-                            if (!selectedNode) {
-                                return;
-                            }
-                            const nodeNum = value.nodes.length;
-                            const label = prompt('Enter a name for the new rabbit hole', `Sub-topic #${nodeNum}`);
-                            if (!label) {
-                                return;
-                            }
-                            const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
-                            setGraph(updatedValue);
-                            selectNodeId(newNode.id);
-                        }}
-                    >
-                        Deeper
-                    </Button>
+                    
                 </Toolbar>
             </AppBar>
             
@@ -220,7 +201,27 @@ export default function MindMapGraph({
                         dagLevelDistance={25}
                         dagMode={"radialin"}
                     />}
-                </div>
+                    <Fab
+                        sx={{position:'fixed', right:'1em', bottom:'1em'}}
+                        variant="extended"
+                        color={"info"}
+                        disabled={!selectedNode}
+                        onClick={() => {
+                            if (!selectedNode) {
+                                return;
+                            }
+                            const nodeNum = value.nodes.length;
+                            const label = prompt('Enter a name for the new rabbit hole', `Sub-topic #${nodeNum}`);
+                            if (!label) {
+                                return;
+                            }
+                            const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
+                            setGraph(updatedValue);
+                            selectNodeId(newNode.id);
+                        }}
+                    >
+                        Deeper
+                    </Fab>               </div>
             </Paper>
         </div>
     );
