@@ -5,6 +5,8 @@ type Graph = { [source: string]: GraphAdjacency };
 type PathSegment = {node: string; distance: Distance};
 
 export function dijkstra(graph: Graph, start: string) {
+    //origin: https://patrickkarsh.medium.com/dijkstras-shortest-path-algorithm-in-javascript-1621556a3a15
+    //inspiration to retain node paths: https://stackoverflow.com/a/47615620/943730
     const nodes = Object.keys(graph);
     const distances: {[key:string]: number} = {};
     const shortestPathByTarget: {[key:string]: PathSegment[]} = {};
