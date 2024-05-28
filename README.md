@@ -47,3 +47,10 @@ Sometimes (often?), it's fun to give your mind a bit more slack.  Letting it fly
 Why?
 
 Like the physical forces of buoyancy and gravity,  my mind's thoughtful forces are constant.  I enjoy many thoughts throughout my days; so many that I tend to (have to?) forget them after a time. It would be nice to have a record of my thoughts so that I could retrieve the more valuable/viable ones.  A major plus would be to use this tool for note-taking with the goal of providing written communication to coworkers.  I could express ideas in a fashion that suits me, then project the data from that model into standard English for the neurotypicals in my life.
+
+## Get started with development
+
+1. `npm run install`
+1. `choco install mkcert`
+1. `npm run mkcert`
+1. `npm run dev`

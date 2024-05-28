@@ -10,26 +10,17 @@ import {
 import useSpeechRecognition from "./useSpeechRecognition";
 
 export default function SpechRecognizer() {
-  const colors = [
-    "aqua",
-    "azure",
-    "beige",
-    "bisque",
-    "black",
-    "blue",
-    "brown",
-    "chocolate",
-    "coral" /* … */,
-  ];
-  const grammar = `#JSGF V1.0; grammar colors; public <color> = ${colors.join(
-    " | "
-  )};`;
+  const grammar = `
+#JSGF V1.0;
+grammar numbers;
+public <drinks> = coffee | tea | milk;`.trim();
   const { listening, listen, recognitionResults, eventLog } =
     useSpeechRecognition({
       grammar,
       maxAlternatives: 3,
       continuous: false,
       actions: {
+        'tea': () => alert('tea'),
         hello: () => console.log("hello"),
       },
     });

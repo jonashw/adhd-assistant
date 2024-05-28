@@ -52,9 +52,9 @@ export default ({
       "speechstart",
       "speechend",
     ]) {
-      recognition.addEventListener(eventType, () => {
+      recognition.addEventListener(eventType, (e) => {
         setEventLog((eventLog) => [...eventLog, eventType]);
-        console.log(eventType);
+        console.log(eventType,e);
       });
     }
     recognition.onresult = (e: SpeechRecognitionEvent) => {
