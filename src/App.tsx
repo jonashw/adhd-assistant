@@ -5,8 +5,19 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import MindMapGraph from "./MindMapGraph";
 import React from "react";
 import { MindMapGraphData } from "./MindMap";
+import { useCircularArray } from "./useCircularArray";
+import { loadImgElement } from "./loadImgElement";
 
 export default function App() {
+  const [images,setImages] = React.useState<HTMLImageElement[]>();
+  const homeImages = useCircularArray(images ?? []);
+
+  React.useEffect(() => {
+    Promise
+    .all(['enso-circle.jpg','om.png','buddha.png','yin-yang.png'].map(loadImgElement))
+    .then(setImages);
+  }, []);
+
   const [graph,setGraph] = React.useState<MindMapGraphData>({
     nodes:[
       {id: 'HOME',label:'MINDFUL',type:'HOME'},
@@ -25,7 +36,9 @@ export default function App() {
     <ThemeProvider theme={defaultTheme}>
       <CssBaseline />
       <main>
-        <MindMapGraph value={graph} height={window.innerHeight} onChange={setGraph}/>
+        {homeImages && 
+          <MindMapGraph homeImages={homeImages} value={graph} height={window.innerHeight} onChange={setGraph}/>
+        }
       </main>
     </ThemeProvider>
   );

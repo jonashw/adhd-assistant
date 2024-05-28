@@ -6,9 +6,8 @@ import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
+import { CircularArray } from "./useCircularArray";
 //import { useContainerHeight } from "./useContainerWidth";
-
-import {loadImgElement} from "./loadImgElement";
 
 type GraphRefType = 
     ForceGraphMethods<
@@ -18,11 +17,13 @@ type GraphRefType =
 export default function MindMapGraph({
     value,
     height,
-    onChange
+    onChange,
+    homeImages
 }:{
     value:MindMapGraphData,
     height?: number,
-    onChange: (value: MindMapGraphData) => void
+    onChange: (value: MindMapGraphData) => void,
+    homeImages: CircularArray<HTMLImageElement>
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const {availableWidth,containerRef} = useContainerWidth()
@@ -37,13 +38,6 @@ export default function MindMapGraph({
     const clonedGraphData = React.useMemo(
         () => MindMap.clone(value),
         [value]);
-    const [homeImg,setHomeImg] = React.useState<HTMLImageElement>();
-
-    React.useEffect(() => {
-        //fetch('/enso-circle.jpg').then(r => r.blob())
-        loadImgElement('/yin-yang.png').then(setHomeImg);
-        //loadImgElement('/enso-circle.jpg').then(setHomeImg);
-    },[]);
 
     React.useEffect(() => {
         if(!value || !selectedNodeId){
@@ -149,8 +143,14 @@ export default function MindMapGraph({
             )}
             <Paper elevation={0}>
                 <div ref={containerRef}>
-                    {homeImg && <ForceGraph2D
-                        onNodeClick={node => selectNodeId(node.id)}
+                    {homeImages.currentItem && <ForceGraph2D
+                        onNodeClick={node => {
+                            if(selectedNodeId === 'HOME' && node.id === 'HOME'){
+                                homeImages.next();
+                            } else {
+                                selectNodeId(node.id);
+                            }
+                        }}
                         onBackgroundClick={() => {
                             selectNodeId('HOME');
                         }}
@@ -170,24 +170,28 @@ export default function MindMapGraph({
                             if(node.id === 'HOME'){
                                 //
                                 ctx.save();
-                                ctx.translate(-nodeRadius/2,-nodeRadius/2);
+                                const side = nodeRadius * 1.9;
+                                ctx.translate(node.x! - side/2, node.y! - side/2);
                                 ctx.globalCompositeOperation = "darken";
-                                ctx.drawImage(
-                                    homeImg,
-                                    0,0,
-                                    homeImg.width, homeImg.height,
-                                    0,0,
-                                    nodeRadius, nodeRadius);
+                                const homeImg = homeImages.currentItem;
+                                if(homeImg){
+                                    ctx.drawImage(
+                                        homeImg,
+                                        0,0,
+                                        homeImg.width, homeImg.height,
+                                        0,0,
+                                        side, side);
+                                }
                                 ctx.restore();
                             } else {
                                 fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                                ctx.beginPath();
+                                ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
+                                ctx.closePath();
+                                ctx.strokeStyle = 'hsl(0 0 20)';
+                                ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
+                                ctx.stroke();
                             }
-                            ctx.beginPath();
-                            ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
-                            ctx.closePath();
-                            ctx.strokeStyle = 'hsl(0 0 20)';
-                            ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
-                            ctx.stroke();
                         }}
                         /*
                         linkCanvasObjectMode={() => "after"}
