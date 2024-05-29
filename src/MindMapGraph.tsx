@@ -7,8 +7,8 @@ import { useUndo } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
 import { CircularArray } from "./useCircularArray";
-//import { useContainerHeight } from "./useContainerWidth";
-
+import { useSpeechRecognition } from "./useSpeechRecognition";
+import { ListenFab } from "./ListenFab";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -38,6 +38,51 @@ export default function MindMapGraph({
     const clonedGraphData = React.useMemo(
         () => MindMap.clone(value),
         [value]);
+
+    const onSpeech = React.useCallback((result: string) => {
+        if(result === "remove"){
+            if(selectedNode){
+                if(selectedNode.id === "HOME"){
+                    alert('sorry, you may not remove HOME');
+                } else {
+                    setGraph(MindMap.remove(value, selectedNode));
+                    selectNodeId("HOME");
+                }
+            } else {
+                alert ('no node selected');
+            }
+        }
+        if(result === "undo"){
+            undoController.undo();
+        }
+        if(result === "redo"){
+            undoController.redo();
+        }
+        if(result.indexOf('deeper') === 0){
+            const label = result.replace(/^deeper/,'').trim();
+            if(label.length === 0){
+                alert('label not long enough');
+                return;
+            }
+            const [updatedValue, newNode] = MindMap.rabbitHole(graph, selectedNodeId, label);
+            setGraph(updatedValue);
+            selectNodeId(newNode.id);
+        }
+    }, [ graph, selectedNode]);
+
+    const { listeningStatus,  startListening, stopListening, transcript} =
+        useSpeechRecognition({
+            onRecognize: onSpeech,
+            interimResults: false,
+            maxAlternatives: 1,
+            continuous: true
+        });
+
+    React.useEffect(() => {
+        if(!transcript){
+            return;
+        }
+    },[transcript]);
 
     React.useEffect(() => {
         if(!value || !selectedNodeId){
@@ -126,7 +171,7 @@ export default function MindMapGraph({
                 <div ref={containerRef}>
                     {homeImages.currentItem && <ForceGraph2D
                         onNodeClick={node => {
-                            if(selectedNodeId === 'HOME' && node.id === 'HOME'){
+                            if (selectedNodeId === 'HOME' && node.id === 'HOME') {
                                 homeImages.next();
                             } else {
                                 selectNodeId(node.id);
@@ -148,19 +193,19 @@ export default function MindMapGraph({
                         nodeColor={nodeColor}
                         nodeRelSize={nodeRadius}
                         nodeCanvasObject={(node, ctx, globalScale) => {
-                            if(node.id === 'HOME'){
+                            if (node.id === 'HOME') {
                                 //
                                 ctx.save();
                                 const side = nodeRadius * 1.9;
-                                ctx.translate(node.x! - side/2, node.y! - side/2);
+                                ctx.translate(node.x! - side / 2, node.y! - side / 2);
                                 ctx.globalCompositeOperation = "darken";
                                 const homeImg = homeImages.currentItem;
-                                if(homeImg){
+                                if (homeImg) {
                                     ctx.drawImage(
                                         homeImg,
-                                        0,0,
+                                        0, 0,
                                         homeImg.width, homeImg.height,
-                                        0,0,
+                                        0, 0,
                                         side, side);
                                 }
                                 ctx.restore();
@@ -201,27 +246,34 @@ export default function MindMapGraph({
                         dagLevelDistance={25}
                         dagMode={"radialin"}
                     />}
-                    <Fab
-                        sx={{position:'fixed', right:'1em', bottom:'1em'}}
-                        variant="extended"
-                        color={"info"}
-                        disabled={!selectedNode}
-                        onClick={() => {
-                            if (!selectedNode) {
-                                return;
-                            }
-                            const nodeNum = value.nodes.length;
-                            const label = prompt('Enter a name for the new rabbit hole', `Sub-topic #${nodeNum}`);
-                            if (!label) {
-                                return;
-                            }
-                            const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
-                            setGraph(updatedValue);
-                            selectNodeId(newNode.id);
-                        }}
+                    <Stack direction={"row-reverse"} gap={2} alignItems={"center"}
+
+                            sx={{ position: 'fixed', right: '1em', bottom: '1em'}}
                     >
-                        Deeper
-                    </Fab>               </div>
+                        <Fab
+                            variant="extended"
+                            color={"info"}
+                            disabled={!selectedNode}
+                            onClick={() => {
+                                if (!selectedNode) {
+                                    return;
+                                }
+                                const nodeNum = value.nodes.length;
+                                const label = prompt('Enter a name for the new rabbit hole', `Sub-topic #${nodeNum}`);
+                                if (!label) {
+                                    return;
+                                }
+                                const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
+                                setGraph(updatedValue);
+                                selectNodeId(newNode.id);
+                            }}
+                        >
+                            Deeper
+                        </Fab>
+
+                        <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />
+                    </Stack>
+                </div>
             </Paper>
         </div>
     );

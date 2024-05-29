@@ -1,99 +1,106 @@
 import React from "react";
 
-type ActionParams = { stop: () => void };
+export type ListeningStatus = "off"|"loading"|"listening";
 
-export default ({
-  grammar,
-  maxAlternatives,
-  continuous,
-  interimResults,
-  actions,
+export function useSpeechRecognition({
+    continuous,
+    interimResults,
+    lang,
+    onRecognize,
+    maxAlternatives
 }: {
-  grammar: string;
-  maxAlternatives?: number;
-  continuous?: boolean;
-  interimResults?: boolean;
-  actions: { [phrase: string]: (p: ActionParams) => void };
-}) => {
-  const [eventLog, setEventLog] = React.useState<string[]>([]);
-  const [listening, setListening] = React.useState(false);
-  const [recognition, setRecognition] = React.useState<
-    SpeechRecognition | undefined
-  >();
-  const [recognitionResults, setRecognitionResults] = React.useState<
-    SpeechRecognitionResult[]
-  >([]);
-  React.useEffect(() => {
-    const SR =
-      (<any>window).SpeechRecognition || (<any>window).webkitSpeechRecognition;
-    const SGL =
-      (<any>window).SpeechGrammarList || (<any>window).webkitSpeechGrammarList;
-    //const SGE = (<any>window).SpeechRecognitionEvent || (<any>window).webkitSpeechRecognitionEvent;
+    continuous?: boolean,
+    interimResults?: boolean,
+    lang?: string,
+    onRecognize?: (result: string) => void,
+    maxAlternatives?: number
+}){
+    const [listeningStatus,setListeningStatus] = React.useState<ListeningStatus>("off");
+    const [recognition,setRecognition] = React.useState<SpeechRecognition>();
+    const [transcript,setTranscript] = React.useState<string>();
 
-    const recognition: SpeechRecognition = new SR();
-    const speechRecognitionList: SpeechGrammarList = new SGL();
-    speechRecognitionList.addFromString(grammar, 1);
-    recognition.grammars = speechRecognitionList;
-    recognition.continuous = continuous ?? false;
-    recognition.lang = "en-US";
-    recognition.interimResults = interimResults ?? false;
-    recognition.maxAlternatives = maxAlternatives ?? 1;
+    React.useEffect(() => {
+        console.log('prop change: ', 'onRecognize')
+    },[onRecognize]);
 
-    for (const eventType of [
-      "error",
-      "end",
-      "audiostart",
-      "audioend",
-      "nomatch",
-      "result",
-      "soundstart",
-      "soundend",
-      "start",
-      "speechstart",
-      "speechend",
-    ]) {
-      recognition.addEventListener(eventType, (e) => {
-        setEventLog((eventLog) => [...eventLog, eventType]);
-        console.log(eventType,e);
-      });
-    }
-    recognition.onresult = (e: SpeechRecognitionEvent) => {
-      let results = Array.from(e.results);
-      setRecognitionResults(results);
-      let transcripts = results.map((result) => result[0].transcript);
-      console.log({ results: e.results });
-      console.log(transcripts.join(", "));
+    React.useEffect(() => {
+        console.log('INIT');
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = lang ?? "en-US";
+        recognition.continuous = continuous ?? false;
+        recognition.interimResults = interimResults ?? false;
+        if(maxAlternatives){
+            recognition.maxAlternatives = maxAlternatives;
+        }
+        recognition.onstart = () => {
+            console.log('start');
+            setListeningStatus('loading');
+        }
+        recognition.onaudiostart = () => {
+            console.log('audio start');
+            setListeningStatus('listening');
+        }
+        recognition.onaudioend = () => {
+            setListeningStatus('off');
+            console.log('audio end');
+        }
+        recognition.onspeechstart = () => {
+            console.log('speech start');
+        }
+        recognition.onspeechend = () => {
+            console.log('speech end');
+        }
+        recognition.onresult = (e) => {
+            console.log(e.results);
+            const result = e.results[e.results.length-1][0].transcript?.trim();
+            console.log(`on result: "${result}"`);
+            setTranscript(result);
+            if(onRecognize){
+                onRecognize(result);
+            }
+        }
+        recognition.onerror = e => {
+            console.error("Speech recognition error:", e.error);
+        }
 
-      let latestTranscript = transcripts[transcripts.length - 1].trim();
-      if (latestTranscript in actions) {
-        console.log(`executing action: ${latestTranscript}`);
-        actions[latestTranscript]({ stop: recognition.stop });
-      }
+        setRecognition(recognition);
+
+        return function cleanup(){
+            console.info('CLEANUP');
+            recognition.stop();
+            setListeningStatus('off');
+            recognition.onaudiostart = null;
+            recognition.onsoundstart = null;
+            recognition.onspeechstart = null;
+            recognition.onresult = null;
+            recognition.onspeechend = null;
+            recognition.onsoundend = null;
+            recognition.onaudioend = null;
+            recognition.onerror = null;
+        }
+    },[continuous, interimResults, lang, maxAlternatives, onRecognize]);
+
+    const startListening = () => {
+        if(listeningStatus !== "off" || !recognition){
+            return;
+        }
+        console.log('cannot start speech recognition yet');
+        recognition.start();
     };
 
-    recognition.onstart = () => {
-      setListening(true);
-      setRecognitionResults([]);
-      setEventLog([]);
+    const stopListening = () => {
+        if(listeningStatus !== 'listening' || !recognition){
+            return;
+        }
+        console.log('cannot stop speech recognition yet');
+        recognition.stop();
     };
 
-    recognition.onend = () => {
-      setListening(false);
+    return {
+        listeningStatus,
+        transcript,
+        startListening,
+        stopListening
     };
-
-    setRecognition(recognition);
-  }, [grammar]);
-  return {
-    recognitionResults,
-    listening,
-    eventLog,
-    listen: () => {
-      if (!recognition) {
-        console.log("recognition NOT started");
-        return;
-      }
-      recognition.start();
-      console.log("recognition started");
-    },
-  };
-};
+}

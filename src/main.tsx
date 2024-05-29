@@ -2,7 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from "./App"
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
-import SpeechRecognizer from './SpeechRecognizer';
+import { SpeechRecognitionDemo } from './SpeechRecognitionDemo';
 
 const router = createBrowserRouter([
   {
@@ -11,7 +11,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/recognize",
-    element: <SpeechRecognizer />
+    element: <SpeechRecognitionDemo />
   },
 ]);
 
