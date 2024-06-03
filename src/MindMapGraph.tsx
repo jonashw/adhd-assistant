@@ -130,11 +130,8 @@ export default function MindMapGraph({
 
                     {selectedNode 
                     ? selectedNode.id === "HOME"
-                    ? <div>
-
-                    </div>
-                    :
-                    <Button
+                    ? <div> </div>
+                    : <Button
                         variant="contained"
                         color="error"
                         disabled={!selectedNode}
@@ -219,7 +216,6 @@ export default function MindMapGraph({
                                 ctx.stroke();
                             }
                         }}
-                        /*
                         linkCanvasObjectMode={() => "after"}
                         linkCanvasObject={(link,ctx,globalScale) => {
                             ctx.save();
@@ -235,16 +231,22 @@ export default function MindMapGraph({
                             ctx.translate(
                                 (target.x+source.x)/2,
                                 (target.y+source.y)/2 + h/2);
-                            ctx.rotate(phi);
+                            const textThresholdAngle = (0/4) * Math.PI;
+                            let textRotationAngle = phi + (phi < textThresholdAngle ? -1 : 1) * Math.PI/2;
+                            if(textRotationAngle <= Math.PI){
+                                //console.log('<90',label);
+                                textRotationAngle -= Math.PI;
+                            }
+                            ctx.rotate(textRotationAngle);
                             ctx.fillText(label, 0,0);
                             ctx.restore();
                         }}
-                        */
                         linkDirectionalArrowLength={nodeRadius / 3}
                         linkDirectionalArrowRelPos={() => 1}
+                        linkWidth={5}
                         cooldownTime={1000}
                         dagLevelDistance={25}
-                        dagMode={"radialin"}
+                        dagMode={"td"}
                     />}
                     <Stack direction={"row-reverse"} gap={2} alignItems={"center"}
 
