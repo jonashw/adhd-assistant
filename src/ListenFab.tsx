@@ -4,18 +4,26 @@ import { ListeningStatus } from "./useSpeechRecognition";
 
 //import { useContainerHeight } from "./useContainerWidth";
 export function ListenFab({
-    status, start, stop
+    status, start, stop, fill
 }: {
     status: ListeningStatus;
     start: () => void;
     stop: () => void;
+    fill?: boolean;
 }) {
+    const active = status === "listening" || status === "recognizing"; 
     return <Fab
+        sx={ fill ? {width:'100%'} : {}}
         variant={"extended"}
-        color={status === "listening" ? "error" : "default"}
-        onClick={status === "listening" ? stop : start}
+        color={active ? "error" : "default"}
+        onClick={active ? stop : start}
         disabled={status === "loading"}
     >
-        {status !== "listening" && <Mic sx={{ mr: 1 }} />} {status === 'listening' ? 'Stop' : 'Listen'}
+        <Mic sx={{ mr: 1 }} />
+        {status === 'listening' 
+        ? 'Stop' 
+        : status === 'recognizing'
+        ? '...'
+        : 'Listen'}
     </Fab>;
 }

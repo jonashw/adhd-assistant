@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSpeechRecognition } from './useSpeechRecognition';
+import { Transcript, useSpeechRecognition } from './useSpeechRecognition';
 import { ListenFab } from './ListenFab';
 import { Stack, TextField } from '@mui/material';
 
@@ -7,7 +7,11 @@ import { Stack, TextField } from '@mui/material';
 export function SpeechRecognitionDemo() {
   const [text, setText] = React.useState("");
 
-  const onSpeech = React.useCallback((result: string) => {
+  const onSpeech = React.useCallback((transcript: Transcript) => {
+    if(!transcript.isFinal){
+      return;
+    }
+    const result = transcript.value;
     if (result.indexOf('alert') === 0) {
       const label = result.replace(/^alert/, '').trim();
       if (label.length === 0) {
