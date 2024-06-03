@@ -7,7 +7,7 @@ import React from "react";
 import { MindMapGraphData } from "./MindMap";
 import { useCircularArray } from "./useCircularArray";
 import { loadImgElement } from "./loadImgElement";
-import TextParser from "./TextParser";
+//import TextParser from "./TextParser";
 
 export default function App() {
   const [images,setImages] = React.useState<HTMLImageElement[]>();
@@ -15,7 +15,7 @@ export default function App() {
 
   React.useEffect(() => {
     Promise
-    .all(['enso-circle.jpg','om.png','buddha.png','yin-yang.png'].map(loadImgElement))
+    .all(['null.png','enso-circle.jpg','om.png','buddha.png','yin-yang.png'].map(loadImgElement))
     .then(setImages);
   }, []);
 
@@ -32,9 +32,9 @@ export default function App() {
       {source:'3',target:'HOME',type:'RETURNS_TO'}
     ]
   };
-  const parsedGraph = TextParser.parse("UI (React) -GET/POST-> Server API (C#; Azure Function App) -SELECT/INSERT-> SQL Server Database");
+  //const parsedGraph = TextParser.parse("UI (React) -GET/POST-> Server API (C#; Azure Function App) -SELECT/INSERT-> SQL Server Database");
   const defaultGraphData = sampleGraph;
-  console.log({parsedGraph,sampleGraph,defaultGraphData});
+  //console.log({parsedGraph,sampleGraph,defaultGraphData});
   const [graph,setGraph] = React.useState<MindMapGraphData>(defaultGraphData);
   const defaultTheme = createTheme();
   return (
