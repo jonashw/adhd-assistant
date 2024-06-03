@@ -7,6 +7,7 @@ import React from "react";
 import { MindMapGraphData } from "./MindMap";
 import { useCircularArray } from "./useCircularArray";
 import { loadImgElement } from "./loadImgElement";
+import TextParser from "./TextParser";
 
 export default function App() {
   const [images,setImages] = React.useState<HTMLImageElement[]>();
@@ -18,7 +19,7 @@ export default function App() {
     .then(setImages);
   }, []);
 
-  const [graph,setGraph] = React.useState<MindMapGraphData>({
+  const sampleGraph: MindMapGraphData = {
     nodes:[
       {id: 'HOME',label:'MINDFUL',type:'HOME'},
       {id: '1',label:'Subtopic #1',type:'RabbitHole'},
@@ -30,7 +31,11 @@ export default function App() {
       {source:'2',target:'HOME',type:'RETURNS_TO'},
       {source:'3',target:'HOME',type:'RETURNS_TO'}
     ]
-  });
+  };
+  const parsedGraph = TextParser.parse("UI (React) -GET/POST-> Server API (C#; Azure Function App) -SELECT/INSERT-> SQL Server Database");
+  const defaultGraphData = sampleGraph;
+  console.log({parsedGraph,sampleGraph,defaultGraphData});
+  const [graph,setGraph] = React.useState<MindMapGraphData>(defaultGraphData);
   const defaultTheme = createTheme();
   return (
     <ThemeProvider theme={defaultTheme}>

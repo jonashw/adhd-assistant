@@ -53,11 +53,24 @@ export type DirectedGraphData<TNode, TLink> = {
 export type DirectedGraphNode<T> = {id:string} & T;
 export type DirectedGraphLink<T> = {source:string, target: string} & T;
 
+export type MindMapNodeType = 'HOME' | 'RabbitHole';
+
 export type MindMapGraphData = 
   DirectedGraphData<
     MindMapGraphNode,
     MindMapGraphLink>;
-export type MindMapGraphNode = {label: string, id: string, type: 'HOME' | 'RabbitHole'};
+
+export type MindMapGraphType = {
+    nodeType: MindMapGraphNode,
+    linkType: MindMapGraphLink
+}
+
+export type MindMapGraphNode = {
+    label: string,
+    id: string,
+    type: 'HOME' | 'RabbitHole'
+}
+
 export type MindMapGraphLink = {type: MindMapGraphLinkType};
 export type MindMapGraphLinkType = 'RETURNS_TO';
 export type PathSegment = {
