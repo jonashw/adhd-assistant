@@ -34,7 +34,7 @@ export default function MindMapGraph({
     const [graph,setGraph,undoController] = useUndo(value);
     React.useEffect(() => onChange(graph),[graph, onChange]);
     const graphRef = React.useRef<GraphRefType>();
-    const [selectedNodeId, selectNodeId] = React.useState<string>("HOME");
+    const [selectedNodeId, selectNodeId] = React.useState<string | undefined>("HOME");
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
     const selectedNode = React.useMemo(
         () => value.nodes.find(n => n.id === selectedNodeId),
@@ -102,6 +102,10 @@ export default function MindMapGraph({
         }
         if(result.value.indexOf('deeper') === 0){
             const label = result.value.replace(/^deeper/,'').trim();
+            if(!selectedNodeId){
+                alert('cannot go deeper without a selected node');
+                return;
+            }
             if(label.length === 0){
                 alert('label not long enough');
                 return;
@@ -173,6 +177,7 @@ export default function MindMapGraph({
                 selectNodeId={selectNodeId}
                 selectedNode={selectedNode}
                 undoController={undoController}
+                homeImages={homeImages}
             />
             
             {pathHome && pathHome.length > 1 && (
@@ -212,7 +217,7 @@ export default function MindMapGraph({
                                         break;
                                     }
                                     case "re-parent": {
-                                        if(!selectNodeId){
+                                        if(!selectedNodeId){
                                             alert('cannot perform re-parenting without a selected node');
                                         } else {
                                             setGraph(MindMap.reparent(graph,selectedNodeId,node.id));
@@ -228,7 +233,7 @@ export default function MindMapGraph({
                             }
                         }}
                         onBackgroundClick={() => {
-                            selectNodeId('HOME');
+                            selectNodeId(undefined);
                         }}
                         enablePanInteraction={false}
                         enableZoomInteraction={false}
