@@ -15,7 +15,7 @@ export default function App() {
 
   React.useEffect(() => {
     Promise
-    .all(['null.png','enso-circle.jpg','om.png','buddha.png','yin-yang.png'].map(loadImgElement))
+    .all(['enso-circle.jpg','null.png','om.png','buddha.png','yin-yang.png'].map(loadImgElement))
     .then(setImages);
   }, []);
 

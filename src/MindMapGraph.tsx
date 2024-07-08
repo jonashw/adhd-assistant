@@ -219,7 +219,7 @@ export default function MindMapGraph({
                     {homeImages.currentItem && <ForceGraph2D
                         onNodeClick={node => {
                             if (selectedNodeId === 'HOME' && node.id === 'HOME') {
-                                homeImages.next();
+                                //homeImages.next();
                             } else {
                                 selectNodeId(node.id);
                             }
