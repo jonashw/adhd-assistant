@@ -79,6 +79,18 @@ export type PathSegment = {
 };
 
 export const MindMap = {
+    reparent: (graph:MindMapGraphData, nodeId: string, newParentNodeId: string): MindMapGraphData => {
+        const links = graph.links.map(l => 
+            l.source === nodeId && l.type === "RETURNS_TO"
+            ? {source: nodeId, target: newParentNodeId, type:l.type}
+            : l
+        );
+        const updatedValue: MindMapGraphData = {
+            nodes: [...graph.nodes],
+            links
+        };
+        return updatedValue;
+    },
     rabbitHole: (graph:MindMapGraphData, origin: string, label: string) => {
         const newNode: MindMapGraphNode = {
             id: crypto.randomUUID(),

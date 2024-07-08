@@ -3,15 +3,24 @@ import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 
+export type GraphNodeClickMode = "re-parent" | "select";
 
 export function MindMapEditorToolbar({
-    value, onChange, undoController, selectedNode, selectNodeId
+    value,
+    onChange,
+    undoController,
+    selectedNode,
+    selectNodeId,
+    nodeClickMode,
+    setNodeClickMode
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
     undoController: UndoController<MindMapGraphData>;
     selectedNode?: DirectedGraphNode<MindMapGraphNode>;
     selectNodeId: (id: string) => void;
+    nodeClickMode: GraphNodeClickMode;
+    setNodeClickMode: (value: GraphNodeClickMode) => void;
 }) {
     return (
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
@@ -23,7 +32,21 @@ export function MindMapEditorToolbar({
                 {selectedNode
                     ? selectedNode.id === "HOME"
                         ? <div> </div>
-                        : <>
+                        : nodeClickMode === "select"
+                        ? <>
+                            <Button
+                                variant="contained"
+                                color="info"
+                                disabled={!selectedNode}
+                                onClick={() => {
+                                    if (!selectedNode) {
+                                        return;
+                                    }
+                                    setNodeClickMode("re-parent");
+                                }}
+                            >
+                                Re-parent
+                            </Button>
                             <Button
                                 variant="contained"
                                 color="error"
@@ -40,6 +63,22 @@ export function MindMapEditorToolbar({
                                 Remove
                             </Button>
                         </>
+                        : nodeClickMode === "re-parent"
+                        ? <>
+                            <span>
+                                Click the node you wish to be the parent.
+                            </span>
+                            <Button 
+                                variant="contained"
+                                color="error"
+                                onClick={() => {
+                                    setNodeClickMode("select");
+                                }}
+                            >
+                                Cancel
+                            </Button>
+                        </>
+                        : <> </>
                     : <></>}
 
             </Toolbar>

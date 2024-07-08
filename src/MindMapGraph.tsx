@@ -9,7 +9,7 @@ import { CircularArray } from "./useCircularArray";
 import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
-import { MindMapEditorToolbar } from "./MindMapEditorToolbar";
+import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -27,6 +27,8 @@ export default function MindMapGraph({
     homeImages: CircularArray<HTMLImageElement>
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
+
+    const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const {availableWidth,containerRef} = useContainerWidth()
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value);
@@ -166,6 +168,8 @@ export default function MindMapGraph({
             <MindMapEditorToolbar 
                 value={value}
                 onChange={setGraph}
+                nodeClickMode={nodeClickMode}
+                setNodeClickMode={setNodeClickMode}
                 selectNodeId={selectNodeId}
                 selectedNode={selectedNode}
                 undoController={undoController}
@@ -202,7 +206,25 @@ export default function MindMapGraph({
                             if (selectedNodeId === 'HOME' && node.id === 'HOME') {
                                 //homeImages.next();
                             } else {
-                                selectNodeId(node.id);
+                                switch(nodeClickMode){
+                                    case "select": {
+                                        selectNodeId(node.id);
+                                        break;
+                                    }
+                                    case "re-parent": {
+                                        if(!selectNodeId){
+                                            alert('cannot perform re-parenting without a selected node');
+                                        } else {
+                                            setGraph(MindMap.reparent(graph,selectedNodeId,node.id));
+                                            setNodeClickMode('select');
+                                        }
+                                        break;
+                                    }
+                                    default: {
+                                        alert(`unexpected click mode: ${nodeClickMode}`)
+                                    }
+
+                                }
                             }
                         }}
                         onBackgroundClick={() => {
