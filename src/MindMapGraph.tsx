@@ -1,15 +1,15 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useContainerWidth } from "./useContainerWidth";
-import { AppBar, Fab, Breadcrumbs, Button, Paper, Stack, Toolbar} from "@mui/material";
+import { Fab, Breadcrumbs, Button, Paper, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
-import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
 import { CircularArray } from "./useCircularArray";
 import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
+import { MindMapEditorToolbar } from "./MindMapEditorToolbar";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -21,7 +21,7 @@ export default function MindMapGraph({
     onChange,
     homeImages
 }:{
-    value:MindMapGraphData,
+    value: MindMapGraphData,
     height?: number,
     onChange: (value: MindMapGraphData) => void,
     homeImages: CircularArray<HTMLImageElement>
@@ -74,6 +74,7 @@ export default function MindMapGraph({
         selectNodeId(newNode.id);
         setRabbitHoleModalVisible(false);
     }
+
 
     const onSpeech = React.useCallback((result: Transcript) => {
         if(!result.isFinal){
@@ -147,6 +148,7 @@ export default function MindMapGraph({
 
     const nodeRadius = 15;
 
+
     const nodeForegroundColor = (node: MindMapGraphNode): string =>
         node.type === 'HOME'
         ? 'black'
@@ -161,34 +163,13 @@ export default function MindMapGraph({
 
     return (
         <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
-            <AppBar position="static" sx={{px:1}} enableColorOnDark>
-                <Toolbar sx={{gap:1,p:0,justifyContent:'space-between'}}>
-                    <Stack sx={{p:0}} gap={0.85} direction="row" justifyContent="space-between">
-                        <UndoRedoToolbar controller={undoController} />
-                    </Stack>
-
-                    {selectedNode 
-                    ? selectedNode.id === "HOME"
-                    ? <div> </div>
-                    : <Button
-                        variant="contained"
-                        color="error"
-                        disabled={!selectedNode}
-                        onClick={() => {
-                            if (!selectedNode) {
-                                return;
-                            }
-
-                            selectNodeId("HOME");
-                            setGraph(MindMap.remove(value, selectedNode));
-                        }}
-                    >
-                        Remove
-                    </Button>
-                    : <></>}
-                    
-                </Toolbar>
-            </AppBar>
+            <MindMapEditorToolbar 
+                value={value}
+                onChange={setGraph}
+                selectNodeId={selectNodeId}
+                selectedNode={selectedNode}
+                undoController={undoController}
+            />
             
             {pathHome && pathHome.length > 1 && (
                 <Breadcrumbs separator="&larr;" aria-label="breadcrumb">
