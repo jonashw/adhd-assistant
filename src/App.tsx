@@ -42,7 +42,11 @@ export default function App() {
       <CssBaseline />
       <main>
         {homeImages && 
-          <MindMapGraph homeImages={homeImages} value={graph} height={window.innerHeight} onChange={setGraph}/>
+          <MindMapGraph
+            homeImages={homeImages}
+            value={graph}
+            onChange={setGraph}
+          />
         }
       </main>
     </ThemeProvider>

@@ -1,6 +1,6 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
-import { useContainerWidth } from "./useContainerWidth";
+import { useElementSize } from "./useContainerWidth";
 import { Fab, Breadcrumbs, Button, Paper, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
@@ -17,19 +17,23 @@ type GraphRefType =
 
 export default function MindMapGraph({
     value,
-    height,
     onChange,
     homeImages
 }:{
     value: MindMapGraphData,
-    height?: number,
     onChange: (value: MindMapGraphData) => void,
     homeImages: CircularArray<HTMLImageElement>
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
-
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
-    const {availableWidth,containerRef} = useContainerWidth()
+    const [headerSize,headerRef] = useElementSize();
+    const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
+
+    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
+        headerSize, breadCrumbsSize
+    ]);
+    const width = window.innerWidth;
+
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value);
     React.useEffect(() => onChange(graph),[graph, onChange]);
@@ -141,7 +145,7 @@ export default function MindMapGraph({
 
     React.useEffect(() => {
         graphRef.current?.d3ReheatSimulation();
-    },[availableWidth]);
+    },[width]);
 
     React.useEffect(() => {
         //selectNodeId(value?.nodes[0]?.id);
@@ -168,31 +172,35 @@ export default function MindMapGraph({
         : 'hsl(0 0 30)';
 
     return (
-        <div style={{display:'flex',flexDirection:'column',height:'100vh'}}>
-            <MindMapEditorToolbar 
-                value={value}
-                onChange={setGraph}
-                nodeClickMode={nodeClickMode}
-                setNodeClickMode={setNodeClickMode}
-                selectNodeId={selectNodeId}
-                selectedNode={selectedNode}
-                undoController={undoController}
-                homeImages={homeImages}
-            />
-            
-            {pathHome && pathHome.length > 1 && (
-                <Breadcrumbs separator="&larr;" aria-label="breadcrumb">
-                    {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟
-                            */}
-                    {[...pathHome].reverse().map((segment) => (
-                        <Button key={segment.node.id} variant="text" onClick={() => {
-                            selectNodeId(segment.node.id);
-                        }}>
-                            {segment.node.label}
-                        </Button>
-                    ))}
-                </Breadcrumbs>
-            )}
+        <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
+            <div ref={headerRef}>
+                <MindMapEditorToolbar 
+                    value={value}
+                    onChange={setGraph}
+                    nodeClickMode={nodeClickMode}
+                    setNodeClickMode={setNodeClickMode}
+                    selectNodeId={selectNodeId}
+                    selectedNode={selectedNode}
+                    undoController={undoController}
+                    homeImages={homeImages}
+                />
+            </div>
+
+            <div ref={breadCrumbsRef}>
+                {pathHome && pathHome.length > 1 && (
+                    <Breadcrumbs separator="&larr;" aria-label="breadcrumb">
+                        {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟 */}
+                        {[...pathHome].reverse().map((segment) => (
+                            <Button key={segment.node.id} variant="text" onClick={() => {
+                                selectNodeId(segment.node.id);
+                            }}>
+                                {segment.node.label}
+                            </Button>
+                        ))}
+                    </Breadcrumbs>
+                )}
+            </div>
+
             {rabbitHoleModalVisible && <MultiModalPrompt
                 title={"Go Down a Rabbit Hole"}
                 defaultValue={nextDefaultNodeName}
@@ -205,7 +213,7 @@ export default function MindMapGraph({
                 }}
             />}
             <Paper elevation={0}>
-                <div ref={containerRef}>
+                <div>
                     {homeImages.currentItem && <ForceGraph2D
                         onNodeClick={node => {
                             if (selectedNodeId === 'HOME' && node.id === 'HOME') {
@@ -243,7 +251,7 @@ export default function MindMapGraph({
                         graphData={clonedGraphData}
                         ref={graphRef}
                         height={height}
-                        width={availableWidth}
+                        width={width}
                         nodeCanvasObjectMode={() => "after"}
                         nodeColor={nodeColor}
                         nodeRelSize={nodeRadius}
