@@ -3,7 +3,7 @@ import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import { CircularArray } from "./useCircularArray";
-import { ArrowLeft, ArrowRight } from "@mui/icons-material";
+import { ArrowLeft, ArrowRight, Camera } from "@mui/icons-material";
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
@@ -16,17 +16,20 @@ export function MindMapEditorToolbar({
     selectNodeId,
     nodeClickMode,
     setNodeClickMode,
-    homeImages
+    homeImages,
+    onScan
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
     undoController: UndoController<MindMapGraphData>;
     selectedNode?: DirectedGraphNode<MindMapGraphNode>;
-    selectNodeId: (id: string) => void;
+    selectNodeId: (id?: string) => void;
     nodeClickMode: GraphNodeClickMode;
     setNodeClickMode: (value: GraphNodeClickMode) => void;
     homeImages: CircularArray<HTMLImageElement>;
+    onScan: () => void;
 }) {
+    const home = value.nodes.find(n => n.type === "HOME");
     return (
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
             <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
@@ -35,7 +38,7 @@ export function MindMapEditorToolbar({
                 </Stack>
 
                 {selectedNode
-                    ? selectedNode.id === "HOME"
+                    ? selectedNode.type === "HOME"
                         ? <>
                             <ButtonGroup
                                 variant="contained" 
@@ -96,8 +99,7 @@ export function MindMapEditorToolbar({
                                     if (!selectedNode) {
                                         return;
                                     }
-
-                                    selectNodeId("HOME");
+                                    selectNodeId(home?.id);
                                     onChange(MindMap.remove(value, selectedNode));
                                 }}
                             >
@@ -119,8 +121,19 @@ export function MindMapEditorToolbar({
                                 Cancel
                             </Button>
                         </>
-                        : <> </>
-                    : <></>}
+                        : <>o</>
+                    : <>
+                        <Button
+                            variant="contained"
+                            color="warning"
+                            onClick={() => {
+                                onScan();
+                                console.log('scanning');
+                            }}
+                        >
+                            <Camera/> Scan
+                        </Button>
+                    </>}
 
             </Toolbar>
         </AppBar>

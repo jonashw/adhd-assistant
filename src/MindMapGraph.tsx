@@ -10,6 +10,7 @@ import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
+import ScanningModal from "./ScanningModal";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -38,8 +39,11 @@ export default function MindMapGraph({
     const [graph,setGraph,undoController] = useUndo(value);
     React.useEffect(() => onChange(graph),[graph, onChange]);
     const graphRef = React.useRef<GraphRefType>();
-    const [selectedNodeId, selectNodeId] = React.useState<string | undefined>("HOME");
+    const home = graph.nodes.find(n => n.type === "HOME");
+    const [selectedNodeId, selectNodeId] = React.useState<string | undefined>(home?.id);
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
+    const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
+
     const selectedNode = React.useMemo(
         () => value.nodes.find(n => n.id === selectedNodeId),
         [selectedNodeId, value]);
@@ -88,11 +92,12 @@ export default function MindMapGraph({
         }
         if(result.value === "remove"){
             if(selectedNode){
-                if(selectedNode.id === "HOME"){
+                if(selectedNode.type === "HOME"){
                     alert('sorry, you may not remove HOME');
                 } else {
                     setGraph(MindMap.remove(value, selectedNode));
-                    selectNodeId("HOME");
+                    const home = value.nodes.find(n => n.type === "HOME");
+                    selectNodeId(home?.id);
                 }
             } else {
                 alert ('no node selected');
@@ -135,11 +140,11 @@ export default function MindMapGraph({
     },[transcript]);
 
     React.useEffect(() => {
-        if(!value || !selectedNodeId){
+        if(!value || !selectedNodeId || !home){
             setPathHome(undefined);
             return;
         }
-        const shortestPathHome = MindMap.shortestPathBetween(value, selectedNodeId, 'HOME');
+        const shortestPathHome = MindMap.shortestPathBetween(value, selectedNodeId, home.id);
         setPathHome(shortestPathHome);
     },[value, selectedNodeId, setPathHome]);
 
@@ -158,7 +163,6 @@ export default function MindMapGraph({
 
     const nodeRadius = 15;
 
-
     const nodeForegroundColor = (node: MindMapGraphNode): string =>
         node.type === 'HOME'
         ? 'black'
@@ -175,6 +179,7 @@ export default function MindMapGraph({
         <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
             <div ref={headerRef}>
                 <MindMapEditorToolbar 
+                    onScan={() => setScanningModalVisible(true)}
                     value={value}
                     onChange={setGraph}
                     nodeClickMode={nodeClickMode}
@@ -201,6 +206,16 @@ export default function MindMapGraph({
                 )}
             </div>
 
+            {scanningModalVisible && <ScanningModal
+                open={scanningModalVisible}
+                onClose={(value?: MindMapGraphData) => {
+                    if(value){
+                        setGraph(value);
+                    }
+                    setScanningModalVisible(false);
+                }}
+            />}
+
             {rabbitHoleModalVisible && <MultiModalPrompt
                 title={"Go Down a Rabbit Hole"}
                 defaultValue={nextDefaultNodeName}
@@ -216,7 +231,7 @@ export default function MindMapGraph({
                 <div>
                     {homeImages.currentItem && <ForceGraph2D
                         onNodeClick={node => {
-                            if (selectedNodeId === 'HOME' && node.id === 'HOME') {
+                            if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
                                 //homeImages.next();
                             } else {
                                 switch(nodeClickMode){
@@ -256,7 +271,7 @@ export default function MindMapGraph({
                         nodeColor={nodeColor}
                         nodeRelSize={nodeRadius}
                         nodeCanvasObject={(node, ctx, globalScale) => {
-                            if (node.id === 'HOME') {
+                            if (node.type === 'HOME') {
                                 //
                                 ctx.save();
                                 const side = nodeRadius * 1.9;
@@ -285,7 +300,7 @@ export default function MindMapGraph({
                                 ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                                 ctx.closePath();
                                 ctx.strokeStyle = 'hsl(0 0 20)';
-                                ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
+                                ctx.lineWidth = 1;
                                 ctx.stroke();
                             }
                         }}
