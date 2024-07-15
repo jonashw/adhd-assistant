@@ -66,7 +66,6 @@ export default function ScanningModal({
                         <input
                             type="file"
                             accept="image/*" 
-                            capture 
                             onChange={async e => {
                                 const file = e.target.files?.item(0);
                                 if(!file){
