@@ -61,8 +61,14 @@ export default function ScanningModal({
         >
             <DialogTitle>Scan a physical graph</DialogTitle>
             <DialogContent>
+                <div style={{marginBottom:'1em'}}>
+                    <Webcam onFrame={osc => {
+                        osc.convertToBlob().then(handleScan);
+                    }}/>
+                </div>
+
                 <DialogContentText gutterBottom>
-                    Upload a photo: 
+                    Or upload a photo: 
                     {' '}
                     <input
                         type="file"
@@ -77,9 +83,6 @@ export default function ScanningModal({
                         }}
                     />
                 </DialogContentText>
-                <Webcam onFrame={osc => {
-                    osc.convertToBlob().then(handleScan);
-                }}/>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => { onClose(); }}>Cancel</Button>
