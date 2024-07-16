@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@mui/material";
 import { DirectedGraphLink, DirectedGraphNode, MindMapGraphData, MindMapGraphLink, MindMapGraphNode } from "./MindMap";
 import { Webcam } from "./Webcam";
 
