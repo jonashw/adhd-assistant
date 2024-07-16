@@ -13,6 +13,11 @@ function imgSourceToCanvas(element: HTMLVideoElement | HTMLImageElement): Offscr
     return canvas;
 }
 
+type WebcamComponentState = {
+    videoDevices: MediaDeviceInfo[];
+    selectedVideoDevice?: MediaDeviceInfo;
+};
+
 export const Webcam = React.forwardRef(function (
     {
         onFrame
@@ -22,13 +27,14 @@ export const Webcam = React.forwardRef(function (
     ref
 ) {
     const videoElementRef = React.useRef<HTMLVideoElement>(null);
-    const [videoDevices,setVideoDevices] = React.useState<MediaDeviceInfo[]>([]);
-    const [selectedVideoDevice,setSelectedVideoDevice] = React.useState<MediaDeviceInfo>();
+    const [state,setState] = React.useState<WebcamComponentState>({
+        videoDevices:[],
+        selectedVideoDevice:undefined
+    });
 
     React.useEffect(() => {
         navigator.mediaDevices.enumerateDevices().then(devices => {
             const videoDevices = devices.filter(d => d.kind === 'videoinput');
-            setVideoDevices(videoDevices.reverse());
             console.log({videoDevices});
             const preferredVideoDevice =
                 videoDevices.find(d => 
@@ -43,7 +49,10 @@ export const Webcam = React.forwardRef(function (
                     || d.label.indexOf('back facing') > -1
                 ) ?? videoDevices.find(() => true);
             if(preferredVideoDevice !== undefined){
-                setSelectedVideoDevice(preferredVideoDevice);
+                setState({
+                    selectedVideoDevice: preferredVideoDevice,
+                    videoDevices: videoDevices.reverse()
+                });
             } else {
                 alert('no video input device found');
             }
@@ -55,45 +64,38 @@ export const Webcam = React.forwardRef(function (
             console.log('no video element yet');
             return;
         }
-        if(!selectedVideoDevice){
+        if(state.selectedVideoDevice === undefined){
             console.log('no selected video device');
             return;
         }
         const video = videoElementRef.current!;
         let stream: MediaStream;
 
-        const init = async () => {
-            console.log('preparing video stream');
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { 
-                    deviceId: {exact: selectedVideoDevice.deviceId}
-                }
-            });
+        console.log('preparing video stream');
+        navigator.mediaDevices.getUserMedia({
+            video: { 
+                deviceId: {exact: state.selectedVideoDevice.deviceId}
+            }
+        }).then(s => {
+            stream = s;
             video.autoplay = true;
             video.srcObject = stream;
             video.onplaying = () => {
                 console.log('started playing', video);
             };
-        };
-
-        init();
-
-        function cleanupStream(stream: MediaStream){
-            console.log('cleanup stream')
-            //reference: https://stackoverflow.com/a/12436772/943730
-            for (const track of stream.getTracks()) {
-                track.stop();
-            }
-        }
+        });
 
         return () => {
             console.log('cleanup')
             video.onplaying = null;
             if (stream !== undefined) {
-                cleanupStream(stream);
+                //reference: https://stackoverflow.com/a/12436772/943730
+                for (const track of stream.getTracks()) {
+                    track.stop();
+                }
             }
         };
-    }, [onFrame, videoElementRef, selectedVideoDevice]);
+    }, [onFrame, videoElementRef, state.selectedVideoDevice]);
 
     React.useImperativeHandle(ref, () => {
         return {
@@ -130,19 +132,19 @@ export const Webcam = React.forwardRef(function (
         <div>
             <div>Click/tap the video to capture</div>
             {videoElement}
-            {videoDevices.length > 1 && (
+            {state.videoDevices.length > 1 && (
                 <Stack direction={"row"} justifyContent={"space-between"} gap={2} alignItems={"center"}>
                     <Typography>
                         Video devices:
                     </Typography>
-                    {videoDevices.map((d,i) => 
+                    {state.videoDevices.map((d,i) => 
                         <Button
                             key={d.deviceId}
                             sx={{flexGrow:1}}
                             size="small"
                                 title={JSON.stringify(d,null,2)}
-                                variant={d === selectedVideoDevice ? "contained" : "outlined"}
-                                onClick={() => setSelectedVideoDevice(d)}
+                                variant={d === state.selectedVideoDevice ? "contained" : "outlined"}
+                                onClick={() => setState({...state, selectedVideoDevice: d }) }
                         >
                             {i+1}
                         </Button>)}
