@@ -4,7 +4,6 @@ import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import { CircularArray } from "./useCircularArray";
 import { ArrowLeft, ArrowRight, Camera } from "@mui/icons-material";
-import { green } from "@mui/material/colors";
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
