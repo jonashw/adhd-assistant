@@ -137,12 +137,15 @@ export const Webcam = React.forwardRef(function (
                     </Typography>
                     {videoDevices.map((d,i) => 
                         <Button
-                        sx={{flexGrow:1}}
-                        size="small"
-                            title={JSON.stringify(d,null,2)}
-                            variant={d === selectedVideoDevice ? "contained" : "outlined"}
-                            onClick={() => setSelectedVideoDevice(d)}
-                        >{i+1}</Button>)}
+                            key={d.deviceId}
+                            sx={{flexGrow:1}}
+                            size="small"
+                                title={JSON.stringify(d,null,2)}
+                                variant={d === selectedVideoDevice ? "contained" : "outlined"}
+                                onClick={() => setSelectedVideoDevice(d)}
+                        >
+                            {i+1}
+                        </Button>)}
                 </Stack>
             )}
         </div>
