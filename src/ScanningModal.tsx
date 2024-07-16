@@ -52,7 +52,8 @@ export default function ScanningModal({
         onClose(graph);
     }
 
-    return <Dialog
+    return (
+        <Dialog
             open={open}
             onClose={() => {
                 onClose();
@@ -60,30 +61,30 @@ export default function ScanningModal({
         >
             <DialogTitle>Scan a physical graph</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    <Typography gutterBottom>
-                        Take or upload a photo
-                        <input
-                            type="file"
-                            accept="image/*" 
-                            onChange={async e => {
-                                const file = e.target.files?.item(0);
-                                if(!file){
-                                    return;
-                                }
-                                console.log('new file',file);
-                                handleScan(file);
-                            }}
-                        />
-                    </Typography>
-                    <Webcam onFrame={osc => {
-                        osc.convertToBlob().then(handleScan);
-                    }}/>
+                <DialogContentText gutterBottom>
+                    Upload a photo: 
+                    {' '}
+                    <input
+                        type="file"
+                        accept="image/*" 
+                        onChange={async e => {
+                            const file = e.target.files?.item(0);
+                            if(!file){
+                                return;
+                            }
+                            console.log('new file',file);
+                            handleScan(file);
+                        }}
+                    />
                 </DialogContentText>
+                <Webcam onFrame={osc => {
+                    osc.convertToBlob().then(handleScan);
+                }}/>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => { onClose(); }}>Cancel</Button>
                 <Button type="submit">OK</Button>
             </DialogActions>
         </Dialog>
+    );
 }
