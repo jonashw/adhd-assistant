@@ -11,6 +11,7 @@ import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 import ScanningModal from "./ScanningModal";
+import { extractGraphFromImage } from "./extractGraphFromImage";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -29,6 +30,7 @@ export default function MindMapGraph({
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
     const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
+    const [busyExtracting,setBusyExtracting] = React.useState(false);
 
     const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
         headerSize, breadCrumbsSize
@@ -182,6 +184,7 @@ export default function MindMapGraph({
                     onScan={() => setScanningModalVisible(true)}
                     value={value}
                     onChange={setGraph}
+                    busyExtracting={busyExtracting}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}
                     selectNodeId={selectNodeId}
@@ -208,11 +211,19 @@ export default function MindMapGraph({
 
             {scanningModalVisible && <ScanningModal
                 open={scanningModalVisible}
-                onClose={(value?: MindMapGraphData) => {
-                    if(value){
-                        setGraph(value);
-                    }
+                onClose={(img?: Blob) => {
                     setScanningModalVisible(false);
+                    if(img){
+                        setBusyExtracting(true);
+                        extractGraphFromImage(img).then(graph => {
+                            if(!graph){
+                                alert('The system was unable to extract graph from the image provided.')
+                            } else {
+                                setGraph(graph);
+                            }
+                            setBusyExtracting(false);
+                        });
+                    }
                 }}
             />}
 

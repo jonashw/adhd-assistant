@@ -1,9 +1,10 @@
-import { AppBar, Button, ButtonGroup, Stack, Toolbar } from "@mui/material";
+import { AppBar, Button, ButtonGroup, CircularProgress, Stack, Toolbar, Typography } from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import { CircularArray } from "./useCircularArray";
 import { ArrowLeft, ArrowRight, Camera } from "@mui/icons-material";
+import { green } from "@mui/material/colors";
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
@@ -17,7 +18,8 @@ export function MindMapEditorToolbar({
     nodeClickMode,
     setNodeClickMode,
     homeImages,
-    onScan
+    onScan,
+    busyExtracting
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
@@ -28,6 +30,7 @@ export function MindMapEditorToolbar({
     setNodeClickMode: (value: GraphNodeClickMode) => void;
     homeImages: CircularArray<HTMLImageElement>;
     onScan: () => void;
+    busyExtracting: boolean
 }) {
     const home = value.nodes.find(n => n.type === "HOME");
     return (
@@ -130,8 +133,12 @@ export function MindMapEditorToolbar({
                                 onScan();
                                 console.log('scanning');
                             }}
+                            disabled={busyExtracting}
                         >
-                            <Camera/> Scan
+                            {busyExtracting 
+                                ? <CircularProgress size={20} sx={{ color: 'white' }} />
+                                : <Camera/>}
+                            <Typography sx={{marginLeft:1}}>Scan</Typography>
                         </Button>
                     </>}
 
