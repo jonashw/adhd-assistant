@@ -1,11 +1,13 @@
 # ADHD Assist
 
-I have ADHD and I need assistance.
+Brainstorming assistance for those with ADHD.
 
-As my mind meanders and jumps from idea to idea in a
-vast and fanciful world of ideas, I can tell this assistant about
-each topical jump. The assistant will maintain a stack of ideas that will
-lead me back to where I started.
+> As my mind meanders and jumps from idea to idea in a
+vast and fanciful world of ideas, I lose track of where I have been.  I wish there was an easy way to mark my path and revisit when the time is right.
+> 
+> -- <cite>Anonymous</cite>
+
+With ADHD Assist, you can navigate a large conceptual space without losing your orientation.  As you brainstorm, tell this assistant about each topical jump you make, or when you introduce a new concept. The assistant will maintain a stack of ideas that will connect the new ideas to what came before, allowing you to find your way back.
 
 https://adhd.jonashw.dev
 
@@ -27,12 +29,12 @@ Use cases:
 
 ## Background
 
-My head is a balloon, filled with helium and buoyant thoughts. It has a strong tendency to float out of reach and be blown off course by the wind.
+> My head is a balloon, filled with helium and buoyant thoughts. It has a strong tendency to float out of reach and be blown off course by the wind.
 
 ![balloon head](README_files/balloon-head-and-body.png)
 
 
-My body is the holder of this balloon's string.  Its constant gripping leaves the arm muscles tense and sore.  It could use some assistance keeping the balloon from floating away.
+> My body is the holder of this balloon's string.  Its constant gripping leaves the arm muscles tense and sore.  It could use some assistance keeping the balloon from floating away.
 
 ### &quot;You are here.&quot;
 
@@ -44,9 +46,7 @@ Those words are marked next to an unmistakable beacon on the map of your ideas, 
 
 Sometimes (often?), it's fun to give your mind a bit more slack.  Letting it fly high can be fun.
 
-Why?
-
-Like the physical forces of buoyancy and gravity,  my mind's thoughtful forces are constant.  I enjoy many thoughts throughout my days; so many that I tend to (have to?) forget them after a time. It would be nice to have a record of my thoughts so that I could retrieve the more valuable/viable ones.  A major plus would be to use this tool for note-taking with the goal of providing written communication to coworkers.  I could express ideas in a fashion that suits me, then project the data from that model into standard English for the neurotypicals in my life.
+> Like the physical forces of buoyancy and gravity,  my mind's thoughtful forces are constant.  I enjoy many thoughts throughout my days; so many that I tend to (have to?) forget them after a time. It would be nice to have a record of my thoughts so that I could retrieve the more valuable/viable ones.  A major plus would be to use this tool for note-taking with the goal of providing written communication to coworkers.  I could express ideas in a fashion that suits me, then project the data from that model into standard English for the neurotypicals in my life.
 
 ## Get started with development
 
