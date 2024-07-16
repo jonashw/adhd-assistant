@@ -28,7 +28,16 @@ export const Webcam = React.forwardRef(function ({
     let stream: MediaStream;
     const init = async () => {
       console.log('preparing video stream');
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      console.log({devices:(await navigator.mediaDevices.enumerateDevices()) });
+      try{
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { exact: "environment" } },
+            audio: false });
+      } catch(_){
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false });
+      }
       video.autoplay = true;
       video.srcObject = stream;
       video.onplaying = () => {
