@@ -32,6 +32,13 @@ export const Webcam = React.forwardRef(function (
             console.log({videoDevices});
             const preferredVideoDevice =
                 videoDevices.find(d => 
+                    /* AFAICT, there is no way to do the equivalent logical 
+                    ** test when enumerating devices directly (`facingMode` is not a property of `MediaDeviceInfo`):
+                    **        navigator.mediaDevices.getUserMedia({video: { facingMode: { exact: "environment" } }}
+                    ** So, we have to emulate this query in order to arrive at a preferred device.
+                    ** The pro of this approach is that we know which of the multiple video devices we are selecting 
+                    ** and can show the user this fact if/when they wish to change the selected device.
+                    ** (AFAICT, there is no way to know which device was chosen when using `getUserMedia`.  )*/
                        d.label.indexOf('facing back') > -1 
                     || d.label.indexOf('back facing') > -1
                 ) ?? videoDevices.find(() => true);
@@ -54,27 +61,14 @@ export const Webcam = React.forwardRef(function (
         }
         const video = videoElementRef.current!;
         let stream: MediaStream;
+
         const init = async () => {
             console.log('preparing video stream');
-            if(selectedVideoDevice !== undefined){
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        deviceId: {exact: selectedVideoDevice.deviceId}
-                    }
-                });
-            } else {
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { exact: "environment" } },
-                        audio: false,
-                    });
-                } catch (_) {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: true,
-                        audio: false
-                    });
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    deviceId: {exact: selectedVideoDevice.deviceId}
                 }
-            }
+            });
             video.autoplay = true;
             video.srcObject = stream;
             video.onplaying = () => {
@@ -84,14 +78,19 @@ export const Webcam = React.forwardRef(function (
 
         init();
 
+        function cleanupStream(stream: MediaStream){
+            console.log('cleanup stream')
+            //reference: https://stackoverflow.com/a/12436772/943730
+            for (const track of stream.getTracks()) {
+                track.stop();
+            }
+        }
+
         return () => {
             console.log('cleanup')
             video.onplaying = null;
-            if (stream) {
-                //reference: https://stackoverflow.com/a/12436772/943730
-                for (const track of stream.getTracks()) {
-                    track.stop();
-                }
+            if (stream !== undefined) {
+                cleanupStream(stream);
             }
         };
     }, [onFrame, videoElementRef, selectedVideoDevice]);

@@ -67,7 +67,7 @@ export default function ScanningModal({
                     }}/>
                 </div>
 
-                <DialogContentText gutterBottom>
+                <Typography gutterBottom>
                     Or upload a photo: 
                     {' '}
                     <input
@@ -82,7 +82,7 @@ export default function ScanningModal({
                             handleScan(file);
                         }}
                     />
-                </DialogContentText>
+                </Typography>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => { onClose(); }}>Cancel</Button>
