@@ -9,8 +9,6 @@ import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
-import ScanningModal from "./ScanningModal";
-import { extractGraphFromImage } from "./extractGraphFromImage";
 import { loadImgElement } from "./loadImgElement";
 type GraphRefType = 
     ForceGraphMethods<
@@ -28,7 +26,6 @@ export default function MindMapGraph({
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
     const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
-    const [busyExtracting,setBusyExtracting] = React.useState(false);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
 
     const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
@@ -46,7 +43,6 @@ export default function MindMapGraph({
     const home = graph.nodes.find(n => n.type === "HOME");
     const [selectedNodeId, selectNodeId] = React.useState<string | undefined>(home?.id);
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
-    const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
 
     const selectedNode = React.useMemo(
         () => value.nodes.find(n => n.id === selectedNodeId),
@@ -191,9 +187,7 @@ export default function MindMapGraph({
         <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
             <div ref={headerRef}>
                 <MindMapEditorToolbar 
-                    onScan={() => setScanningModalVisible(true)}
                     value={value}
-                    busyExtracting={busyExtracting}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}
                     selectNodeId={selectNodeId}
@@ -217,25 +211,6 @@ export default function MindMapGraph({
                     </Breadcrumbs>
                 )}
             </div>
-
-            {scanningModalVisible && <ScanningModal
-                open={scanningModalVisible}
-                onClose={(img?: Blob) => {
-                    setScanningModalVisible(false);
-                    if(img){
-                        setBusyExtracting(true);
-                        extractGraphFromImage(img).then(graph => {
-                            if(!graph){
-                                alert('The system was unable to extract graph from the image provided.')
-                            } else {
-                                console.log('extracted graph',graph);
-                                change(graph);
-                            }
-                            setBusyExtracting(false);
-                        });
-                    }
-                }}
-            />}
 
             {rabbitHoleModalVisible && <MultiModalPrompt
                 title={"Go Down a Rabbit Hole"}
