@@ -21,7 +21,7 @@ function groupBy<TValue>(
             key,
             values: lookup[key]
         }));
-    console.log({groups});
+    //console.log({groups});
 
     return new GroupByResult(groups);
 }
@@ -40,10 +40,6 @@ class GroupByResult<TValue>{
         return dict;
     }
 }
-
-
-
-
 
 
 export type DirectedGraphData<TNode, TLink> = {
