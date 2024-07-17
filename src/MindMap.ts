@@ -55,6 +55,7 @@ export type DirectedGraphLink<T> = {source:string, target: string} & T;
 
 export type MindMapNodeType = 'HOME' | 'RabbitHole';
 
+export type MindMapGraphDataRecord = MindMapGraphData & {id: string};
 export type MindMapGraphData = 
   DirectedGraphData<
     MindMapGraphNode,

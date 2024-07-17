@@ -1,12 +1,10 @@
-import { AppBar, Button, ButtonGroup, CircularProgress, Stack, Toolbar, Typography } from "@mui/material";
+import { AppBar, Button, CircularProgress, Stack, Toolbar, Typography } from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
-import { CircularArray } from "./useCircularArray";
-import { ArrowLeft, ArrowRight, Camera } from "@mui/icons-material";
+import { Camera } from "@mui/icons-material";
 
 export type GraphNodeClickMode = "re-parent" | "select";
-
 
 export function MindMapEditorToolbar({
     value,
@@ -16,7 +14,6 @@ export function MindMapEditorToolbar({
     selectNodeId,
     nodeClickMode,
     setNodeClickMode,
-    homeImages,
     onScan,
     busyExtracting
 }: {
@@ -27,7 +24,6 @@ export function MindMapEditorToolbar({
     selectNodeId: (id?: string) => void;
     nodeClickMode: GraphNodeClickMode;
     setNodeClickMode: (value: GraphNodeClickMode) => void;
-    homeImages: CircularArray<HTMLImageElement>;
     onScan: () => void;
     busyExtracting: boolean
 }) {
@@ -41,43 +37,7 @@ export function MindMapEditorToolbar({
 
                 {selectedNode
                     ? selectedNode.type === "HOME"
-                        ? <>
-                            <ButtonGroup
-                                variant="contained" 
-                                color={"info"}
-                                aria-label="Change the icon for HOME"
-                            >
-                                <Button
-                                    onClick={() => {
-                                        homeImages.prev();
-                                    }}
-                                    aria-label="Previous home image"
-                                >
-                                    <ArrowLeft />
-                                </Button>
-                                {homeImages.currentItem && 
-                                    <div style={{
-                                        display:'flex',
-                                        alignItems:'center',
-                                        background: 'white',
-                                        padding: '0 8px'
-                                    }}>
-                                        <img
-                                            src={homeImages.currentItem.src} 
-                                            style={{height:'32px'}}
-                                        />
-                                    </div>
-                                }
-                                <Button
-                                    onClick={() => {
-                                        homeImages.next();
-                                    }}
-                                    aria-label="Next home image"
-                                >
-                                    <ArrowRight />
-                                </Button>
-                            </ButtonGroup>
-                        </>
+                        ? <> You are home </>
                         : nodeClickMode === "select"
                         ? <>
                             <Button

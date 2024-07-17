@@ -10,7 +10,7 @@ export type UndoController<T> = {
     onChange: (newCurrentState: T) => void;
 }
 
-export function useUndo<T>(initialState: T) {
+export function useUndo<T>(initialState: T, callback?: (value: T) => void) {
     const initialUndoState = {
         prev: [],
         curr: initialState,
@@ -38,6 +38,9 @@ export function useUndo<T>(initialState: T) {
                     ? state.next
                     : [...state.next, state.curr],
             });
+            if(callback){
+                callback(newCurr);
+            }
         },
         redo() {
             const newNext = [...state.next];
@@ -52,6 +55,9 @@ export function useUndo<T>(initialState: T) {
                 curr: newCurr,
                 next: newNext
             });
+            if(callback){
+                callback(newCurr);
+            }
         },
         onChange(newCurrentState: T): void {
             if(state.curr === newCurrentState){
@@ -65,6 +71,9 @@ export function useUndo<T>(initialState: T) {
                 curr: newCurrentState,
                 next: []
             });
+            if(callback){
+                callback(newCurrentState);
+            }
         }
     };
 

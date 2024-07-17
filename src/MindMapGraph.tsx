@@ -5,13 +5,13 @@ import { Fab, Breadcrumbs, Button, Paper, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
-import { CircularArray } from "./useCircularArray";
 import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 import ScanningModal from "./ScanningModal";
 import { extractGraphFromImage } from "./extractGraphFromImage";
+import { loadImgElement } from "./loadImgElement";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -20,17 +20,16 @@ type GraphRefType =
 export default function MindMapGraph({
     value,
     onChange,
-    homeImages
 }:{
     value: MindMapGraphData,
     onChange: (value: MindMapGraphData) => void,
-    homeImages: CircularArray<HTMLImageElement>
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
     const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
     const [busyExtracting,setBusyExtracting] = React.useState(false);
+    const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
 
     const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
         headerSize, breadCrumbsSize
@@ -38,8 +37,11 @@ export default function MindMapGraph({
     const width = window.innerWidth;
 
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
-    const [graph,setGraph,undoController] = useUndo(value);
-    React.useEffect(() => onChange(graph),[graph, onChange]);
+    const [graph,setGraph,undoController] = useUndo(value,onChange);
+    const change = React.useCallback((updatedGraph: MindMapGraphData) => {
+        setGraph(updatedGraph);
+        onChange(updatedGraph);
+    },[graph,onChange]);
     const graphRef = React.useRef<GraphRefType>();
     const home = graph.nodes.find(n => n.type === "HOME");
     const [selectedNodeId, selectNodeId] = React.useState<string | undefined>(home?.id);
@@ -73,7 +75,9 @@ export default function MindMapGraph({
             return;
         }
         const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, label);
-        setGraph(updatedValue);
+
+        console.log('added rabbit hole');
+        change(updatedValue);
         selectNodeId(newNode.id);
     };
 
@@ -82,11 +86,11 @@ export default function MindMapGraph({
             return;
         }
         const [updatedValue, newNode] = MindMap.rabbitHole(value, selectedNode.id, newRabbitHoleName);
-        setGraph(updatedValue);
+        console.log('rabbit hole');
+        change(updatedValue);
         selectNodeId(newNode.id);
         setRabbitHoleModalVisible(false);
     }
-
 
     const onSpeech = React.useCallback((result: Transcript) => {
         if(!result.isFinal){
@@ -97,7 +101,8 @@ export default function MindMapGraph({
                 if(selectedNode.type === "HOME"){
                     alert('sorry, you may not remove HOME');
                 } else {
-                    setGraph(MindMap.remove(value, selectedNode));
+                    console.log('removed node',selectedNode);
+                    change(MindMap.remove(value, selectedNode));
                     const home = value.nodes.find(n => n.type === "HOME");
                     selectNodeId(home?.id);
                 }
@@ -122,7 +127,8 @@ export default function MindMapGraph({
                 return;
             }
             const [updatedValue, newNode] = MindMap.rabbitHole(graph, selectedNodeId, label);
-            setGraph(updatedValue);
+            console.log('deeper by voice',newNode);
+            change(updatedValue);
             selectNodeId(newNode.id);
         }
     }, [ graph, selectedNode]);
@@ -149,6 +155,10 @@ export default function MindMapGraph({
         const shortestPathHome = MindMap.shortestPathBetween(value, selectedNodeId, home.id);
         setPathHome(shortestPathHome);
     },[value, selectedNodeId, setPathHome]);
+
+    React.useEffect(() => {
+        loadImgElement('/enso-circle.jpg').then(setHomeImage);
+    },[]);
 
     React.useEffect(() => {
         graphRef.current?.d3ReheatSimulation();
@@ -183,14 +193,13 @@ export default function MindMapGraph({
                 <MindMapEditorToolbar 
                     onScan={() => setScanningModalVisible(true)}
                     value={value}
-                    onChange={setGraph}
                     busyExtracting={busyExtracting}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}
                     selectNodeId={selectNodeId}
                     selectedNode={selectedNode}
                     undoController={undoController}
-                    homeImages={homeImages}
+                    onChange={change}
                 />
             </div>
 
@@ -219,7 +228,8 @@ export default function MindMapGraph({
                             if(!graph){
                                 alert('The system was unable to extract graph from the image provided.')
                             } else {
-                                setGraph(graph);
+                                console.log('extracted graph',graph);
+                                change(graph);
                             }
                             setBusyExtracting(false);
                         });
@@ -240,7 +250,7 @@ export default function MindMapGraph({
             />}
             <Paper elevation={0}>
                 <div>
-                    {homeImages.currentItem && <ForceGraph2D
+                    {homeImage && <ForceGraph2D
                         onNodeClick={node => {
                             if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
                                 //homeImages.next();
@@ -254,7 +264,9 @@ export default function MindMapGraph({
                                         if(!selectedNodeId){
                                             alert('cannot perform re-parenting without a selected node');
                                         } else {
-                                            setGraph(MindMap.reparent(graph,selectedNodeId,node.id));
+
+                                            console.log('reparented node',selectedNodeId);
+                                            change(MindMap.reparent(graph,selectedNodeId,node.id));
                                             setNodeClickMode('select');
                                         }
                                         break;
@@ -284,27 +296,28 @@ export default function MindMapGraph({
                         nodeCanvasObject={(node, ctx, globalScale) => {
                             if (node.type === 'HOME') {
                                 //
-                                ctx.save();
-                                const side = nodeRadius * 1.9;
-                                const homeImg = homeImages.currentItem;
-                                if (homeImg) {
+                                if (homeImage) {
+                                    ctx.save();
+                                    const side = nodeRadius * 1.9;
                                     ctx.translate(node.x! - side / 2, node.y! - side / 2);
                                     ctx.globalCompositeOperation = "darken";
                                     ctx.drawImage(
-                                        homeImg,
+                                        homeImage,
                                         0, 0,
-                                        homeImg.width, homeImg.height,
+                                        homeImage.width, homeImage.height,
                                         0, 0,
                                         side, side);
+                                    ctx.restore();
                                 } else {
+                                    ctx.save();
                                     ctx.beginPath();
                                     ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                                     ctx.closePath();
                                     ctx.strokeStyle = 'hsl(0 0 20)';
                                     ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
                                     ctx.stroke();
+                                    ctx.restore();
                                 }
-                                ctx.restore();
                             } else {
                                 fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
                                 ctx.beginPath();
@@ -346,7 +359,7 @@ export default function MindMapGraph({
                         cooldownTime={1000}
                         dagLevelDistance={25}
                         dagMode={"radialin"}
-                    />}
+                    /> }
                     <Stack direction={"row-reverse"} gap={2} alignItems={"center"}
 
                             sx={{ position: 'fixed', right: '1em', bottom: '1em'}}

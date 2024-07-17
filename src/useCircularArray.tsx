@@ -10,7 +10,9 @@ export function useCircularArray<T>(items: T[] | Promise<T[]>): CircularArray<T>
     const [currentIndex, setCurrentIndex] = React.useState<number>(0);
     const [actualItems, setActualItems] = React.useState<T[]>([]);
     const currentItem = React.useMemo(() => actualItems[currentIndex], [actualItems, currentIndex]);
+
     React.useEffect(() => {
+        console.log('items changed',items);
         if ('then' in items) {
             items.then(setActualItems);
         } else {
@@ -28,9 +30,15 @@ export function useCircularArray<T>(items: T[] | Promise<T[]>): CircularArray<T>
         console.log('move to ', i, ' by ', di);
         setCurrentIndex(i);
     };
-    return {
+    React.useEffect(() => {
+        console.log('actualItems changed');
+    },[actualItems]);
+    React.useEffect(() => {
+        console.log('currentItem changed');
+    },[currentItem]);
+    return React.useMemo(() => ({
         prev: () => move(-1),
         next: () => move(1),
         currentItem
-    } as CircularArray<T>;
+    } as CircularArray<T>), [actualItems,currentItem]);
 }
