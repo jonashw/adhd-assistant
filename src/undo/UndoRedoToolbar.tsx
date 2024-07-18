@@ -1,10 +1,10 @@
-import { Button, Hidden } from '@mui/material';
+import { Button, ButtonGroup, Hidden } from '@mui/material';
 import { UndoController } from './useUndo';
 import { Undo as UndoIcon, Redo as RedoIcon } from '@mui/icons-material';
 
 export function UndoRedoToolbar<T>({ controller }: { controller: UndoController<T>; }) {
     const space = <>&nbsp;</>;
-    return <>
+    return <ButtonGroup>
         {([
             [<UndoIcon/>,"Undo",controller.canUndo, controller.undo],
             ["Redo",<RedoIcon/>,controller.canRedo, controller.redo]
@@ -24,5 +24,5 @@ export function UndoRedoToolbar<T>({ controller }: { controller: UndoController<
                     : <>{b}</>}
             </Button>
         )}
-    </>;
+    </ButtonGroup>;
 }

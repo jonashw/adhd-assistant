@@ -1,9 +1,10 @@
-import { AppBar, Button, Stack, Toolbar} from "@mui/material";
+import { AppBar, Button, ButtonGroup, Toolbar} from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
+import { AltRoute, Delete, Edit } from "@mui/icons-material";
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
@@ -47,17 +48,16 @@ export function MindMapEditorToolbar({
             />
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
                 <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
-                    <Stack sx={{ p: 0 }} gap={0.85} direction="row" justifyContent="space-between">
-                        <UndoRedoToolbar controller={undoController} />
-                    </Stack>
+                    <UndoRedoToolbar controller={undoController} />
 
                     {selectedNode
                         ? selectedNode.type === "HOME"
                             ? <> You are home </>
                             : nodeClickMode === "select"
-                            ? <>
+                            ? <ButtonGroup aria-label="Operations that can be performed on the currently-selected node">
                                 <Button
                                     variant="contained"
+                                    title="Rename this node"
                                     color="info"
                                     disabled={!selectedNode}
                                     onClick={() => {
@@ -67,10 +67,11 @@ export function MindMapEditorToolbar({
                                         setNodeToRename(selectedNode);
                                     }}
                                 >
-                                    Rename
+                                    <Edit/>
                                 </Button>
 
                                 <Button
+                                    title={"Change the target of this node's RETURNS_TO relation"}
                                     variant="contained"
                                     color="info"
                                     disabled={!selectedNode}
@@ -81,10 +82,12 @@ export function MindMapEditorToolbar({
                                         setNodeClickMode("re-parent");
                                     }}
                                 >
-                                    Re-parent
+                                    <AltRoute/>
                                 </Button>
+
                                 <Button
                                     variant="contained"
+                                    title="Remove this node from the graph"
                                     color="error"
                                     disabled={!selectedNode}
                                     onClick={() => {
@@ -95,9 +98,9 @@ export function MindMapEditorToolbar({
                                         onChange(MindMap.remove(value, selectedNode));
                                     }}
                                 >
-                                    Remove
+                                    <Delete/>
                                 </Button>
-                            </>
+                            </ButtonGroup>
                             : nodeClickMode === "re-parent"
                             ? <>
                                 <span>
