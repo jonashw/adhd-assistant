@@ -2,19 +2,20 @@ import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/
 import { DirectedGraphNode, MindMapGraphData, MindMapGraphNode } from './MindMap';
 
 type HierarchicalNode = {
+    id: string,
     label: string,
     children: HierarchicalNode[]
 };
 
 function asHierarchy(graph: MindMapGraphData, node: DirectedGraphNode<MindMapGraphNode>): HierarchicalNode {
-    const label = node.label;
+    const {id,label} = node;
     const children = 
         graph.links
         .filter(l => l.target === node.id)
         .map(l => graph.nodes.find(n => n.id === l.source))
         .filter(n => n !== undefined)
         .map(n => asHierarchy(graph,n!));
-    return { label, children };
+    return { id, label, children };
 }
 
 function HierarchicalNodeList({root}:{root:HierarchicalNode}){
@@ -23,7 +24,7 @@ function HierarchicalNodeList({root}:{root:HierarchicalNode}){
         ? <></> 
         : <ul>
             {children.map(n => (
-                <li>
+                <li key={n.id}>
                     {n.label}
                     {HierarchicalNodeChildList(n.children)}
                 </li>
