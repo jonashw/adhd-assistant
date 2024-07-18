@@ -27,7 +27,6 @@ export default function MindMapGraph({
     const [headerSize,headerRef] = useElementSize();
     const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
-
     const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
         headerSize, breadCrumbsSize
     ]);
@@ -223,6 +222,7 @@ export default function MindMapGraph({
                     setRabbitHoleModalVisible(false);
                 }}
             />}
+
             <Paper elevation={0}>
                 <div>
                     {homeImage && <ForceGraph2D

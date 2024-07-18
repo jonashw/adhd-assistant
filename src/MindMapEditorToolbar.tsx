@@ -5,6 +5,8 @@ import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
 import { AltRoute, Delete, Edit } from "@mui/icons-material";
+import { MindMapOutlineModal } from "./MindMapOutlineModal";
+
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
@@ -27,6 +29,7 @@ export function MindMapEditorToolbar({
 }) {
     const home = value.nodes.find(n => n.type === "HOME");
     const [nodeToRename,setNodeToRename] = React.useState<DirectedGraphNode<MindMapGraphNode>>();
+    const [outlineVisible, setOutlineVisible] = React.useState(false);
     return (
         <>
             <NodeNameEditorModal
@@ -46,9 +49,25 @@ export function MindMapEditorToolbar({
                     setNodeToRename(undefined);
                 }}
             />
+
+            <MindMapOutlineModal
+                graph={value}
+                open={outlineVisible}
+                onClose={() => {
+                    setOutlineVisible(false);
+                }}
+            />
+
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
                 <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
                     <UndoRedoToolbar controller={undoController} />
+                    <Button 
+                        variant="contained"
+                        color="info"
+                        onClick={() => setOutlineVisible(true)}
+                    >
+                        View Outline
+                    </Button>
 
                     {selectedNode
                         ? selectedNode.type === "HOME"
