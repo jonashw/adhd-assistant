@@ -4,7 +4,7 @@ import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
-import { AltRoute, Delete, Edit } from "@mui/icons-material";
+import { AltRoute, Delete, Edit, FormatListBulleted } from "@mui/icons-material";
 import { MindMapOutlineModal } from "./MindMapOutlineModal";
 
 
@@ -63,10 +63,11 @@ export function MindMapEditorToolbar({
                     <UndoRedoToolbar controller={undoController} />
                     <Button 
                         variant="contained"
+                        title="View Outline"
                         color="info"
                         onClick={() => setOutlineVisible(true)}
                     >
-                        View Outline
+                        <FormatListBulleted/>
                     </Button>
 
                     {selectedNode
