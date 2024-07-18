@@ -3,10 +3,12 @@ import { MindMapGraphDataRecord } from "./MindMap";
 
 export const GraphRepositoryContext = React.createContext<{
     graphs: MindMapGraphDataRecord[],
-    saveGraph: (g: MindMapGraphDataRecord) => void
+    saveGraph: (g: MindMapGraphDataRecord) => void,
+    deleteGraphById: (id: string) => void
 }>({
     graphs: [],
-    saveGraph: () => {}
+    saveGraph: () => {},
+    deleteGraphById: () => {}
 });
 
 const sampleGraphs: MindMapGraphDataRecord[] = [
@@ -26,8 +28,20 @@ const sampleGraphs: MindMapGraphDataRecord[] = [
     }
 ];
 
+const STORAGE_KEY = "graphs_2024-07-17";
+
+const json = localStorage.getItem(STORAGE_KEY);
+const loadedGraphs: MindMapGraphDataRecord[] = !!json ? JSON.parse(json) : sampleGraphs;
+console.log('loading graphs from localStorage');
+
 export function GraphRepositoryContextProvider({children}:{children:React.JSX.Element}){
-    const [graphs, setGraphs] = React.useState(sampleGraphs);
+
+    const [graphs, setGraphs] = React.useState(loadedGraphs);
+    React.useEffect(() => {
+        console.log('saving graphs to localStorage');
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(graphs,null,2));
+    },[graphs]);
+
     const saveGraph = React.useCallback((graph: MindMapGraphDataRecord) => {
         setGraphs(graphs => {
             if(graphs.find(g => g.id === graph.id) !== undefined){
@@ -38,8 +52,12 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
         });
     },[]);
 
+    const deleteGraphById = React.useCallback((id: string) => {
+        setGraphs(graphs => graphs.filter(g => g.id !== id));
+    },[]);
+
     return (
-        <GraphRepositoryContext.Provider value={{graphs,saveGraph}}>
+        <GraphRepositoryContext.Provider value={{graphs,saveGraph,deleteGraphById}}>
             {children}
         </GraphRepositoryContext.Provider>
     );
