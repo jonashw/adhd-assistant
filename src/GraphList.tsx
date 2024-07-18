@@ -16,6 +16,9 @@ import {
     ListItemIcon,
     ListItemText,
     Paper,
+    SpeedDial,
+    SpeedDialAction,
+    SpeedDialIcon,
     Stack,
     Toolbar,
     Typography
@@ -23,8 +26,9 @@ import {
 import React from 'react';
 import ScanningModal from "./ScanningModal";
 import { extractGraphFromImage } from "./extractGraphFromImage";
-import { Add,  CameraAlt, Delete } from '@mui/icons-material';
+import { CameraAlt, Delete } from '@mui/icons-material';
 import { MindMapGraphData } from './MindMap';
+import { sampleGraphs } from './sampleGraphs';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
 
@@ -40,6 +44,7 @@ export function GraphList() {
     const [busyExtracting,setBusyExtracting] = React.useState(false);
     const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
     const [idOfGraphToDelete,setIdOfGraphToDelete] = React.useState<string>();
+    const [speedDialOpen, setSpeedDialOpen] = React.useState(false);
     return <div>
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
             <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
@@ -127,7 +132,7 @@ export function GraphList() {
             <Stack
                 gap={2}
                 direction={"row"} 
-                alignItems={"center"}
+                alignItems={"flex-end"}
                 sx={{position:'absolute',right:'1em',bottom:'1em'}}
             >
                 <Fab
@@ -142,18 +147,38 @@ export function GraphList() {
                         ? <CircularProgress size={20} sx={{ color: 'white' }} />
                         : <CameraAlt />}
                 </Fab>
-                <Fab
-                    color="primary"
-                    onClick={() => {
-                        handleNewGraph({
-                            nodes: [{ id: crypto.randomUUID(), label: 'HOME', type: 'HOME' }],
-                            links: []
-                        });
-                    }}
-                    disabled={busyExtracting}
+
+                <SpeedDial
+                    ariaLabel="Add a new mind map"
+                    icon={<SpeedDialIcon />}
+                    onClose={() => setSpeedDialOpen(false)}
+                    onOpen={() => setSpeedDialOpen(true)}
+                    open={speedDialOpen}
                 >
-                    <Add/>
-                </Fab>
+                        <SpeedDialAction
+                            icon={<img src="/Enso.svg" width={24} />}
+                            tooltipTitle={"Empty"}
+                            tooltipOpen
+                            onClick={() => {
+                                handleNewGraph({
+                                    nodes: [{ id: crypto.randomUUID(), label: 'HOME', type: 'HOME' }],
+                                    links: []
+                                });
+                            }}
+                        />
+                        <SpeedDialAction
+                            icon={<GraphIcon size={24} />}
+                            tooltipTitle={"Sample"}
+                            tooltipOpen
+                            onClick={() => {
+                                handleNewGraph({
+                                    ...sampleGraphs[0]
+                                });
+                            }}
+                        />
+                </SpeedDial>
+
+ 
             </Stack>
         </Paper>
 
