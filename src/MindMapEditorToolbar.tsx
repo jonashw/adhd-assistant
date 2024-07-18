@@ -1,7 +1,9 @@
-import { AppBar, Button,  Stack, Toolbar} from "@mui/material";
+import { AppBar, Button, Stack, Toolbar} from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
+import React from "react";
+import { NodeNameEditorModal } from "./NodeNameEditorModal";
 
 export type GraphNodeClickMode = "re-parent" | "select";
 
@@ -23,67 +25,101 @@ export function MindMapEditorToolbar({
     setNodeClickMode: (value: GraphNodeClickMode) => void;
 }) {
     const home = value.nodes.find(n => n.type === "HOME");
+    const [nodeToRename,setNodeToRename] = React.useState<DirectedGraphNode<MindMapGraphNode>>();
     return (
-        <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
-            <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
-                <Stack sx={{ p: 0 }} gap={0.85} direction="row" justifyContent="space-between">
-                    <UndoRedoToolbar controller={undoController} />
-                </Stack>
+        <>
+            <NodeNameEditorModal
+                node={nodeToRename}
+                onClose={(updatedName?: string) => {
+                    if(nodeToRename !== undefined && updatedName !== undefined){
+                        const updatedGraph = {
+                            links: value.links,
+                            nodes: value.nodes.map(n => 
+                                n.id === nodeToRename.id 
+                                ? {...n, label: updatedName}
+                                : n
+                            )
+                        };
+                        onChange(updatedGraph);
+                    }
+                    setNodeToRename(undefined);
+                }}
+            />
+            <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
+                <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
+                    <Stack sx={{ p: 0 }} gap={0.85} direction="row" justifyContent="space-between">
+                        <UndoRedoToolbar controller={undoController} />
+                    </Stack>
 
-                {selectedNode
-                    ? selectedNode.type === "HOME"
-                        ? <> You are home </>
-                        : nodeClickMode === "select"
-                        ? <>
-                            <Button
-                                variant="contained"
-                                color="info"
-                                disabled={!selectedNode}
-                                onClick={() => {
-                                    if (!selectedNode) {
-                                        return;
-                                    }
-                                    setNodeClickMode("re-parent");
-                                }}
-                            >
-                                Re-parent
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="error"
-                                disabled={!selectedNode}
-                                onClick={() => {
-                                    if (!selectedNode) {
-                                        return;
-                                    }
-                                    selectNodeId(home?.id);
-                                    onChange(MindMap.remove(value, selectedNode));
-                                }}
-                            >
-                                Remove
-                            </Button>
-                        </>
-                        : nodeClickMode === "re-parent"
-                        ? <>
-                            <span>
-                                Click the node you wish to be the parent.
-                            </span>
-                            <Button 
-                                variant="contained"
-                                color="error"
-                                onClick={() => {
-                                    setNodeClickMode("select");
-                                }}
-                            >
-                                Cancel
-                            </Button>
-                        </>
-                        : <>o</>
-                    : <>
-                        
-                    </>}
+                    {selectedNode
+                        ? selectedNode.type === "HOME"
+                            ? <> You are home </>
+                            : nodeClickMode === "select"
+                            ? <>
+                                <Button
+                                    variant="contained"
+                                    color="info"
+                                    disabled={!selectedNode}
+                                    onClick={() => {
+                                        if (!selectedNode) {
+                                            return;
+                                        }
+                                        setNodeToRename(selectedNode);
+                                    }}
+                                >
+                                    Rename
+                                </Button>
 
-            </Toolbar>
-        </AppBar>
+                                <Button
+                                    variant="contained"
+                                    color="info"
+                                    disabled={!selectedNode}
+                                    onClick={() => {
+                                        if (!selectedNode) {
+                                            return;
+                                        }
+                                        setNodeClickMode("re-parent");
+                                    }}
+                                >
+                                    Re-parent
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    disabled={!selectedNode}
+                                    onClick={() => {
+                                        if (!selectedNode) {
+                                            return;
+                                        }
+                                        selectNodeId(home?.id);
+                                        onChange(MindMap.remove(value, selectedNode));
+                                    }}
+                                >
+                                    Remove
+                                </Button>
+                            </>
+                            : nodeClickMode === "re-parent"
+                            ? <>
+                                <span>
+                                    Click the node you wish to be the parent.
+                                </span>
+                                <Button 
+                                    variant="contained"
+                                    color="error"
+                                    onClick={() => {
+                                        setNodeClickMode("select");
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </>
+                            : <>o</>
+                        : <>
+                            
+                        </>}
+
+                </Toolbar>
+            </AppBar>
+        </>
     );
 }
