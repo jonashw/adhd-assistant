@@ -58,10 +58,8 @@ export function MultiModalPrompt({
         >
             <DialogTitle>{title}</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    <Typography gutterBottom>
-                        {instructions}
-                    </Typography>
+                <DialogContentText gutterBottom>
+                    {instructions}
                 </DialogContentText>
                 <ListenFab fill status={listeningStatus} start={startListening} stop={stopListening} />
                 {transcript && !transcript.isFinal && <Typography gutterBottom>{transcript.value}</Typography>}
