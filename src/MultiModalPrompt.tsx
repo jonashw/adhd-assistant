@@ -1,7 +1,8 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField, Typography } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, Stack, Switch, TextField, Typography } from "@mui/material";
 import React from "react";
 import { ListenFab } from "./ListenFab";
 import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
+import { useLocalStorage } from "./useLocalStorage";
 
 export type MultiModalPromptRef = {
     open: (defaultValue?: string) => Promise<string|undefined>
@@ -23,9 +24,15 @@ export function MultiModalPrompt({
     label?: string
 }) {
     const [value, setValue] = React.useState(defaultValue);
+    const [autoListen, setAutoListen] = useLocalStorage(
+        true,
+        "AUTO_LISTEN_IN_MULTIMODAL",
+        b => b.toString(),
+        str => str === "true"
+    );
     const { listeningStatus, startListening, stopListening, transcript } =
         useSpeechRecognition({
-            autoStart: true,
+            autoStart: autoListen,
             onRecognize: React.useCallback((result: Transcript | undefined) => {
                 if(!result || !result.isFinal){
                     return;
@@ -63,22 +70,35 @@ export function MultiModalPrompt({
                 </DialogContentText>
                 <ListenFab fill status={listeningStatus} start={startListening} stop={stopListening} />
                 {transcript && !transcript.isFinal && <Typography gutterBottom>{transcript.value}</Typography>}
-                {listeningStatus === "off" && <TextField
-                    required
-                    margin="dense"
-                    id="value"
-                    onFocus={e => {
-                        e.target.select();
-                    }}
-                    name="value"
-                    label={label}
-                    value={value}
-                    onChange={e => setValue(e.target.value)}
-                    type="text"
-                    fullWidth
-                    variant="standard"
-                    autoComplete={"off"}
-                />}
+                {listeningStatus === "off" && (
+                    <Stack direction={"column"}>
+                        <TextField
+                            required
+                            margin="dense"
+                            id="value"
+                            onFocus={e => {
+                                e.target.select();
+                            }}
+                            name="value"
+                            label={label}
+                            value={value}
+                            onChange={e => setValue(e.target.value)}
+                            type="text"
+                            fullWidth
+                            variant="standard"
+                            autoComplete={"off"}
+                        />
+                        <FormControlLabel 
+                            label="Auto-listen next time"
+                            control={
+                                <Switch
+                                    checked={autoListen}
+                                    onChange={e => setAutoListen(e.target.checked)}
+                                />
+                            }
+                        />
+                    </Stack>
+                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => { onClose(); }}>Cancel</Button>
