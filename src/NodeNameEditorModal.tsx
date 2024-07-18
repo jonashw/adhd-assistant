@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from "@mui/material";
 import React from "react";
 import { DirectedGraphNode, MindMapGraphNode } from "./MindMap";
 
@@ -12,7 +12,11 @@ export function NodeNameEditorModal({
     const [name,setName] = React.useState(node?.label ?? "");
 
     React.useEffect(() => {
-        setName(node?.label ?? "");
+        if(node === undefined){
+            console.log('no node');
+            return;
+        }
+        setName(node.label);
     },[node]);
 
     return (
@@ -25,14 +29,21 @@ export function NodeNameEditorModal({
         >
             <DialogTitle>Rename node</DialogTitle>
             <DialogContent>
-                <input
-                    ref={e => {
-                        e?.focus();
-                        e?.select();
+                <TextField
+                    required
+                    margin="dense"
+                    id="value"
+                    onFocus={e => {
+                        e.target.select();
                     }}
-                    type="text"
+                    name="value"
+                    label={"Name"}
                     value={name}
                     onChange={e => setName(e.target.value)}
+                    type="text"
+                    fullWidth
+                    variant="standard"
+                    autoComplete={"off"}
                 />
             </DialogContent>
             <DialogActions>
