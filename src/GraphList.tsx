@@ -152,7 +152,8 @@ export function GraphList() {
                     ariaLabel="Add a new mind map"
                     icon={<SpeedDialIcon />}
                     onClose={() => setSpeedDialOpen(false)}
-                    onOpen={() => setSpeedDialOpen(true)}
+                    onOpen={() => {/* disabled the default mouseover trigger */}}
+                    onClick={() => { setSpeedDialOpen(true); }}
                     open={speedDialOpen}
                 >
                         <SpeedDialAction
