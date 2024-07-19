@@ -1,6 +1,6 @@
 import React from "react";
 import { MindMapGraphDataRecord } from "./MindMap";
-import { sampleGraphs } from "./sampleGraphs";
+import DB from "./GraphsDatabase";
 
 export const GraphRepositoryContext = React.createContext<{
     graphs: MindMapGraphDataRecord[],
@@ -12,25 +12,30 @@ export const GraphRepositoryContext = React.createContext<{
     deleteGraphById: () => {}
 });
 
-const STORAGE_KEY = "graphs_2024-07-17";
-
-const json = localStorage.getItem(STORAGE_KEY);
-const loadedGraphs: MindMapGraphDataRecord[] = !!json ? JSON.parse(json) : sampleGraphs;
-console.log('loading graphs from localStorage');
-
 export function GraphRepositoryContextProvider({children}:{children:React.JSX.Element}){
+    const [graphs, setGraphs] = React.useState<MindMapGraphDataRecord[]>([]);
 
-    const [graphs, setGraphs] = React.useState(loadedGraphs);
     React.useEffect(() => {
-        console.log('saving graphs to localStorage');
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(graphs,null,2));
-    },[graphs]);
+        DB.openDatabase()
+            .then(db => db.graph.getAll())
+            .then(graphs => setGraphs(graphs));
+    },[]);
 
     const saveGraph = React.useCallback((graph: MindMapGraphDataRecord) => {
         setGraphs(graphs => {
             if(graphs.find(g => g.id === graph.id) !== undefined){
+                DB.openDatabase()
+                    .then(db => db.graph.put(graph))
+                    .then(() => {
+                        console.log('graph updated in DB');
+                    });
                 return graphs.map(g => g.id === graph.id ? graph : g);
             } else {
+                DB.openDatabase()
+                    .then(db => db.graph.add(graph))
+                    .then(() => {
+                        console.log('graph added to DB');
+                    });
                 return [...graphs, graph];
             }
         });
