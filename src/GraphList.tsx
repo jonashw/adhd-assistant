@@ -153,7 +153,12 @@ export function GraphList() {
                     icon={<SpeedDialIcon />}
                     onClose={() => setSpeedDialOpen(false)}
                     onOpen={() => {/* disabled the default mouseover trigger */}}
-                    onClick={() => { setSpeedDialOpen(true); }}
+                    onClick={() => { 
+                        if(busyExtracting){
+                            return;
+                        }
+                        setSpeedDialOpen(true); 
+                    }}
                     open={speedDialOpen}
                 >
                         <SpeedDialAction
