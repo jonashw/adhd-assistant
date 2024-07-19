@@ -152,7 +152,7 @@ export default function MindMapGraph({
     },[value, selectedNodeId, setPathHome]);
 
     React.useEffect(() => {
-        loadImgElement('/enso-circle.jpg').then(setHomeImage);
+        loadImgElement('/Enso.svg').then(setHomeImage);
     },[]);
 
     React.useEffect(() => {
