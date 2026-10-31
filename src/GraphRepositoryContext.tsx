@@ -1,5 +1,5 @@
 import React from "react";
-import { MindMapGraphDataRecord } from "./MindMap";
+import { MindMap, MindMapGraphDataRecord } from "./MindMap";
 import DB from "./GraphsDatabase";
 
 export const GraphRepositoryContext = React.createContext<{
@@ -18,7 +18,18 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
     React.useEffect(() => {
         DB.openDatabase()
             .then(db => db.graph.getAll())
-            .then(graphs => setGraphs(graphs));
+            .then(graphs => {
+                const migrated = graphs.map(g => MindMap.migrateDoneLabels(g) as MindMapGraphDataRecord);
+                const changed = migrated.filter((g, i) => g !== graphs[i]);
+                if(changed.length > 0){
+                    DB.openDatabase()
+                        .then(db => Promise.all(changed.map(g => db.graph.put(g))))
+                        .then(() => {
+                            console.log(`moved DONE labels into status on ${changed.length} graph(s)`);
+                        });
+                }
+                setGraphs(migrated);
+            });
     },[]);
 
     const saveGraph = React.useCallback((graph: MindMapGraphDataRecord) => {
@@ -43,6 +54,11 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
 
     const deleteGraphById = React.useCallback((id: string) => {
         setGraphs(graphs => graphs.filter(g => g.id !== id));
+        DB.openDatabase()
+            .then(db => db.graph.delete(id))
+            .then(() => {
+                console.log('graph deleted from DB');
+            });
     },[]);
 
     return (

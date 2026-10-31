@@ -26,8 +26,9 @@ import {
 import React from 'react';
 import ScanningModal from "./ScanningModal";
 import { extractGraphFromImage } from "./extractGraphFromImage";
-import { CameraAlt, Delete } from '@mui/icons-material';
-import { MindMapGraphData } from './MindMap';
+import { CameraAlt, Delete, Download, UploadFile } from '@mui/icons-material';
+import { MindMap, MindMapGraphData } from './MindMap';
+import { exportGraph, readGraphFile } from './GraphFile';
 import { sampleGraphs } from './sampleGraphs';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
@@ -45,6 +46,18 @@ export function GraphList() {
     const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
     const [idOfGraphToDelete,setIdOfGraphToDelete] = React.useState<string>();
     const [speedDialOpen, setSpeedDialOpen] = React.useState(false);
+    const importInputRef = React.useRef<HTMLInputElement>(null);
+    function handleImport(file: File){
+        readGraphFile(file)
+            .then(graph => {
+                //keep the exported id so a re-import is identical, unless that graph is already here
+                const exists = GraphContext.graphs.some(g => g.id === graph.id);
+                const imported = exists ? {...graph, id: crypto.randomUUID()} : graph;
+                GraphContext.saveGraph(MindMap.migrateDoneLabels(imported) as typeof imported);
+                navigate(`/graph/${imported.id}`);
+            })
+            .catch((e: Error) => alert(`Could not import that file. ${e.message}`));
+    }
     return <div>
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
             <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
@@ -84,12 +97,20 @@ export function GraphList() {
                             }}
                             onClick={() => navigate(`/graph/${g.id}`)}
                             secondaryAction={
-                                <IconButton edge="end" title="Delete this item" aria-label="delete" onClick={e => {
-                                    e.stopPropagation();
-                                    setIdOfGraphToDelete(g.id);
-                                }}>
-                                    <Delete />
-                                </IconButton>
+                                <Stack direction="row" gap={1}>
+                                    <IconButton title="Export this mind map as a JSON file" aria-label="export" onClick={e => {
+                                        e.stopPropagation();
+                                        exportGraph(g, `adhd-assist-graph-${i + 1}-${new Date().toISOString().slice(0, 10)}`);
+                                    }}>
+                                        <Download />
+                                    </IconButton>
+                                    <IconButton edge="end" title="Delete this item" aria-label="delete" onClick={e => {
+                                        e.stopPropagation();
+                                        setIdOfGraphToDelete(g.id);
+                                    }}>
+                                        <Delete />
+                                    </IconButton>
+                                </Stack>
                             }
 
                         >
@@ -173,6 +194,15 @@ export function GraphList() {
                             }}
                         />
                         <SpeedDialAction
+                            icon={<UploadFile />}
+                            tooltipTitle={"Import"}
+                            tooltipOpen
+                            onClick={() => {
+                                setSpeedDialOpen(false);
+                                importInputRef.current?.click();
+                            }}
+                        />
+                        <SpeedDialAction
                             icon={<GraphIcon size={24} />}
                             tooltipTitle={"Sample"}
                             tooltipOpen
@@ -187,6 +217,20 @@ export function GraphList() {
  
             </Stack>
         </Paper>
+
+        <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            hidden
+            onChange={e => {
+                const file = e.target.files?.[0];
+                e.target.value = '';
+                if(file){
+                    handleImport(file);
+                }
+            }}
+        />
 
         <Dialog
             open={idOfGraphToDelete !== undefined}

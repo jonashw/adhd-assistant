@@ -59,6 +59,17 @@ class ObjectStore<T> {
             };
         });
     }
+    delete(key: IDBValidKey): Promise<void> {
+        return new Promise((resolve,reject) => {
+            const request = this.store.delete(key);
+            request.onerror = (e) => {
+                reject(e);
+            };
+            request.onsuccess = () => {
+                resolve();
+            };
+        });
+    }
     getAll(): Promise<T[]> {
         return new Promise((resolve,reject) => {
             const request = this.store.getAll();
