@@ -77,7 +77,7 @@ export function YouStrip({graph, onChange, selectNodeId}: {
                     color="warning"
                     data-testid="claude-asks-badge"
                     title={nav.trail.unplaced.length > 0 ? `${nav.trail.unplaced.length} Claude thread(s) asking which place they serve` : undefined}
-                    sx={{flexShrink: 0, "& .MuiBadge-badge": {fontWeight: 700, top: 4, right: 10}}}
+                    sx={{flexShrink: 0, "& .MuiBadge-badge": {fontWeight: 700, top: 3, right: 5}}}
                 >
                     <Button size="small" variant="contained" onClick={() => setWhatsNextOpen(true)}>
                         What's next
