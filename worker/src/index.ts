@@ -5,6 +5,7 @@ import { deleteMap, listMaps, saveMap } from "./maps";
 import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
+import { getMedia, uploadMedia } from "./media";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
     const email = await requireUser(request, env);
@@ -18,6 +19,14 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
     if (url.pathname === "/api/maps" && request.method === "GET") {
         return json(await listMaps(env));
+    }
+    const mediaMatch = /^\/api\/media\/([^/]+)$/.exec(url.pathname);
+    if (mediaMatch && request.method === "GET") {
+        return getMedia(env, decodeURIComponent(mediaMatch[1]));
+    }
+    const uploadMatch = /^\/api\/maps\/([^/]+)\/media$/.exec(url.pathname);
+    if (uploadMatch && request.method === "POST") {
+        return json(await uploadMedia(env, request, decodeURIComponent(uploadMatch[1]), url.searchParams.get("place")), 201);
     }
     const readJson = () => request.json().catch(() => {
         throw new HttpError(400, "The body must be JSON.");
