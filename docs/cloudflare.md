@@ -30,6 +30,13 @@ working as before and stores maps in the browser only.
 5. **Deploy.** This builds the app, applies database migrations and deploys the Worker:
    `npm run worker:deploy`
 
+   After the first deploy, let Cloudflare deploy every push to `main` (Workers Builds):
+   Workers & Pages → adhd-assist → Settings → Build → connect `jonashw/adhd-assistant`, then set
+   - Build command: `npm run build`
+   - Deploy command: `npx wrangler d1 migrations apply adhd-assist --remote && npx wrangler deploy`
+
+   If the migration step fails with an auth error, give the build's API token D1 Edit.
+
 6. **Bring maps over.** On the old site, export each mind map (download button in the list).
    On the new site, sign in and use + → Import.
 
