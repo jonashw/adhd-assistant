@@ -1,6 +1,6 @@
 import { DirectedGraphData, MindMapGraphData, MindMapGraphLink, MindMapGraphNode } from "./MindMap";
 
-type LinkType = "RETURNS_TO"|"HOME"|undefined;
+type LinkType = "PART_OF"|"HOME"|undefined;
 
 export default {
     parse(code: string): MindMapGraphData {

@@ -29,6 +29,7 @@ import { extractGraphFromImage } from "./extractGraphFromImage";
 import { CameraAlt, Delete, Download, UploadFile } from '@mui/icons-material';
 import { MindMap, MindMapGraphData } from './MindMap';
 import { exportGraph, readGraphFile } from './GraphFile';
+import { ServerApi } from './ServerApi';
 import { sampleGraphs } from './sampleGraphs';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
@@ -36,7 +37,7 @@ function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={s
 export function GraphList() {
     const navigate = useNavigate();
     function handleNewGraph(graph: MindMapGraphData){
-        const newGraph = {...graph, id: crypto.randomUUID()};
+        const newGraph = MindMap.normalize({...graph, id: crypto.randomUUID()});
         console.log('extracted graph',newGraph);
         GraphContext.saveGraph(newGraph);
         navigate(`/graph/${newGraph.id}`);
@@ -53,7 +54,7 @@ export function GraphList() {
                 //keep the exported id so a re-import is identical, unless that graph is already here
                 const exists = GraphContext.graphs.some(g => g.id === graph.id);
                 const imported = exists ? {...graph, id: crypto.randomUUID()} : graph;
-                GraphContext.saveGraph(MindMap.migrateDoneLabels(imported) as typeof imported);
+                GraphContext.saveGraph(MindMap.normalize(imported));
                 navigate(`/graph/${imported.id}`);
             })
             .catch((e: Error) => alert(`Could not import that file. ${e.message}`));
@@ -62,6 +63,14 @@ export function GraphList() {
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
             <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
                 <span>ADHD Assist</span>
+                {GraphContext.status?.mode === "server" && <Button
+                    color="inherit"
+                    size="small"
+                    title={`Signed in as ${GraphContext.status.email}`}
+                    onClick={() => ServerApi.signOut().then(() => window.location.reload())}
+                >
+                    Sign out
+                </Button>}
             </Toolbar>
         </AppBar>
 

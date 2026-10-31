@@ -23,7 +23,7 @@ export async function extractGraphFromImage(img: File | Blob): Promise<MindMapGr
     var links: DirectedGraphLink<MindMapGraphLink>[] = newGraph.edges.map(({ source, target }) => ({
         source,
         target,
-        type: 'RETURNS_TO'
+        type: 'PART_OF'
     }));
 
     var nodes: DirectedGraphNode<MindMapGraphNode>[] = newGraph.nodes.map(({ label, id }) => ({

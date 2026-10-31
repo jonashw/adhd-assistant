@@ -18,6 +18,7 @@ export default function GraphEditor() {
   }
   return (
         <MindMapGraph
+          key={`${graph.id}:${GraphContext.reloadCount[graph.id] ?? 0}`}
           value={graph}
           onChange={updatedGraph => {
             GraphContext.saveGraph({...updatedGraph, id: graph.id});

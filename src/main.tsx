@@ -9,6 +9,7 @@ import {
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { GraphList } from './GraphList';
+import { SignInGate } from './SignInGate';
 
 const defaultTheme = createTheme();
 
@@ -19,7 +20,9 @@ const router = createBrowserRouter([
       <ThemeProvider theme={defaultTheme}>
         <CssBaseline />
         <main>
-          <Outlet/>
+          <SignInGate>
+            <Outlet/>
+          </SignInGate>
         </main>
       </ThemeProvider>
     ),

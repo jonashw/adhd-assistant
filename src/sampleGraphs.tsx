@@ -10,9 +10,9 @@ export const sampleGraphs: MindMapGraphDataRecord[] = [
             { id: '3', label: 'Subtopic #3', type: 'RabbitHole' },
         ],
         links: [
-            { source: '1', target: 'HOME', type: 'RETURNS_TO' },
-            { source: '2', target: 'HOME', type: 'RETURNS_TO' },
-            { source: '3', target: 'HOME', type: 'RETURNS_TO' }
+            { source: '1', target: 'HOME', type: 'PART_OF' },
+            { source: '2', target: 'HOME', type: 'PART_OF' },
+            { source: '3', target: 'HOME', type: 'PART_OF' }
         ]
     }
 ];
