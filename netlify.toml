@@ -1,0 +1,5 @@
+# The old Netlify site. The Cloudflare Worker ignores this file (see docs/cloudflare.md).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
