@@ -54,10 +54,10 @@ function Head({x, y, r}: {x: number, y: number, r: number}) {
             <ellipse cx={x - rx * 0.42} cy={cy - ry * 0.45} rx={rx * 0.2} ry={ry * 0.32}
                 transform={`rotate(25 ${x - rx * 0.42} ${cy - ry * 0.45})`} className="jon-balloon-shine"/>
             <g className="part eyes">
-                <circle cx={x - r * 0.3} cy={cy - r * 0.05} r={r * 0.13} className="crew-ink"/>
-                <circle cx={x + r * 0.3} cy={cy - r * 0.05} r={r * 0.13} className="crew-ink"/>
+                <circle cx={x - r * 0.3} cy={cy - r * 0.08} r={r * 0.17} className="jon-face-ink"/>
+                <circle cx={x + r * 0.3} cy={cy - r * 0.08} r={r * 0.17} className="jon-face-ink"/>
             </g>
-            <path d={`M${x - r * 0.38} ${cy + r * 0.3} q${r * 0.38} ${r * 0.36} ${r * 0.76} 0`} className="jon-smile"/>
+            <path d={`M${x - r * 0.38} ${cy + r * 0.3} q${r * 0.38} ${r * 0.36} ${r * 0.76} 0`} className="jon-smile" style={{strokeWidth: Math.max(1.2, r * 0.2)}}/>
         </g>
     );
 }
