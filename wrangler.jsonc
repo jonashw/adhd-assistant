@@ -15,8 +15,7 @@
     {
       "binding": "DB",
       "database_name": "adhd-assist",
-      // replace with the id printed by: npx wrangler d1 create adhd-assist
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "423eeb20-4d2d-46a1-a096-79ebe645a028",
       "migrations_dir": "worker/migrations"
     }
   ],
