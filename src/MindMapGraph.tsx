@@ -398,6 +398,27 @@ export default function MindMapGraph({
                                 ctx.stroke();
                                 ctx.restore();
                             }
+                            //threads that checked in without a place: a numbered badge on HOME, so the question can't hide
+                            const asking = node.type === "HOME" ? nav.trail.unplaced.length : 0;
+                            if (asking > 0) {
+                                ctx.save();
+                                const r = Math.max(4.5, 7 / globalScale);
+                                const bx = node.x! + nodeRadius * 0.75;
+                                const by = node.y! - nodeRadius * 0.75;
+                                ctx.beginPath();
+                                ctx.arc(bx, by, r, 0, Math.PI * 2);
+                                ctx.fillStyle = 'hsl(25 90 48)';
+                                ctx.fill();
+                                ctx.lineWidth = Math.max(0.8, 1.5 / globalScale);
+                                ctx.strokeStyle = 'white';
+                                ctx.stroke();
+                                ctx.fillStyle = 'white';
+                                ctx.font = `bold ${r * 1.25}px Sans-Serif`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'middle';
+                                ctx.fillText(asking > 9 ? "9+" : String(asking), bx, by + r * 0.05);
+                                ctx.restore();
+                            }
                             const flag = nav.flagOf(node.id);
                             if (flag) {
                                 ctx.save();
