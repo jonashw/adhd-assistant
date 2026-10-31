@@ -4,7 +4,9 @@ import {
     Stack, TextField, Typography, useMediaQuery, useTheme
 } from "@mui/material";
 import { MindMapGraphData } from "./MindMap";
-import { LinkedItem, age } from "./TrailTypes";
+import { LinkedItem, PlaceSuggestion, age } from "./TrailTypes";
+import { MindMap } from "./MindMap";
+import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { useNavigator } from "./NavigatorContext";
 import { currentWeather, Suggestion, targetPlaces, whatsNext } from "./Navigator";
 import { CrewIcon } from "./Crew";
@@ -37,9 +39,48 @@ function Mindful() {
     );
 }
 
+/* A thread suggested a new place: Jon charts it (renaming the last name if he likes), or answers below */
+function ChartSuggestion({item, suggestion, graph, onChart}: {
+    item: LinkedItem,
+    suggestion: PlaceSuggestion,
+    graph: MindMapGraphData,
+    onChart: (names: string[]) => Promise<void>
+}) {
+    const [last, setLast] = React.useState(suggestion.path[suggestion.path.length - 1]);
+    const [busy, setBusy] = React.useState(false);
+    const under = graph.nodes.find(n => n.id === suggestion.underNoteId);
+    const lead = suggestion.path.slice(0, -1);
+    return (
+        <Stack gap={1} data-testid="place-suggestion">
+            <Typography variant="body2">
+                It suggests a new place: {under && under.type !== "HOME" ? `${under.label} › ` : ""}{[...lead, last].join(" › ")}
+            </Typography>
+            <Stack direction="row" gap={1} alignItems="center">
+                <TextField size="small" label="Name" value={last} sx={{flex: 1}} inputProps={{maxLength: 120}}
+                    onChange={e => setLast(e.target.value)}/>
+                <Button size="small" variant="contained" disabled={busy || !last.trim()}
+                    onClick={() => {
+                        setBusy(true);
+                        onChart([...lead, last.trim()]).finally(() => setBusy(false));
+                    }}>Chart it</Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Or pick an existing place for {item.title}:</Typography>
+        </Stack>
+    );
+}
+
 /* A thread checked in without naming a place: that question is a flare until Jon answers */
-function ClaudeAsks({items, graph}: {items: LinkedItem[], graph: MindMapGraphData}) {
+function ClaudeAsks({items, graph, onChange}: {items: LinkedItem[], graph: MindMapGraphData, onChange?: (graph: MindMapGraphData) => void}) {
     const nav = useNavigator();
+    const {whenSaved} = React.useContext(GraphRepositoryContext);
+    //the squirrel stakes the new place (dashed until Jon walks there), then the thread moves in once the map is saved
+    const chart = (item: LinkedItem, suggestion: PlaceSuggestion) => async (names: string[]) => {
+        if (!onChange) return;
+        const [charted, placeId] = MindMap.chartPath(graph, suggestion.underNoteId, names);
+        onChange(charted);
+        await whenSaved(nav.mapId);
+        await run(nav.placeItem(item.id, placeId));
+    };
     const [error, setError] = React.useState<string>();
     const choices = targetPlaces(graph);
     const run = (work: Promise<void>) => work.then(() => setError(undefined)).catch((e: Error) => setError(e.message));
@@ -53,6 +94,9 @@ function ClaudeAsks({items, graph}: {items: LinkedItem[], graph: MindMapGraphDat
                         Which place does <strong>{item.title}</strong> serve?
                         {item.lastHeardAt && <Typography component="span" variant="caption" color="text.secondary"> {age(item.lastHeardAt, nav.now)}</Typography>}
                     </Typography>
+                    {item.suggestion && item.suggestion.mapId === nav.mapId && onChange
+                        && graph.nodes.some(n => n.id === item.suggestion!.underNoteId)
+                        && <ChartSuggestion item={item} suggestion={item.suggestion} graph={graph} onChart={chart(item, item.suggestion)}/>}
                     <Stack direction="row" gap={1} alignItems="center">
                         <Autocomplete
                             size="small"
@@ -73,9 +117,11 @@ function ClaudeAsks({items, graph}: {items: LinkedItem[], graph: MindMapGraphDat
 }
 
 /* What's next: the app suggests where Jon's feet go; Jon picks */
-export function WhatsNextDialog({open, graph, onClose, onGo}: {
+export function WhatsNextDialog({open, graph, onChange, onClose, onGo}: {
     open: boolean,
     graph: MindMapGraphData,
+    /* edits the map, for charting a place Claude suggested */
+    onChange?: (graph: MindMapGraphData) => void,
     onClose: () => void,
     onGo: (id: string) => void
 }) {
@@ -108,7 +154,7 @@ export function WhatsNextDialog({open, graph, onClose, onGo}: {
         <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm" data-testid="whats-next">
             <DialogTitle>What's next</DialogTitle>
             <DialogContent>
-                {!standing && nav.trail.unplaced.length > 0 && <ClaudeAsks items={nav.trail.unplaced} graph={graph}/>}
+                {!standing && nav.trail.unplaced.length > 0 && <ClaudeAsks items={nav.trail.unplaced} graph={graph} onChange={onChange}/>}
                 {standing ? <Mindful/>
                 : result.kind === "mindful" ? <Mindful/>
                 : result.kind === "small" ? (

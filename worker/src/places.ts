@@ -45,7 +45,13 @@ export async function findPlaces(env: Env, query: string, limit = 15): Promise<F
     const found: (FoundPlace & {score: number})[] = [];
     for (const map of maps) {
         for (const node of map.nodes) {
-            if (node.type === "HOME") continue;
+            if (node.type === "HOME") {
+                //each map's HOME is listed so a thread can suggest a new region under it
+                if (words.length === 0 || words.every(w => "home".includes(w) || node.label.toLowerCase().includes(w))) {
+                    found.push({place: placeKey(map.id, node.id), map: homeLabel(map), path: "HOME", status: "open", canTarget: false, score: 100});
+                }
+                continue;
+            }
             const path = pathOf(map, node.id);
             const haystack = `${path.join(" ")} ${node.body ?? ""}`.toLowerCase();
             const label = node.label.toLowerCase();
