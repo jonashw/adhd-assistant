@@ -66,8 +66,9 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `whats_next`.
-It can't change places, statuses or links. Its instructions ask each thread to check in when work
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`.
+It can't change places, statuses or links. When no place fits, a thread suggests new names under the
+closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
 instructions can repeat that if threads forget.
 

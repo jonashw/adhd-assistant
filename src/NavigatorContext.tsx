@@ -5,6 +5,7 @@ import { emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, Trai
 import { readTether, standingAt, Tether, WeatherAnswer } from "./Navigator";
 
 export type Navigator = {
+    mapId: string,
     loaded: boolean,
     trail: TrailData,
     tether: Tether,
@@ -212,7 +213,7 @@ export function NavigatorProvider({graph, children}: {graph: MindMapGraphDataRec
     }, [store, refresh]);
 
     const value: Navigator = {
-        loaded, trail, tether, now, weatherAnswer,
+        mapId, loaded, trail, tether, now, weatherAnswer,
         arrive, tieOff, untie, answerWeather, flagOf, plantFlag, clearFlag,
         signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem, refresh
     };

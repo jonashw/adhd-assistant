@@ -29,8 +29,13 @@ export type LinkedItem = {
     stateNote?: string,
     lastHeardAt?: string,
     /* the places on this map it serves; signals land only at the primary one */
-    places: {noteId: string, primary: boolean}[]
+    places: {noteId: string, primary: boolean}[],
+    /* a thread with no place yet may suggest a new one, for Jon to chart */
+    suggestion?: PlaceSuggestion
 };
+
+/* New place names (outermost first) under an existing place; the last name is the thread's place */
+export type PlaceSuggestion = {mapId: string, underNoteId: string, path: string[]};
 
 export type TrailData = {
     /* recent visits, oldest first, always including the last tie-off or untie */

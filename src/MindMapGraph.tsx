@@ -253,7 +253,7 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-                <YouStrip graph={value} selectNodeId={selectNodeId}/>
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}/>
             </div>
 
             <div

@@ -1,6 +1,6 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
-import { freshTracksDays, kindOfUrl, LinkedItem, ThreadState } from "../../src/TrailTypes";
+import { freshTracksDays, kindOfUrl, LinkedItem, PlaceSuggestion, ThreadState } from "../../src/TrailTypes";
 
 /* Linked items: things outside the map that places point at. A Claude thread is one that also reports
    how it is doing; its state becomes at most one open signal, at its primary place. */
@@ -177,8 +177,47 @@ export async function placeItem(env: Env, itemId: string, place: PlaceRef): Prom
     }
     await checkTarget(env, place);
     await setPrimary(env, itemId, place);
+    await env.DB.prepare("DELETE FROM place_suggestions WHERE item_id = ?").bind(itemId).run();
     await raiseFor(env, itemId);
     return (await getItem(env, itemId))!;
+}
+
+/* A thread whose place isn't on the map suggests new names under the closest existing place. The map
+   doesn't change: Jon charts it, picks another place, or says no. */
+export async function suggestPlace(env: Env, threadId: string, under: PlaceRef, path: string[]): Promise<PlaceSuggestion> {
+    const names = path.map(n => n.trim()).filter(Boolean);
+    if (names.length === 0 || names.length > 3 || names.some(n => n.length > 120)) {
+        throw new HttpError(422, "Suggest one to three names of up to 120 characters, outermost first.");
+    }
+    const item = await env.DB.prepare("SELECT kind FROM linked_items WHERE id = ?").bind(threadId).first<{kind: string}>();
+    if (item?.kind !== "claude.thread") {
+        throw new HttpError(404, "No thread has that id. Check in first.");
+    }
+    const parent = await env.DB.prepare("SELECT type FROM notes WHERE map_id = ? AND id = ?")
+        .bind(under.mapId, under.noteId).first<{type: string}>();
+    if (!parent) {
+        throw new HttpError(404, "There is no such place to suggest under.");
+    }
+    if (parent.type === "HOME" && names.length < 2) {
+        throw new HttpError(422, 'Right under HOME, suggest a region and a place inside it, like ["Music", "NYE party"].');
+    }
+    // if the whole path already exists, the thread should simply check in there
+    let current: string | undefined = under.noteId;
+    for (const name of names) {
+        const child: {id: string} | null = current === undefined ? null : await env.DB.prepare(
+            "SELECT id FROM notes WHERE map_id = ? AND parent_id = ? AND lower(label) = lower(?)"
+        ).bind(under.mapId, current, name).first<{id: string}>();
+        current = child?.id;
+    }
+    if (current) {
+        throw new HttpError(409, `That place already exists: check in with place "${under.mapId}/${current}".`);
+    }
+    await env.DB.prepare(
+        `INSERT INTO place_suggestions (item_id, map_id, under_note_id, path, created_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (item_id) DO UPDATE SET map_id = excluded.map_id, under_note_id = excluded.under_note_id,
+            path = excluded.path, created_at = excluded.created_at`
+    ).bind(threadId, under.mapId, under.noteId, JSON.stringify(names), new Date().toISOString()).run();
+    return {mapId: under.mapId, underNoteId: under.noteId, path: names};
 }
 
 /* Jon pastes a link onto a place */
@@ -226,7 +265,7 @@ export async function removeLink(env: Env, place: PlaceRef, itemId: string): Pro
 
 /* The items linked to places on one map, and the Claude threads still waiting for a place */
 export async function itemsFor(env: Env, mapId: string): Promise<{items: LinkedItem[], unplaced: LinkedItem[]}> {
-    const [items, places, unplaced] = await env.DB.batch([
+    const [items, places, unplaced, suggestions] = await env.DB.batch([
         env.DB.prepare(
             `SELECT * FROM linked_items WHERE id IN (SELECT item_id FROM item_places WHERE map_id = ?) ORDER BY created_at`
         ).bind(mapId),
@@ -234,12 +273,21 @@ export async function itemsFor(env: Env, mapId: string): Promise<{items: LinkedI
         env.DB.prepare(
             `SELECT * FROM linked_items WHERE kind = 'claude.thread' AND state != 'done'
              AND id NOT IN (SELECT item_id FROM item_places WHERE is_primary = 1) ORDER BY created_at`
-        )
+        ),
+        env.DB.prepare("SELECT * FROM place_suggestions")
     ]);
+    type SuggestionRow = {item_id: string, map_id: string, under_note_id: string, path: string};
+    const suggestionOf = new Map((suggestions.results as SuggestionRow[])
+        .map(r => [r.item_id, {mapId: r.map_id, underNoteId: r.under_note_id, path: JSON.parse(r.path) as string[]}]));
     const placeRows = places.results as PlaceRow[];
     return {
         items: (items.results as ItemRow[]).map(r => toItem(r, placeRows.filter(p => p.item_id === r.id))),
-        unplaced: (unplaced.results as ItemRow[]).map(r => toItem(r, []))
+        unplaced: (unplaced.results as ItemRow[]).map(r => {
+            const item = toItem(r, []);
+            const suggestion = suggestionOf.get(r.id);
+            if (suggestion) item.suggestion = suggestion;
+            return item;
+        })
     };
 }
 

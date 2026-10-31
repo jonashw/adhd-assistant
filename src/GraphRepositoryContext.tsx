@@ -10,11 +10,14 @@ export const GraphRepositoryContext = React.createContext<{
     /* bumps when a map is replaced from elsewhere, so its editor starts fresh */
     reloadCount: {[id: string]: number},
     saveGraph: (g: MindMapGraphDataRecord) => void,
+    /* resolves once the server holds every change made to this map so far */
+    whenSaved: (id: string) => Promise<void>,
     deleteGraphById: (id: string) => void
 }>({
     graphs: [],
     reloadCount: {},
     saveGraph: () => {},
+    whenSaved: () => Promise.resolve(),
     deleteGraphById: () => {}
 });
 
@@ -30,6 +33,17 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
     const revisions = React.useRef<{[id: string]: number | null}>({});
     const pending = React.useRef(new Map<string, MindMapGraphDataRecord>());
     const inFlight = React.useRef(new Set<string>());
+    const waiters = React.useRef(new Map<string, (() => void)[]>());
+    const settled = (id: string) => {
+        if (!pending.current.has(id) && !inFlight.current.has(id)) {
+            (waiters.current.get(id) ?? []).forEach(resolve => resolve());
+            waiters.current.delete(id);
+        }
+    };
+    const whenSaved = React.useCallback((id: string) => new Promise<void>(resolve => {
+        waiters.current.set(id, [...(waiters.current.get(id) ?? []), resolve]);
+        settled(id);
+    }), []);
 
     const replaceFromServer = React.useCallback((id: string, latest: MindMapGraphDataRecord | null, message: string) => {
         pending.current.delete(id);
@@ -72,6 +86,13 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
                 inFlight.current.delete(id);
                 if (saveNext) {
                     flush(id);
+                }
+                //a failed save still releases its waiters, which then find the place missing and say so
+                if (saveNext) {
+                    settled(id);
+                } else {
+                    (waiters.current.get(id) ?? []).forEach(resolve => resolve());
+                    waiters.current.delete(id);
                 }
             });
     }, [replaceFromServer]);
@@ -132,7 +153,7 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
     }, [status]);
 
     return (
-        <GraphRepositoryContext.Provider value={{status, graphs, reloadCount, saveGraph, deleteGraphById}}>
+        <GraphRepositoryContext.Provider value={{status, graphs, reloadCount, saveGraph, whenSaved, deleteGraphById}}>
             {children}
             <Snackbar
                 open={notice !== undefined}

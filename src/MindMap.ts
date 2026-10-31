@@ -284,6 +284,26 @@ export const MindMap = {
         };
         return updatedValue;
     },
+    /* Chart a suggested path of names under a place, reusing children that already have a name; returns the last place */
+    chartPath: (graph: MindMapGraphData, underId: string, names: string[]): [MindMapGraphData, string] => {
+        let current = underId;
+        let next = graph;
+        for (const name of names) {
+            const existing = next.nodes.find(n =>
+                n.label.trim().toLowerCase() === name.trim().toLowerCase() && MindMap.parentOf(next, n.id) === current);
+            if (existing) {
+                current = existing.id;
+                continue;
+            }
+            const node: MindMapGraphNode = {id: crypto.randomUUID(), label: name.trim(), type: 'RabbitHole'};
+            next = {
+                nodes: [...next.nodes, node],
+                links: [...next.links, {source: node.id, target: current, type: 'PART_OF'}]
+            };
+            current = node.id;
+        }
+        return [next, current];
+    },
     rabbitHole: (graph:MindMapGraphData, origin: string, label: string) => {
         const newNode: MindMapGraphNode = {
             id: crypto.randomUUID(),

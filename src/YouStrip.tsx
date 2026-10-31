@@ -9,7 +9,11 @@ import { WhatsNextDialog } from "./WhatsNextDialog";
 export const youStripHeight = 52;
 
 /* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
-export function YouStrip({graph, selectNodeId}: {graph: MindMapGraphData, selectNodeId: (id: string) => void}) {
+export function YouStrip({graph, onChange, selectNodeId}: {
+    graph: MindMapGraphData,
+    onChange?: (graph: MindMapGraphData) => void,
+    selectNodeId: (id: string) => void
+}) {
     const nav = useNavigator();
     const {tether, now} = nav;
     const labelOf = (id: string) => {
@@ -112,6 +116,7 @@ export function YouStrip({graph, selectNodeId}: {graph: MindMapGraphData, select
             <WhatsNextDialog
                 open={whatsNextOpen}
                 graph={graph}
+                onChange={onChange}
                 onClose={() => setWhatsNextOpen(false)}
                 onGo={id => {
                     setWhatsNextOpen(false);

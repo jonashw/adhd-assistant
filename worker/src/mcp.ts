@@ -4,7 +4,7 @@ import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validatio
 import { z } from "zod";
 import { Env } from "./env";
 import { HttpError } from "./http";
-import { checkIn, reportState } from "./items";
+import { checkIn, reportState, suggestPlace } from "./items";
 import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places";
 import { LinkedItem, threadStates } from "../../src/TrailTypes";
 
@@ -17,7 +17,8 @@ const instructions = `ADHD Assist is Jon's attention navigator: a map of the pla
 Your thread's state shows up as a signal on his map, so he knows when you need him without checking every thread.
 
 - When you start work for Jon, call check_in with this thread's title and, if you know it, its link. Keep the thread_id it returns.
-- Name the place this thread serves: call find_places with a few words, and pass the best match as place. Regions right under HOME can't be targets; pick a place inside one. If you aren't sure, check in without a place and Jon will pick one.
+- Name the place this thread serves: call find_places with a few words, and pass the best match as place. Regions right under HOME can't be targets; pick a place inside one.
+- If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.`;
 
@@ -29,7 +30,7 @@ const describeThread = (item: LinkedItem) => {
         thread_id: item.id,
         title: item.title,
         state: item.state,
-        place: primary ? "set" : "not set: Jon will be asked which place this thread serves",
+        place: primary ? "set" : "not set: if no existing place fits, call suggest_place; otherwise Jon will be asked to pick one",
     };
 };
 
@@ -79,9 +80,24 @@ function buildServer(env: Env): McpServer {
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(async () => describeThread(await reportState(env, args.thread_id, args.state, args.note))));
 
+    server.registerTool("suggest_place", {
+        title: "Suggest a place",
+        description: "When no existing place fits this thread, suggest a new one: one to three names, outermost first, under the closest existing place (HOME included; find_places lists each map's HOME). The map doesn't change: Jon charts it, picks another place, or says no. Charting places this thread there.",
+        inputSchema: {
+            thread_id: z.string().describe("The thread_id check_in returned"),
+            under: place.describe("The closest existing place, from find_places; may be a map's HOME"),
+            names: z.array(z.string().min(1).max(120)).min(1).max(3)
+                .describe("New names, outermost first; the last is this thread's place. Right under HOME, give a region and a place, like [\"Music\", \"NYE party\"]")
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(async () => {
+        const suggestion = await suggestPlace(env, args.thread_id, parsePlace(args.under), args.names);
+        return {suggested: suggestion.path.join(" › "), next: "Jon will see it in What's next. Once he charts it, this thread's signals land there."};
+    }));
+
     server.registerTool("find_places", {
         title: "Find places",
-        description: "Search Jon's map for places by their words. Returns each place's value (for check_in), its path and status. canTarget is false for regions right under HOME.",
+        description: "Search Jon's map for places by their words. Returns each place's value (for check_in), its path and status. canTarget is false for HOME and the regions right under it (use those as \"under\" for suggest_place).",
         inputSchema: {query: z.string().max(200).describe("A few words; empty lists the first places")},
         annotations: {readOnlyHint: true, openWorldHint: false}
     }, args => run(() => findPlaces(env, args.query)));
