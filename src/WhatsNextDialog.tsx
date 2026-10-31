@@ -52,8 +52,8 @@ export function Mindful() {
                 <img src="/Enso.svg" alt="" width={size} height={size}/>
                 {/* the sloth hooks its claws over the inside edge of the enso's top, so its body hangs against the white */}
                 <Box sx={{position: "absolute", top: 28 * u, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={44 * u} bar={false}/></Box>
-                <Box sx={{position: "absolute", bottom: 30 * u, left: "54%", transform: "translateX(-50%)", lineHeight: 0}}>
-                    <MindfulScene size={101 * u}/>
+                <Box sx={{position: "absolute", bottom: 24 * u, left: "54%", transform: "translateX(-50%)", lineHeight: 0}}>
+                    <MindfulScene size={131 * u}/>
                 </Box>
             </Box>}
             <Typography variant="overline">You are here: Mindful</Typography>
