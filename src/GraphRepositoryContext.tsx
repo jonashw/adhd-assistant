@@ -76,6 +76,12 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
             });
     }, [replaceFromServer]);
 
+    //maps made while the stored ones were still loading are kept, not overwritten
+    const setLoaded = (loaded: MindMapGraphDataRecord[]) => setGraphs(current => [
+        ...loaded,
+        ...current.filter(g => !loaded.some(l => l.id === g.id))
+    ]);
+
     React.useEffect(() => {
         ServerApi.status().then(async status => {
             setStatus(status);
@@ -84,7 +90,7 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
                 for (const map of maps) {
                     revisions.current[map.id] = map.revision;
                 }
-                setGraphs(maps.map(({id, nodes, links}) => MindMap.normalize({id, nodes, links})));
+                setLoaded(maps.map(({id, nodes, links}) => MindMap.normalize({id, nodes, links})));
             } else if (status.mode === "local") {
                 const db = await DB.openDatabase();
                 const stored = await db.graph.getAll();
@@ -95,7 +101,7 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
                     await Promise.all(changed.map(g => db.graph.put(g)));
                     console.log(`brought ${changed.length} graph(s) up to the current model`);
                 }
-                setGraphs(migrated);
+                setLoaded(migrated);
             }
         }).catch((e: Error) => setNotice(`Couldn't load your maps: ${e.message}`));
     }, []);

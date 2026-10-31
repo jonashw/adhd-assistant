@@ -74,7 +74,11 @@ export type MindMapGraphNode = {
     doneAt?: string,
     hidden?: boolean,
     /* the node this one was seen from when it was made; never changes, even when the node moves */
-    origin?: string
+    origin?: string,
+    /* its next step fits in 5 minutes */
+    small?: boolean,
+    /* Jon's own interest, 1 to 5; unset is neutral */
+    interest?: number
 }
 
 export type MindMapGraphLink = {type: MindMapGraphLinkType, label?: string};
@@ -112,6 +116,54 @@ export const MindMap = {
         })),
     setHidden: (graph: MindMapGraphData, nodeId: string, hidden: boolean): MindMapGraphData =>
         updateNode(graph, nodeId, n => ({...n, hidden})),
+    setSmall: (graph: MindMapGraphData, nodeId: string, small: boolean): MindMapGraphData =>
+        updateNode(graph, nodeId, n => {
+            const {small: _, ...rest} = n;
+            return small ? {...rest, small} : rest;
+        }),
+    setInterest: (graph: MindMapGraphData, nodeId: string, interest: number | undefined): MindMapGraphData =>
+        updateNode(graph, nodeId, n => {
+            const {interest: _, ...rest} = n;
+            return interest ? {...rest, interest} : rest;
+        }),
+    /* The places this one waits on (its BLOCKED_BY links) */
+    blockersOf: (graph: MindMapGraphData, nodeId: string): string[] =>
+        graph.links.filter(l => l.source === nodeId && l.type === 'BLOCKED_BY').map(l => l.target),
+    /* Blocked while any place it waits on is still unfinished (not done or dropped) */
+    isBlocked: (graph: MindMapGraphData, nodeId: string): boolean => {
+        const byId = new Map(graph.nodes.map(n => [n.id, n]));
+        return MindMap.blockersOf(graph, nodeId).some(id => {
+            const blocker = byId.get(id);
+            return blocker !== undefined && blocker.status !== 'done' && blocker.status !== 'dropped';
+        });
+    },
+    /* Would "nodeId waits on blockerId" make places wait on each other in a loop? */
+    wouldLoop: (graph: MindMapGraphData, nodeId: string, blockerId: string): boolean => {
+        if (nodeId === blockerId) {
+            return true;
+        }
+        const seen = new Set<string>();
+        const stack = [blockerId];
+        while (stack.length > 0) {
+            const current = stack.pop()!;
+            if (current === nodeId) {
+                return true;
+            }
+            if (!seen.has(current)) {
+                seen.add(current);
+                stack.push(...MindMap.blockersOf(graph, current));
+            }
+        }
+        return false;
+    },
+    addBlocker: (graph: MindMapGraphData, nodeId: string, blockerId: string): MindMapGraphData =>
+        MindMap.blockersOf(graph, nodeId).includes(blockerId) || MindMap.wouldLoop(graph, nodeId, blockerId)
+            ? graph
+            : {nodes: graph.nodes, links: [...graph.links, {source: nodeId, target: blockerId, type: 'BLOCKED_BY'}]},
+    removeBlocker: (graph: MindMapGraphData, nodeId: string, blockerId: string): MindMapGraphData => ({
+        nodes: graph.nodes,
+        links: graph.links.filter(l => !(l.source === nodeId && l.target === blockerId && l.type === 'BLOCKED_BY'))
+    }),
     /* Nodes to draw: everything when revealing hidden, otherwise only nodes with no tucked node on their way home */
     visibleGraph: (graph: MindMapGraphData, revealHidden: boolean): MindMapGraphData => {
         if (revealHidden) {

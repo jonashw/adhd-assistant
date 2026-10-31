@@ -14,7 +14,7 @@ type GraphFileContents = {
 const plain = (graph: MindMapGraphDataRecord): MindMapGraphDataRecord => ({
     id: graph.id,
     nodes: graph.nodes.map(n => ({...n})),
-    links: graph.links.map(({source, target, type}) => ({source, target, type}))
+    links: graph.links.map(({source, target, type, label}) => label ? {source, target, type, label} : {source, target, type})
 });
 
 export function exportGraph(graph: MindMapGraphDataRecord, name: string) {

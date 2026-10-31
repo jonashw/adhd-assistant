@@ -10,6 +10,9 @@ import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 import { loadImgElement } from "./loadImgElement";
+import { useNavigator } from "./NavigatorContext";
+import { standingAt } from "./Navigator";
+import { YouStrip } from "./YouStrip";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -46,6 +49,27 @@ export default function MindMapGraph({
     const home = graph.nodes.find(n => n.type === "HOME");
     const [selectedNodeId, selectNodeId] = React.useState<string | undefined>(home?.id);
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
+
+    const nav = useNavigator();
+    //once the trail has loaded, open the map where Jon stands; after that, every place he opens is a visit
+    const syncedWithTrail = React.useRef(false);
+    React.useEffect(() => {
+        if (!nav.loaded || syncedWithTrail.current) {
+            return;
+        }
+        syncedWithTrail.current = true;
+        const here = standingAt(nav.tether);
+        if (MindMap.visibleGraph(value, false).nodes.some(n => n.id === here)) {
+            selectNodeId(here);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nav.loaded]);
+    React.useEffect(() => {
+        if (syncedWithTrail.current && selectedNodeId && value.nodes.some(n => n.id === selectedNodeId)) {
+            nav.arrive(selectedNodeId);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedNodeId]);
 
     const selectedNode = React.useMemo(
         () => value.nodes.find(n => n.id === selectedNodeId),
@@ -229,6 +253,7 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
+                <YouStrip graph={value} selectNodeId={selectNodeId}/>
             </div>
 
             <div
@@ -359,12 +384,31 @@ export default function MindMapGraph({
                                 }
                             } else {
                                 fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, nodeForegroundColor(node));
+                                ctx.save();
                                 ctx.beginPath();
                                 ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                                 ctx.closePath();
                                 ctx.strokeStyle = 'hsl(0 0 20)';
                                 ctx.lineWidth = 1;
+                                if (MindMap.isBlocked(value, node.id)) {
+                                    //waiting on something: a dashed ring
+                                    ctx.setLineDash([3, 2]);
+                                    ctx.lineWidth = 2;
+                                }
                                 ctx.stroke();
+                                ctx.restore();
+                            }
+                            const flag = nav.flagOf(node.id);
+                            if (flag) {
+                                ctx.save();
+                                const fontSize = Math.max(5, 10 / globalScale);
+                                ctx.font = `${fontSize}px Sans-Serif`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'bottom';
+                                ctx.fillStyle = 'hsl(220 60 35)';
+                                const text = `⚑ ${flag.label}`;
+                                ctx.fillText(text.length > 24 ? `${text.slice(0, 23)}…` : text, node.x!, node.y! - nodeRadius - 1);
+                                ctx.restore();
                             }
                         }}
                         linkCanvasObjectMode={() => "after"}

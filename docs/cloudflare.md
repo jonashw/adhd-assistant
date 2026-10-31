@@ -37,6 +37,11 @@ working as before and stores maps in the browser only.
 
    If the migration step fails with an auth error, give the build's API token D1 Edit.
 
+   Turn off **Builds for Preview branches** (Settings → Build → Previews Base). PR builds always
+   run `npx wrangler preview`, whatever the preview command says, and it fails until the config
+   names a separate preview database. Google sign-in wouldn't work on preview URLs anyway; the
+   Netlify preview covers the UI.
+
 6. **Bring maps over.** On the old site, export each mind map (download button in the list).
    On the new site, sign in and use + → Import.
 

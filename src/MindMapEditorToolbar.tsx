@@ -4,7 +4,8 @@ import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode, nodeStatuses } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
-import { AltRoute, Check, Delete, Edit, FormatListBulleted, TaskAlt, Visibility, VisibilityOff } from "@mui/icons-material";
+import { AltRoute, Check, Delete, Edit, FormatListBulleted, OutlinedFlag, TaskAlt, Visibility, VisibilityOff } from "@mui/icons-material";
+import { PlaceDetailsDialog } from "./PlaceDetailsDialog";
 import { MindMapOutlineModal } from "./MindMapOutlineModal";
 
 
@@ -36,6 +37,7 @@ export function MindMapEditorToolbar({
     const home = value.nodes.find(n => n.type === "HOME");
     const [nodeToRename,setNodeToRename] = React.useState<DirectedGraphNode<MindMapGraphNode>>();
     const [outlineVisible, setOutlineVisible] = React.useState(false);
+    const [detailsVisible, setDetailsVisible] = React.useState(false);
     const [statusMenuAnchor, setStatusMenuAnchor] = React.useState<HTMLElement>();
     const anyTucked = value.nodes.some(MindMap.isTucked);
     const closeStatusMenu = (updatedGraph?: MindMapGraphData) => {
@@ -69,6 +71,13 @@ export function MindMapEditorToolbar({
                     setNodeToRename(undefined);
                 }}
             />
+
+            {detailsVisible && <PlaceDetailsDialog
+                node={selectedNode}
+                graph={value}
+                onChange={onChange}
+                onClose={() => setDetailsVisible(false)}
+            />}
 
             <MindMapOutlineModal
                 graph={value}
@@ -158,6 +167,16 @@ export function MindMapEditorToolbar({
                                     onClick={e => setStatusMenuAnchor(e.currentTarget)}
                                 >
                                     <TaskAlt/>
+                                </Button>
+
+                                <Button
+                                    variant="contained"
+                                    title="Flag, blocked by, small and interest"
+                                    aria-label="Place details"
+                                    color="info"
+                                    onClick={() => setDetailsVisible(true)}
+                                >
+                                    <OutlinedFlag/>
                                 </Button>
 
                                 <Button
