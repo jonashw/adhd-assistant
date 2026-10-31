@@ -10,6 +10,7 @@ import {
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { GraphList } from './GraphList';
 import { SignInGate } from './SignInGate';
+import { CrewPreview } from './CrewPreview';
 
 const defaultTheme = createTheme();
 
@@ -37,6 +38,15 @@ const router = createBrowserRouter([
         element: <GraphEditor />
       }
     ]
+  },
+  {
+    path: "/crew",
+    element: (
+      <ThemeProvider theme={defaultTheme}>
+        <CssBaseline />
+        <CrewPreview />
+      </ThemeProvider>
+    )
   },
   {
     path: "/recognize",
