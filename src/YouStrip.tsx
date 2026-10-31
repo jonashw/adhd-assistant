@@ -1,5 +1,5 @@
 import React from "react";
-import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Stack, Typography } from "@mui/material";
+import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Stack, Typography } from "@mui/material";
 import { MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
@@ -73,9 +73,17 @@ export function YouStrip({graph, onChange, selectNodeId}: {
                         {back && <Button size="small" onClick={reelIn}>Reel in</Button>}
                         <Button size="small" onClick={() => nav.tieOff(here)}>Tie off</Button>
                     </>}
-                <Button size="small" variant="contained" onClick={() => setWhatsNextOpen(true)}>
-                    What's next
-                </Button>
+                <Badge
+                    badgeContent={nav.trail.unplaced.length}
+                    color="warning"
+                    data-testid="claude-asks-badge"
+                    title={nav.trail.unplaced.length > 0 ? `${nav.trail.unplaced.length} Claude thread(s) asking which place they serve` : undefined}
+                    sx={{flexShrink: 0, "& .MuiBadge-badge": {fontWeight: 700, top: 3, right: 5}}}
+                >
+                    <Button size="small" variant="contained" onClick={() => setWhatsNextOpen(true)}>
+                        What's next
+                    </Button>
+                </Badge>
             </Stack>
 
             {tugging && <Alert
