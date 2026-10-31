@@ -51,4 +51,6 @@ GOOGLE_CLIENT_SECRET=dev
 Then `npm run worker:dev` and open `http://localhost:8787/auth/dev-login` to sign in without
 Google. `DEV_LOGIN` only works on localhost and must never be set as a deployed secret.
 
-The `public/_redirects` file is for Netlify; Wrangler warns that it ignores it, which is expected.
+The Netlify SPA rewrite lives in `netlify.toml`, not `public/_redirects`: Cloudflare reads a `_redirects` file in the assets and rejects that rule as an infinite loop. The Worker's `not_found_handling` already does the same job.
+
+Wrangler needs Node 22 or later (see `.nvmrc`).
