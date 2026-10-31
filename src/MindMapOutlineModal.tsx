@@ -67,7 +67,14 @@ export function MindMapOutlineModal({
     const nav = useNavigator();
     const flagText: FlagText = id => {
         const flag = nav.flagOf(id);
-        return flag?.dueAt ? `⚑ ${flag.label}, due ${formatDue(flag.dueAt, nav.now)}` : undefined;
+        const signals = nav.signalsAt(id);
+        const parts = [
+            flag?.dueAt ? `⚑ ${flag.label}, due ${formatDue(flag.dueAt, nav.now)}` : undefined,
+            signals.some(s => s.kind === "request") ? "✴ flare" : undefined,
+            signals.some(s => s.kind === "trouble") ? "≋ smoke" : undefined,
+            signals.some(s => s.kind === "news") ? "∴ fresh tracks" : undefined
+        ].filter(Boolean);
+        return parts.length ? parts.join(" · ") : undefined;
     };
     return (
         <Dialog

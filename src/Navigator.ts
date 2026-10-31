@@ -1,5 +1,5 @@
 import { MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
-import { Signal, Visit } from "./Trail";
+import { LinkedItem, Signal, Visit } from "./TrailTypes";
 
 /* Where Jon stands, read from the trail. Pure functions, so they are easy to check. */
 
@@ -131,7 +131,9 @@ export type NavigatorInput = {
     tether: Tether,
     weather?: WeatherAnswer["answer"],
     now: Date,
-    weights?: Weights
+    weights?: Weights,
+    /* linked items, so a reason can name the Claude thread behind a signal */
+    items?: LinkedItem[]
 };
 
 const dayMs = 24 * 3600_000;
@@ -182,7 +184,15 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
             }
         }
     }
-    const hasSignal = (noteId: string, kind: Signal["kind"]) => signals.some(s => s.noteId === noteId && s.kind === kind);
+    const signalOf = (noteId: string, kind: Signal["kind"]) => signals.find(s => s.noteId === noteId && s.kind === kind);
+    const hasSignal = (noteId: string, kind: Signal["kind"]) => signalOf(noteId, kind) !== undefined;
+    const itemById = new Map((input.items ?? []).map(i => [i.id, i]));
+    /* "Claude is waiting on you in "Fix the importer" (PR #7 is ready)" */
+    const fromClaude = (signal: Signal, what: string, fallback: string) => {
+        const item = signal.itemId ? itemById.get(signal.itemId) : undefined;
+        if (!item) return signal.source === "claude" ? signal.label : fallback;
+        return `${what} in "${item.title}"${item.stateNote ? ` (${item.stateNote})` : ""}`;
+    };
     const setDown = tether.state === "aloft" && tether.setDown !== graph.nodes.find(n => n.type === "HOME")?.id
         ? tether.setDown : undefined;
 
@@ -201,8 +211,9 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
         const last = lastArrivedAt[node.id];
         const reason =
             flag ? `Flag: ${flag.label}, due ${formatDue(flag.dueAt!, now)}`
-            : hasSignal(node.id, "request") ? "Flare: someone is waiting on you"
-            : hasSignal(node.id, "trouble") ? "Smoke: something is going wrong"
+            : hasSignal(node.id, "request") ? `Flare: ${fromClaude(signalOf(node.id, "request")!, "Claude is waiting on you", "someone is waiting on you")}`
+            : hasSignal(node.id, "trouble") ? `Smoke: ${fromClaude(signalOf(node.id, "trouble")!, "Claude ran into trouble", "something is going wrong")}`
+            : hasSignal(node.id, "news") ? `Fresh tracks: ${fromClaude(signalOf(node.id, "news")!, "Claude finished", "news to read")}`
             : node.id === setDown ? "You set this down at your feet"
             : (node.interest ?? 0) >= 4 ? "You marked this as interesting"
             : last ? `Last here ${Math.max(1, Math.round((now.getTime() - Date.parse(last)) / dayMs))} day(s) ago`
@@ -216,9 +227,11 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
     if (input.weather === "gusty") {
         //one small thing, preferring where he stands; a flag only if its next step is small too
         const here = standingAt(tether);
+        const isNear = (s: Suggestion) => s.node.id === here || MindMap.parentOf(graph, s.node.id) === here;
+        //reading fresh tracks is a small thing too, and the most welcome one
+        const tracks = open.filter(s => hasSignal(s.node.id, "news"));
         const small = open.filter(s => s.node.small);
-        const nearby = small.filter(s => s.node.id === here || MindMap.parentOf(graph, s.node.id) === here);
-        return {kind: "small", pick: nearby[0] ?? small[0]};
+        return {kind: "small", pick: tracks.find(isNear) ?? tracks[0] ?? small.find(isNear) ?? small[0]};
     }
 
     //the bar: a place needs Jon when it has a flag, a flare or smoke, or he set it down
@@ -254,3 +267,9 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
     const shown = new Set([dueSoon, ...top].filter(Boolean).map(s => s!.node.id));
     return {kind: "ranked", flag: dueSoon, top, flip, others: open.filter(s => !shown.has(s.node.id))};
 }
+
+/* Places a Claude thread can serve: not HOME, and not a whole region right under it */
+export const targetPlaces = (graph: MindMapGraphData): MindMapGraphNode[] => {
+    const home = graph.nodes.find(n => n.type === "HOME")?.id;
+    return graph.nodes.filter(n => n.type !== "HOME" && MindMap.parentOf(graph, n.id) !== home && !MindMap.isTucked(n));
+};

@@ -1,31 +1,22 @@
 /* The trail (visits) and the signals over places, kept beside the map.
    Signed in, they live on the server; on the local-only site, in this browser. */
 
-export type VisitKind = "arrive" | "untie" | "tie_off";
-export type Visit = {id: number, noteId: string, kind: VisitKind, at: string};
-export type SignalKind = "deadline" | "request" | "trouble" | "news";
-export type Signal = {
-    id: string, noteId: string, kind: SignalKind,
-    source: "jon" | "claude" | "jira" | "calendar",
-    label: string,
-    /* YYYY-MM-DD, for deadlines */
-    dueAt?: string,
-    raisedAt: string
-};
-export type TrailData = {
-    /* recent visits, oldest first, always including the last tie-off or untie */
-    recent: Visit[],
-    lastArrivedAt: {[noteId: string]: string},
-    signals: Signal[]
-};
+import { LinkedItem, Signal, TrailData, Visit, VisitKind } from "./TrailTypes";
+export * from "./TrailTypes";
 
-export const emptyTrail: TrailData = {recent: [], lastArrivedAt: {}, signals: []};
+export const emptyTrail: TrailData = {recent: [], lastArrivedAt: {}, signals: [], items: [], unplaced: []};
 
 export interface TrailStore {
     load(mapId: string): Promise<TrailData>;
     addVisit(mapId: string, noteId: string, kind: VisitKind): Promise<Visit>;
     plantFlag(mapId: string, noteId: string, label: string, dueAt: string): Promise<Signal>;
     clearSignal(mapId: string, signalId: string): Promise<void>;
+    /* linked items need the server; the local-only site has none */
+    readonly linksSupported: boolean;
+    addLink(mapId: string, noteId: string, url: string, title?: string): Promise<LinkedItem>;
+    removeLink(mapId: string, noteId: string, itemId: string): Promise<void>;
+    placeItem(itemId: string, mapId: string, noteId: string): Promise<LinkedItem>;
+    forgetItem(itemId: string): Promise<void>;
 }
 
 async function send<T>(path: string, body?: unknown): Promise<T> {
@@ -51,8 +42,16 @@ export const serverTrailStore: TrailStore = {
     load: mapId => send(`${mapPath(mapId)}/trail`),
     addVisit: (mapId, noteId, kind) => send(`${mapPath(mapId)}/visits`, {noteId, kind}),
     plantFlag: (mapId, noteId, label, dueAt) => send(`${mapPath(mapId)}/signals`, {noteId, label, dueAt}),
-    clearSignal: (mapId, signalId) => send(`${mapPath(mapId)}/signals/${encodeURIComponent(signalId)}/clear`, {})
+    clearSignal: (mapId, signalId) => send(`${mapPath(mapId)}/signals/${encodeURIComponent(signalId)}/clear`, {}),
+    linksSupported: true,
+    addLink: (mapId, noteId, url, title) => send(`${mapPath(mapId)}/places/${encodeURIComponent(noteId)}/links`, {url, title}),
+    removeLink: (mapId, noteId, itemId) =>
+        send(`${mapPath(mapId)}/places/${encodeURIComponent(noteId)}/links/${encodeURIComponent(itemId)}/remove`, {}),
+    placeItem: (itemId, mapId, noteId) => send(`/api/items/${encodeURIComponent(itemId)}/place`, {mapId, noteId}),
+    forgetItem: itemId => send(`/api/items/${encodeURIComponent(itemId)}/forget`, {})
 };
+
+const needsServer = () => Promise.reject(new Error("Linked items need you to be signed in."));
 
 type LocalTrail = {visits: Visit[], signals: (Signal & {clearedAt?: string})[]};
 
@@ -89,7 +88,7 @@ export const localTrailStore: TrailStore = {
                 lastArrivedAt[v.noteId] = v.at;
             }
         }
-        return {recent: visits, lastArrivedAt, signals: signals.filter(s => !s.clearedAt)};
+        return {recent: visits, lastArrivedAt, signals: signals.filter(s => !s.clearedAt), items: [], unplaced: []};
     },
     async addVisit(mapId, noteId, kind) {
         const trail = readLocal(mapId);
@@ -110,5 +109,10 @@ export const localTrailStore: TrailStore = {
         const trail = readLocal(mapId);
         const clearedAt = new Date().toISOString();
         writeLocal(mapId, {...trail, signals: trail.signals.map(s => s.id === signalId ? {...s, clearedAt} : s)});
-    }
+    },
+    linksSupported: false,
+    addLink: needsServer,
+    removeLink: needsServer,
+    placeItem: needsServer,
+    forgetItem: needsServer
 };

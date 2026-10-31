@@ -1,11 +1,89 @@
 import React from "react";
 import {
-    Alert, Autocomplete, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle,
+    Alert, Autocomplete, Box, Button, Chip, Link, List, ListItem, ListItemText, MenuItem, Select, Dialog, DialogActions, DialogContent, DialogTitle,
     FormControlLabel, Rating, Stack, Switch, TextField, Typography
 } from "@mui/material";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
-import { formatDue } from "./Navigator";
+import { formatDue, targetPlaces } from "./Navigator";
+import { age, isSilent, LinkedItem } from "./TrailTypes";
+
+const kindNames: {[kind in LinkedItem["kind"]]: string} = {
+    "claude.thread": "Claude thread",
+    "claude.project": "Claude project",
+    "github.pr": "Pull request",
+    "url": "Link"
+};
+
+const stateNames = {working: "working", waiting: "waiting on you", done: "finished", failed: "ran into trouble"};
+
+/* What a Claude thread last said, and how long ago */
+function threadLine(item: LinkedItem, now: Date): string {
+    if (item.kind !== "claude.thread") return kindNames[item.kind];
+    const heard = item.lastHeardAt ? `, ${age(item.lastHeardAt, now)}` : "";
+    if (isSilent(item, now)) return `Claude thread: check in?${heard}`;
+    const note = item.stateNote ? `: ${item.stateNote}` : "";
+    return `Claude thread, ${item.state ? stateNames[item.state] : "checked in"}${note}${heard}`;
+}
+
+/* Claude threads and pasted links on this place (FR-7) */
+function LinkedItems({noteId, graph}: {noteId: string, graph: MindMapGraphData}) {
+    const nav = useNavigator();
+    const [url, setUrl] = React.useState("");
+    const [error, setError] = React.useState<string>();
+    const [busy, setBusy] = React.useState(false);
+    const items = nav.itemsAt(noteId);
+    const signals = nav.signalsAt(noteId);
+    const run = (work: () => Promise<void>) => {
+        setBusy(true);
+        setError(undefined);
+        return work().catch((e: Error) => setError(e.message)).finally(() => setBusy(false));
+    };
+    const others = targetPlaces(graph).filter(n => n.id !== noteId);
+    return (
+        <Box data-testid="linked-items">
+            <Typography variant="overline">Linked</Typography>
+            {error && <Alert severity="warning">{error}</Alert>}
+            {signals.filter(s => !s.itemId).map(s => (
+                <Typography key={s.id} variant="body2">{s.label} · {age(s.raisedAt, nav.now)}</Typography>
+            ))}
+            {items.length === 0 && <Typography variant="body2" color="text.secondary">Nothing yet</Typography>}
+            <List dense disablePadding>
+                {items.map(item => {
+                    const primary = item.places.find(p => p.noteId === noteId)?.primary;
+                    return (
+                        <ListItem key={item.id} disableGutters secondaryAction={
+                            <Button size="small" disabled={busy} onClick={() => run(() => nav.removeLink(noteId, item.id))}>Unlink</Button>
+                        }>
+                            <ListItemText
+                                primary={item.url
+                                    ? <Link href={item.url} target="_blank" rel="noopener noreferrer">{item.title}</Link>
+                                    : item.title}
+                                secondary={<>
+                                    {threadLine(item, nav.now)}{primary || item.kind !== "claude.thread" ? "" : " · its signals land at another place"}
+                                    {item.kind === "claude.thread" && primary && others.length > 0 &&
+                                        <Select size="small" variant="standard" value="" displayEmpty sx={{ml: 1, fontSize: "inherit"}}
+                                            onChange={e => e.target.value && run(() => nav.placeItem(item.id, String(e.target.value)))}>
+                                            <MenuItem value="">Move to…</MenuItem>
+                                            {others.map(n => <MenuItem key={n.id} value={n.id}>{n.label}</MenuItem>)}
+                                        </Select>}
+                                </>}
+                                secondaryTypographyProps={{component: "div"}}
+                            />
+                        </ListItem>
+                    );
+                })}
+            </List>
+            <Stack direction="row" gap={1} alignItems="center" sx={{mt: 1}}>
+                <TextField size="small" label="Paste a link" value={url} sx={{flex: 1}} type="url"
+                    onChange={e => setUrl(e.target.value)}
+                    helperText="A Claude project or thread, a GitHub PR, or any web page"/>
+                <Button size="small" disabled={busy || !url.trim()}
+                    onClick={() => run(() => nav.addLink(noteId, url.trim()).then(() => setUrl("")))}>Link</Button>
+            </Stack>
+        </Box>
+    );
+}
 
 /* A place's flag, what it waits on, and the two things the ranking reads: small and interest */
 export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
@@ -69,6 +147,8 @@ export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
                                 >Plant flag</Button>
                             </Stack>}
                     </Box>
+
+                    {nav.linksSupported && <LinkedItems noteId={node.id} graph={graph}/>}
 
                     <Box>
                         <Typography variant="overline">Waiting on</Typography>
