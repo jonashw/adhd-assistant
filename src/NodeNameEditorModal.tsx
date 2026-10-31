@@ -22,6 +22,7 @@ export function NodeNameEditorModal({
     return (
         <Dialog
             open={node !== undefined}
+            fullWidth
             closeAfterTransition={true}
             onClose={() => {
                 onClose();
@@ -39,8 +40,18 @@ export function NodeNameEditorModal({
                     name="value"
                     label={"Name"}
                     value={name}
-                    onChange={e => setName(e.target.value)}
-                    type="text"
+                    onChange={e => setName(e.target.value.replace(/\n/g, ' '))}
+                    onKeyDown={e => {
+                        //wraps like a text area but submits like a single-line field
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (node !== undefined && name.trim() && name !== node.label) {
+                                onClose(name);
+                            }
+                        }
+                    }}
+                    multiline
+                    maxRows={4}
                     fullWidth
                     variant="standard"
                     autoComplete={"off"}
@@ -48,7 +59,7 @@ export function NodeNameEditorModal({
             </DialogContent>
             <DialogActions>
                 <Button
-                    disabled={name === node?.label}
+                    disabled={name === node?.label || !name.trim()}
                     onClick={() => {
                         if (node === undefined) {
                             return;

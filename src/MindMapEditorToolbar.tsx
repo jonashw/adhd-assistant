@@ -1,10 +1,10 @@
-import { AppBar, Button, ButtonGroup, Toolbar} from "@mui/material";
+import { AppBar, Button, ButtonGroup, Divider, ListItemIcon, ListItemText, Menu, MenuItem, Toolbar} from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
-import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
+import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode, nodeStatuses } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
-import { AltRoute, Delete, Edit, FormatListBulleted } from "@mui/icons-material";
+import { AltRoute, Check, Delete, Edit, FormatListBulleted, TaskAlt, Visibility, VisibilityOff } from "@mui/icons-material";
 import { MindMapOutlineModal } from "./MindMapOutlineModal";
 
 
@@ -18,6 +18,9 @@ export function MindMapEditorToolbar({
     selectNodeId,
     nodeClickMode,
     setNodeClickMode,
+    revealHidden,
+    setRevealHidden,
+    onNodeRemoved,
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
@@ -26,10 +29,27 @@ export function MindMapEditorToolbar({
     selectNodeId: (id?: string) => void;
     nodeClickMode: GraphNodeClickMode;
     setNodeClickMode: (value: GraphNodeClickMode) => void;
+    revealHidden: boolean;
+    setRevealHidden: (value: boolean) => void;
+    onNodeRemoved: (node: MindMapGraphNode) => void;
 }) {
     const home = value.nodes.find(n => n.type === "HOME");
     const [nodeToRename,setNodeToRename] = React.useState<DirectedGraphNode<MindMapGraphNode>>();
     const [outlineVisible, setOutlineVisible] = React.useState(false);
+    const [statusMenuAnchor, setStatusMenuAnchor] = React.useState<HTMLElement>();
+    const anyTucked = value.nodes.some(MindMap.isTucked);
+    const closeStatusMenu = (updatedGraph?: MindMapGraphData) => {
+        setStatusMenuAnchor(undefined);
+        if(!updatedGraph || !selectedNode){
+            return;
+        }
+        const updatedNode = updatedGraph.nodes.find(n => n.id === selectedNode.id);
+        if(updatedNode && MindMap.isTucked(updatedNode) && !revealHidden){
+            //the selected node is leaving the graph, so select where it returns to
+            selectNodeId(MindMap.parentOf(updatedGraph, selectedNode.id) ?? home?.id);
+        }
+        onChange(updatedGraph);
+    };
     return (
         <>
             <NodeNameEditorModal
@@ -58,8 +78,39 @@ export function MindMapEditorToolbar({
                 }}
             />
 
+            <Menu
+                anchorEl={statusMenuAnchor}
+                open={statusMenuAnchor !== undefined && selectedNode !== undefined}
+                onClose={() => closeStatusMenu()}
+            >
+                {selectedNode && nodeStatuses.map(status => {
+                    const current = (selectedNode.status ?? 'active') === status;
+                    return (
+                        <MenuItem
+                            key={status}
+                            selected={current}
+                            onClick={() => closeStatusMenu(
+                                current ? undefined : MindMap.setStatus(value, selectedNode.id, status))}
+                        >
+                            <ListItemIcon>{current && <Check fontSize="small"/>}</ListItemIcon>
+                            <ListItemText
+                                primary={status[0].toUpperCase() + status.slice(1)}
+                                secondary={status === 'done' && current && selectedNode.doneAt ? selectedNode.doneAt : undefined}
+                            />
+                        </MenuItem>
+                    );
+                })}
+                <Divider/>
+                {selectedNode && <MenuItem
+                    onClick={() => closeStatusMenu(MindMap.setHidden(value, selectedNode.id, !selectedNode.hidden))}
+                >
+                    <ListItemIcon>{selectedNode.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}</ListItemIcon>
+                    <ListItemText primary={selectedNode.hidden ? "Unhide" : "Hide"}/>
+                </MenuItem>}
+            </Menu>
+
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
-                <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
+                <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between', '& .MuiButton-root': { minWidth: 40, px: 1 } }}>
                     <UndoRedoToolbar controller={undoController} />
                     <Button 
                         variant="contained"
@@ -69,6 +120,16 @@ export function MindMapEditorToolbar({
                     >
                         <FormatListBulleted/>
                     </Button>
+
+                    {(anyTucked || revealHidden) && <Button
+                        variant={revealHidden ? "outlined" : "contained"}
+                        title={revealHidden ? "Tuck hidden and done nodes away" : "Reveal hidden and done nodes"}
+                        color="info"
+                        sx={revealHidden ? {bgcolor: 'background.paper'} : undefined}
+                        onClick={() => setRevealHidden(!revealHidden)}
+                    >
+                        {revealHidden ? <VisibilityOff/> : <Visibility/>}
+                    </Button>}
 
                     {selectedNode
                         ? selectedNode.type === "HOME"
@@ -88,6 +149,15 @@ export function MindMapEditorToolbar({
                                     }}
                                 >
                                     <Edit/>
+                                </Button>
+
+                                <Button
+                                    variant="contained"
+                                    title="Set status, or hide this node"
+                                    color="info"
+                                    onClick={e => setStatusMenuAnchor(e.currentTarget)}
+                                >
+                                    <TaskAlt/>
                                 </Button>
 
                                 <Button
@@ -116,6 +186,7 @@ export function MindMapEditorToolbar({
                                         }
                                         selectNodeId(home?.id);
                                         onChange(MindMap.remove(value, selectedNode));
+                                        onNodeRemoved(selectedNode);
                                     }}
                                 >
                                     <Delete/>

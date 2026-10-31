@@ -1,7 +1,7 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useElementSize } from "./useContainerWidth";
-import { Fab, Breadcrumbs, Button, Paper, Stack} from "@mui/material";
+import { Fab, Breadcrumbs, Button, Paper, Snackbar, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
@@ -25,11 +25,15 @@ export default function MindMapGraph({
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
-    const [breadCrumbsSize,breadCrumbsRef] = useElementSize();
+    const breadCrumbsRef = React.useRef<HTMLDivElement>(null);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
-    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsSize.height), [
-        headerSize, breadCrumbsSize
+    //the breadcrumb bar keeps a fixed height (it scrolls sideways) so the canvas never resizes when the path grows
+    const breadCrumbsHeight = 40;
+    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight), [
+        headerSize
     ]);
+    const [revealHidden, setRevealHidden] = React.useState(false);
+    const [removedNode, setRemovedNode] = React.useState<MindMapGraphNode>();
     const width = window.innerWidth;
 
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
@@ -47,8 +51,8 @@ export default function MindMapGraph({
         () => value.nodes.find(n => n.id === selectedNodeId),
         [selectedNodeId, value]);
     const clonedGraphData = React.useMemo(
-        () => MindMap.clone(value),
-        [value]);
+        () => MindMap.clone(MindMap.visibleGraph(value, revealHidden)),
+        [value, revealHidden]);
 
     const utilizeNativePrompt = false;
 
@@ -98,6 +102,7 @@ export default function MindMapGraph({
                 } else {
                     console.log('removed node',selectedNode);
                     change(MindMap.remove(value, selectedNode));
+                    setRemovedNode(selectedNode);
                     const home = value.nodes.find(n => n.type === "HOME");
                     selectNodeId(home?.id);
                 }
@@ -152,6 +157,14 @@ export default function MindMapGraph({
     },[value, selectedNodeId, setPathHome]);
 
     React.useEffect(() => {
+        //keep the selected node, at the end of the path, in view
+        const bar = breadCrumbsRef.current;
+        if(bar){
+            bar.scrollLeft = bar.scrollWidth;
+        }
+    },[pathHome]);
+
+    React.useEffect(() => {
         loadImgElement('/Enso.svg').then(setHomeImage);
     },[]);
 
@@ -170,14 +183,24 @@ export default function MindMapGraph({
 
     const nodeRadius = 15;
 
+    //which nodes would show with hidden nodes tucked away; the rest are drawn muted when revealed
+    const visibleIds = React.useMemo(
+        () => new Set(MindMap.visibleGraph(value, false).nodes.map(n => n.id)),
+        [value]);
+
+    const isMuted = (node: MindMapGraphNode) =>
+        MindMap.isTucked(node) || (revealHidden && !visibleIds.has(node.id));
+
     const nodeForegroundColor = (node: MindMapGraphNode): string =>
-        node.type === 'HOME'
+        node.type === 'HOME' || isMuted(node)
         ? 'black'
         : 'white';
 
     const nodeColor = (node:MindMapGraphNode) =>
         node.type === 'HOME'
         ? 'white'
+        : isMuted(node)
+        ? node.id === selectedNodeId ? 'hsl(220 30 70)' : 'hsl(0 0 75)'
         : node.id === selectedNodeId
         ? 'hsl(220 75 50)'
         : 'hsl(0 0 30)';
@@ -189,6 +212,14 @@ export default function MindMapGraph({
                     value={value}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}
+                    revealHidden={revealHidden}
+                    setRevealHidden={reveal => {
+                        setRevealHidden(reveal);
+                        if(!reveal && selectedNodeId && !visibleIds.has(selectedNodeId)){
+                            selectNodeId(home?.id);
+                        }
+                    }}
+                    onNodeRemoved={setRemovedNode}
                     selectNodeId={selectNodeId}
                     selectedNode={selectedNode}
                     undoController={undoController}
@@ -196,9 +227,16 @@ export default function MindMapGraph({
                 />
             </div>
 
-            <div ref={breadCrumbsRef}>
+            <div
+                ref={breadCrumbsRef}
+                style={{height: breadCrumbsHeight, flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap'}}
+            >
                 {pathHome && pathHome.length > 1 && (
-                    <Breadcrumbs separator="&larr;" aria-label="breadcrumb">
+                    <Breadcrumbs
+                        separator="&larr;"
+                        aria-label="breadcrumb"
+                        sx={{'& .MuiBreadcrumbs-ol': {flexWrap: 'nowrap', height: breadCrumbsHeight}, '& .MuiBreadcrumbs-li': {flexShrink: 0}}}
+                    >
                         {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟 */}
                         {[...pathHome].reverse().map((segment) => (
                             <Button key={segment.node.id} variant="text" onClick={() => {
@@ -210,6 +248,28 @@ export default function MindMapGraph({
                     </Breadcrumbs>
                 )}
             </div>
+
+            <Snackbar
+                open={removedNode !== undefined}
+                autoHideDuration={8000}
+                onClose={(_, reason) => {
+                    if(reason !== 'clickaway'){
+                        setRemovedNode(undefined);
+                    }
+                }}
+                message={`Deleted "${removedNode?.label ?? ''}"`}
+                action={
+                    <Button color="info" size="small" onClick={() => {
+                        undoController.undo();
+                        if(removedNode){
+                            selectNodeId(removedNode.id);
+                        }
+                        setRemovedNode(undefined);
+                    }}>
+                        Undo
+                    </Button>
+                }
+            />
 
             {rabbitHoleModalVisible && <MultiModalPrompt
                 title={"Go Down a Rabbit Hole"}
