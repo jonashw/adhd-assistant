@@ -9,7 +9,7 @@ import { MindMap } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { useNavigator } from "./NavigatorContext";
 import { currentWeather, Suggestion, targetPlaces, whatsNext } from "./Navigator";
-import { CrewIcon } from "./Crew";
+import { CrewAtRest, Sloth, Squirrel } from "./Crew";
 
 function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: string) => void, testId: string}) {
     return (
@@ -23,14 +23,15 @@ function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: 
     );
 }
 
-function Mindful() {
+export function Mindful() {
     return (
         <Stack alignItems="center" gap={2} sx={{py: 3, textAlign: "center"}} data-testid="mindful">
             <Box sx={{position: "relative", width: 180, height: 180}}>
                 <img src="/Enso.svg" alt="" width={180} height={180}/>
-                <Box sx={{position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)"}}><CrewIcon who="sloth" size={28}/></Box>
-                <Box sx={{position: "absolute", bottom: 40, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 0.5}}>
-                    <CrewIcon who="spider" size={18}/><CrewIcon who="squirrel" size={20}/><CrewIcon who="dog" size={24}/>
+                {/* the enso's top edge is the sloth's branch */}
+                <Box sx={{position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={40} bar={false}/></Box>
+                <Box sx={{position: "absolute", bottom: 30, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
+                    <CrewAtRest size={54}/>
                 </Box>
             </Box>
             <Typography variant="overline">You are here: Mindful</Typography>
@@ -52,8 +53,9 @@ function ChartSuggestion({item, suggestion, graph, onChart}: {
     const lead = suggestion.path.slice(0, -1);
     return (
         <Stack gap={1} data-testid="place-suggestion">
-            <Typography variant="body2">
-                It suggests a new place: {under && under.type !== "HOME" ? `${under.label} › ` : ""}{[...lead, last].join(" › ")}
+            <Typography variant="body2" sx={{display: "flex", gap: 1, alignItems: "center"}}>
+                <Squirrel size={28} doing="glide"/>
+                <span>It suggests a new place: {under && under.type !== "HOME" ? `${under.label} › ` : ""}{[...lead, last].join(" › ")}</span>
             </Typography>
             <Stack direction="row" gap={1} alignItems="center">
                 <TextField size="small" label="Name" value={last} sx={{flex: 1}} inputProps={{maxLength: 120}}

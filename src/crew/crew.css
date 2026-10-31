@@ -1,0 +1,327 @@
+/* The robot crew. Colours are variables, so a theme can recolour them; all motion stops when the device asks for reduced motion. */
+
+.crew {
+    --crew-ink: #263238;
+    --crew-eye: #4dd0e1;
+    --crew-metal: #cfd8dc;
+    --crew-metal-dark: #78909c;
+    --crew-dog: #d9a54a;
+    --crew-dog-dark: #b07f2c;
+    --crew-squirrel: #a08d7d;
+    --crew-squirrel-dark: #6e5b4d;
+    --crew-squirrel-light: #efe4d6;
+    --crew-spider: #607d8b;
+    --crew-spider-dark: #37474f;
+    --crew-sloth: #a8937a;
+    --crew-sloth-dark: #6f5e4a;
+    --crew-sloth-face: #efe3cd;
+    display: inline-block;
+    vertical-align: middle;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.crew .part {
+    transform-box: fill-box;
+}
+
+/* shared materials */
+.crew .crew-ink { fill: var(--crew-ink); }
+.crew .crew-eye { fill: var(--crew-eye); }
+.crew .crew-glow { fill: var(--crew-eye); opacity: 0.22; }
+.crew .crew-shut { fill: none; stroke: var(--crew-eye); stroke-width: 1; stroke-linecap: round; }
+.crew .crew-metal { fill: var(--crew-metal); }
+.crew .crew-metal-dark { fill: var(--crew-metal-dark); }
+.crew .crew-rivet { fill: var(--crew-metal-dark); opacity: 0.8; }
+.crew .crew-seam { fill: none; stroke: var(--crew-ink); stroke-width: 0.7; opacity: 0.28; stroke-linecap: round; }
+.crew .crew-line { fill: none; stroke: var(--crew-ink); stroke-width: 0.8; stroke-linecap: round; }
+.crew .crew-whisker { fill: none; stroke: var(--crew-metal-dark); stroke-width: 0.5; stroke-linecap: round; }
+.crew .crew-antenna { stroke: var(--crew-metal-dark); stroke-width: 1.2; stroke-linecap: round; }
+.crew .crew-led { fill: var(--crew-eye); animation: crew-led 3.2s ease-in-out infinite; }
+
+.crew .eyes { transform-origin: 50% 50%; }
+.crew.is-blink .eyes { animation: crew-blink 200ms ease-in-out; }
+
+@keyframes crew-led {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
+}
+@keyframes crew-blink {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.1); }
+}
+
+/* ---- dog ---- */
+.crew-dog .dog-fur { fill: var(--crew-dog); }
+.crew-dog .dog-fur-dark { fill: var(--crew-dog-dark); }
+.crew-dog .dog-all { transform-origin: 50% 100%; }
+.crew-dog .dog-tail { transform-origin: 100% 100%; animation: dog-wag-slow 1.8s ease-in-out infinite; }
+.crew-dog .dog-ear { transform-origin: 50% 0%; }
+.crew-dog .dog-head { transform-origin: 0% 100%; transition: transform 300ms ease; }
+.crew-dog .dog-leg { transform-origin: 50% 0%; }
+.crew-dog .dog-breathe { transform-origin: 50% 100%; animation: crew-breathe 3.6s ease-in-out infinite; }
+
+.crew-dog.is-wag .dog-tail { animation: dog-wag-fast 220ms ease-in-out 5; }
+.crew-dog.is-ear .dog-ear { animation: dog-ear 600ms ease-out; }
+.crew-dog.is-tilt .dog-head { transform: rotate(-9deg); }
+.crew-dog.is-sniff .dog-head { animation: dog-sniff 900ms ease-in-out; }
+.crew-dog.is-dream .dog-tail { animation: dog-wag-fast 300ms ease-in-out 3; }
+
+/* trailing Jon: a steady trot */
+.crew-dog.doing-trail .dog-all { animation: dog-bob 420ms ease-in-out infinite; }
+.crew-dog.doing-trail .leg-back-near,
+.crew-dog.doing-trail .leg-front-far { animation: dog-step 420ms ease-in-out infinite; }
+.crew-dog.doing-trail .leg-front-near,
+.crew-dog.doing-trail .leg-back-far { animation: dog-step 420ms ease-in-out infinite reverse; }
+.crew-dog.doing-trail .dog-tail { animation: dog-wag-fast 420ms ease-in-out infinite; }
+
+/* arriving: sinks down before curling up at Jon's feet */
+.crew-dog.doing-settle .dog-all { animation: dog-settle 1000ms ease-in forwards; }
+.crew-dog.doing-settle .dog-tail { animation: dog-wag-fast 250ms ease-in-out 4; }
+
+@keyframes dog-wag-slow {
+    0%, 100% { transform: rotate(-4deg); }
+    50% { transform: rotate(5deg); }
+}
+@keyframes dog-wag-fast {
+    0%, 100% { transform: rotate(-14deg); }
+    50% { transform: rotate(14deg); }
+}
+@keyframes dog-ear {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-28deg); }
+    55% { transform: rotate(6deg); }
+    75% { transform: rotate(-4deg); }
+}
+@keyframes dog-sniff {
+    0%, 100% { transform: rotate(0); }
+    30%, 60% { transform: rotate(10deg); }
+    45%, 75% { transform: rotate(7deg); }
+}
+@keyframes dog-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1.2px); }
+}
+@keyframes dog-step {
+    0%, 100% { transform: rotate(-16deg); }
+    50% { transform: rotate(16deg); }
+}
+@keyframes dog-settle {
+    0% { transform: none; }
+    40% { transform: rotate(-3deg) translateY(1px); }
+    100% { transform: translateY(5px) scaleY(0.82); }
+}
+@keyframes crew-breathe {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(1.05); }
+}
+
+/* ---- spider ---- */
+.crew-spider .spider-shell { fill: var(--crew-spider); }
+.crew-spider .spider-shell-dark { fill: var(--crew-spider-dark); }
+.crew-spider .spider-leg { fill: none; stroke: var(--crew-spider-dark); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.crew-spider .spider-fang { fill: none; stroke: var(--crew-metal-dark); stroke-width: 1.1; stroke-linecap: round; }
+.crew-spider .spider-thread { stroke: var(--crew-metal-dark); stroke-width: 0.8; transform-origin: 50% 0%; }
+.crew-spider .spider-body { transform-origin: 50% 30%; }
+.crew-spider .spider-abdomen { transform-origin: 50% 0%; animation: crew-breathe 3s ease-in-out infinite; }
+.crew-spider .leg-l1 { transform-origin: 100% 100%; }
+.crew-spider .leg-r1 { transform-origin: 0% 100%; }
+.crew-spider .leg-l2, .crew-spider .leg-l3, .crew-spider .leg-l4 { transform-origin: 100% 0%; }
+.crew-spider .leg-r2, .crew-spider .leg-r3, .crew-spider .leg-r4 { transform-origin: 0% 0%; }
+
+.crew-spider.is-tap .leg-r1 { animation: spider-tap 350ms ease-in-out 2; }
+.crew-spider.is-shuffle .spider-body { animation: spider-shuffle 600ms ease-in-out; }
+.crew-spider.is-preen .leg-l1 { animation: spider-tap-left 500ms ease-in-out 2; }
+
+/* the tug: two firm pulls on the string, then a wait */
+.crew-spider.doing-tug .spider-body { animation: spider-tug 2.4s ease-in-out infinite; }
+.crew-spider.doing-tug .spider-thread { animation: spider-tug-thread 2.4s ease-in-out infinite; }
+.crew-spider.doing-tug .leg-l1, .crew-spider.doing-tug .leg-r1 { animation: spider-grip 2.4s ease-in-out infinite; }
+
+/* asking: head cocked, one leg raised */
+.crew-spider.doing-ask .spider-body { animation: spider-ask 3s ease-in-out infinite; }
+.crew-spider.doing-ask .leg-r1 { animation: spider-wave 3s ease-in-out infinite; }
+
+/* climbing the string, hand over hand */
+.crew-spider.doing-climb .spider-body { animation: spider-climb 1.6s ease-in-out infinite; }
+.crew-spider.doing-climb .spider-thread { animation: spider-climb-thread 1.6s ease-in-out infinite; }
+.crew-spider.doing-climb .leg-l1, .crew-spider.doing-climb .leg-r2,
+.crew-spider.doing-climb .leg-l3, .crew-spider.doing-climb .leg-r4 { animation: spider-scurry 400ms ease-in-out infinite; }
+.crew-spider.doing-climb .leg-r1, .crew-spider.doing-climb .leg-l2,
+.crew-spider.doing-climb .leg-r3, .crew-spider.doing-climb .leg-l4 { animation: spider-scurry 400ms ease-in-out infinite reverse; }
+
+@keyframes spider-tap {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(-22deg); }
+}
+@keyframes spider-tap-left {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(22deg); }
+}
+@keyframes spider-shuffle {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-1.5px); }
+    65% { transform: translateX(1.5px); }
+}
+@keyframes spider-tug {
+    0%, 18%, 36%, 100% { transform: translateY(0); }
+    9%, 27% { transform: translateY(3px); }
+}
+@keyframes spider-tug-thread {
+    0%, 18%, 36%, 100% { transform: scaleY(1); }
+    9%, 27% { transform: scaleY(1.18); }
+}
+@keyframes spider-grip {
+    0%, 18%, 36%, 100% { transform: rotate(0); }
+    9%, 27% { transform: rotate(8deg); }
+}
+@keyframes spider-ask {
+    0%, 15%, 85%, 100% { transform: rotate(0); }
+    30%, 70% { transform: rotate(-12deg); }
+    50% { transform: rotate(-9deg) translateY(-0.5px); }
+}
+@keyframes spider-wave {
+    0%, 20%, 80%, 100% { transform: rotate(0); }
+    35%, 65% { transform: rotate(-30deg); }
+    50% { transform: rotate(-20deg); }
+}
+@keyframes spider-climb {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+@keyframes spider-climb-thread {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.76); }
+}
+@keyframes spider-scurry {
+    0%, 100% { transform: rotate(-9deg); }
+    50% { transform: rotate(9deg); }
+}
+
+/* ---- flying squirrel ---- */
+.crew-squirrel .sq-fur { fill: var(--crew-squirrel); }
+.crew-squirrel .sq-fur-dark { fill: var(--crew-squirrel-dark); }
+.crew-squirrel .sq-belly { fill: var(--crew-squirrel-light); }
+.crew-squirrel .sq-stripe { fill: none; stroke: var(--crew-squirrel-light); stroke-width: 1.6; stroke-linecap: round; }
+.crew-squirrel .sq-glide-tail { fill: none; stroke: var(--crew-squirrel-dark); stroke-width: 5; stroke-linecap: round; }
+.crew-squirrel .sq-all { transform-origin: 50% 100%; }
+.crew-squirrel .sq-tail { transform-origin: 90% 95%; animation: sq-tail-sway 4s ease-in-out infinite; }
+.crew-squirrel .sq-head { transform-origin: 30% 90%; }
+.crew-squirrel .sq-ear { transform-origin: 50% 100%; }
+.crew-squirrel .sq-paws { transform-origin: 50% 50%; }
+.crew-squirrel .sq-breathe { animation: crew-breathe 3.2s ease-in-out infinite; }
+.crew-squirrel .sq-float { transform-origin: 50% 50%; animation: sq-float 2.6s ease-in-out infinite; }
+
+/* dart and freeze: a quick scamper, then perfectly still with wide eyes and ears up */
+.crew-squirrel.is-dart .sq-all { animation: sq-dart 1500ms ease-out; }
+.crew-squirrel.is-dart .eyes { animation: sq-wide 1500ms ease-out; }
+.crew-squirrel.is-dart .sq-ear { animation: sq-ears-up 1500ms ease-out; }
+.crew-squirrel.is-dart .sq-tail { animation: sq-tail-up 1500ms ease-out; }
+.crew-squirrel.is-flick .sq-tail { animation: sq-flick 550ms ease-in-out; }
+.crew-squirrel.is-ear .sq-ear-front { animation: sq-twitch 450ms ease-in-out; }
+.crew-squirrel.is-nibble .sq-paws { animation: sq-nibble 150ms ease-in-out 6; }
+.crew-squirrel.is-nibble .sq-head { animation: sq-nod 150ms ease-in-out 6; }
+
+@keyframes sq-tail-sway {
+    0%, 100% { transform: rotate(-2deg); }
+    50% { transform: rotate(3deg); }
+}
+@keyframes sq-dart {
+    0% { transform: translateX(0); }
+    10% { transform: translateX(6px) translateY(-1.5px); }
+    14%, 72% { transform: translateX(6px); }
+    100% { transform: translateX(0); }
+}
+@keyframes sq-wide {
+    0%, 10% { transform: scale(1); }
+    16%, 72% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+@keyframes sq-ears-up {
+    0%, 10% { transform: rotate(0); }
+    16%, 72% { transform: rotate(-10deg) scaleY(1.1); }
+    100% { transform: rotate(0); }
+}
+@keyframes sq-tail-up {
+    0% { transform: rotate(0); }
+    10% { transform: rotate(-12deg); }
+    16%, 72% { transform: rotate(4deg); }
+    100% { transform: rotate(0); }
+}
+@keyframes sq-flick {
+    0%, 100% { transform: rotate(0); }
+    25% { transform: rotate(-11deg); }
+    55% { transform: rotate(7deg); }
+    80% { transform: rotate(-3deg); }
+}
+@keyframes sq-twitch {
+    0%, 100% { transform: rotate(0); }
+    30% { transform: rotate(14deg); }
+    60% { transform: rotate(-6deg); }
+}
+@keyframes sq-nibble {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1.2px); }
+}
+@keyframes sq-nod {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(4deg); }
+}
+@keyframes sq-float {
+    0%, 100% { transform: translateY(0) rotate(-3deg); }
+    50% { transform: translateY(2px) rotate(3deg); }
+}
+
+/* ---- sloth ---- */
+.crew-sloth .sloth-bar { stroke: var(--crew-sloth-dark); stroke-width: 2.6; stroke-linecap: round; }
+.crew-sloth .sloth-limb { stroke: var(--crew-sloth-dark); stroke-width: 4.5; stroke-linecap: round; }
+.crew-sloth .sloth-limb-far { stroke: var(--crew-sloth-dark); stroke-width: 4; stroke-linecap: round; opacity: 0.7; }
+.crew-sloth .sloth-claw { fill: none; stroke: var(--crew-metal-dark); stroke-width: 1.1; stroke-linecap: round; }
+.crew-sloth .sloth-body { fill: none; stroke: var(--crew-sloth); stroke-width: 15; stroke-linecap: round; }
+.crew-sloth .sloth-fur { fill: var(--crew-sloth); }
+.crew-sloth .sloth-face { fill: var(--crew-sloth-face); }
+.crew-sloth .sloth-band { fill: var(--crew-sloth-dark); }
+.crew-sloth .sloth-swing { transform-origin: 50% 0%; animation: sloth-sway 7s ease-in-out infinite alternate; }
+.crew-sloth .sloth-head { transform-origin: 85% 25%; }
+.crew-sloth .sloth-mouth { transform-origin: 50% 20%; transform: scale(0); }
+.crew-sloth .sloth-smile { transform-origin: 50% 50%; }
+
+/* sloths blink slowly */
+.crew-sloth.is-blink .eyes { animation: crew-blink 900ms ease-in-out; }
+.crew-sloth.is-yawn .sloth-head { animation: sloth-yawn-head 2800ms ease-in-out; }
+.crew-sloth.is-yawn .sloth-mouth { animation: sloth-yawn 2800ms ease-in-out; }
+.crew-sloth.is-yawn .sloth-smile { animation: sloth-hide 2800ms ease-in-out; }
+.crew-sloth.is-yawn .eyes { animation: sloth-squint 2800ms ease-in-out; }
+.crew-sloth.is-look .sloth-head { animation: sloth-look 2600ms ease-in-out; }
+
+@keyframes sloth-sway {
+    0% { transform: rotate(-2.5deg); }
+    100% { transform: rotate(2.5deg); }
+}
+@keyframes sloth-yawn-head {
+    0%, 100% { transform: rotate(0); }
+    35%, 65% { transform: rotate(14deg); }
+}
+@keyframes sloth-yawn {
+    0%, 15%, 90%, 100% { transform: scale(0); }
+    40%, 62% { transform: scale(1); }
+}
+@keyframes sloth-hide {
+    0%, 15%, 90%, 100% { opacity: 1; }
+    25%, 80% { opacity: 0; }
+}
+@keyframes sloth-squint {
+    0%, 15%, 90%, 100% { transform: scaleY(1); }
+    35%, 65% { transform: scaleY(0.15); }
+}
+@keyframes sloth-look {
+    0%, 100% { transform: rotate(0); }
+    30%, 70% { transform: rotate(-10deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .crew, .crew * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

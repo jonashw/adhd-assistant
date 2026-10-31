@@ -3,7 +3,7 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
-import { CrewIcon } from "./Crew";
+import { Dog, Spider } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
 export const youStripHeight = 52;
@@ -78,7 +78,7 @@ export function YouStrip({graph, onChange, selectNodeId}: {
             </Stack>
 
             {tugging && <Alert
-                icon={<CrewIcon who="spider" size={20}/>}
+                icon={<Spider size={24} doing="tug"/>}
                 severity="info"
                 //floats above the map, so the canvas never jumps when the tug comes and goes
                 sx={{position: "fixed", left: 8, right: 8, bottom: 88, zIndex: 1200, boxShadow: 3}}
@@ -95,7 +95,7 @@ export function YouStrip({graph, onChange, selectNodeId}: {
 
             <Dialog open={askWeather} data-testid="weather-check">
                 <DialogTitle sx={{display: "flex", gap: 1, alignItems: "center"}}>
-                    <CrewIcon who="spider"/> Gusty up there?
+                    <Spider size={36} doing="ask"/> Gusty up there?
                 </DialogTitle>
                 <DialogContent>
                     <Typography>
@@ -129,7 +129,10 @@ export function YouStrip({graph, onChange, selectNodeId}: {
                 open={offerTieOff !== undefined && here === offerTieOff && tether.state === "aloft"}
                 autoHideDuration={12000}
                 onClose={(_, reason) => reason !== "clickaway" && setOfferTieOff(undefined)}
-                message={<>You're at {offerTieOff && labelOf(offerTieOff)}.</>}
+                message={<Stack direction="row" gap={1} alignItems="center">
+                    <Dog size={28} doing="settle"/>
+                    <span>You're at {offerTieOff && labelOf(offerTieOff)}.</span>
+                </Stack>}
                 action={<Button color="info" size="small" onClick={() => {
                     if (offerTieOff) {
                         nav.tieOff(offerTieOff);
