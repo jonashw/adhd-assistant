@@ -39,9 +39,9 @@ export default function MindMapGraph({
     const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value,onChange);
     const change = React.useCallback((updatedGraph: MindMapGraphData) => {
+        //the undo history passes the change on to onChange, so it is saved once
         setGraph(updatedGraph);
-        onChange(updatedGraph);
-    },[graph,onChange]);
+    },[setGraph]);
     const graphRef = React.useRef<GraphRefType>();
     const home = graph.nodes.find(n => n.type === "HOME");
     const [selectedNodeId, selectNodeId] = React.useState<string | undefined>(home?.id);
@@ -51,7 +51,11 @@ export default function MindMapGraph({
         () => value.nodes.find(n => n.id === selectedNodeId),
         [selectedNodeId, value]);
     const clonedGraphData = React.useMemo(
-        () => MindMap.clone(MindMap.visibleGraph(value, revealHidden)),
+        () => {
+            //only the tree is drawn; ties across it (BLOCKED_BY, ALSO_IN, labelled) get their own view later
+            const visible = MindMap.visibleGraph(value, revealHidden);
+            return MindMap.clone({...visible, links: visible.links.filter(l => l.type === 'PART_OF')});
+        },
         [value, revealHidden]);
 
     const utilizeNativePrompt = false;

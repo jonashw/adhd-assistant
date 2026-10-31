@@ -19,7 +19,7 @@ function asHierarchy(graph: MindMapGraphData, node: DirectedGraphNode<MindMapGra
     ].filter(s => s).join(' ');
     const children = 
         graph.links
-        .filter(l => l.target === node.id)
+        .filter(l => l.target === node.id && l.type === 'PART_OF')
         .map(l => graph.nodes.find(n => n.id === l.source))
         .filter(n => n !== undefined)
         .map(n => asHierarchy(graph,n!,muted))

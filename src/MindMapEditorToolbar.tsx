@@ -161,7 +161,7 @@ export function MindMapEditorToolbar({
                                 </Button>
 
                                 <Button
-                                    title={"Change the target of this node's RETURNS_TO relation"}
+                                    title={"Move this node under another parent"}
                                     variant="contained"
                                     color="info"
                                     disabled={!selectedNode}
