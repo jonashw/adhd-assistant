@@ -3,6 +3,7 @@ import React from "react";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { useParams } from "react-router-dom";
 import { Paper } from "@mui/material";
+import { NavigatorProvider } from "./NavigatorContext";
 //import TextParser from "./TextParser";
 
 export default function GraphEditor() {
@@ -17,6 +18,7 @@ export default function GraphEditor() {
     return <Paper elevation={0}>Invalid Graph ID</Paper>;
   }
   return (
+      <NavigatorProvider key={graph.id} graph={graph}>
         <MindMapGraph
           key={`${graph.id}:${GraphContext.reloadCount[graph.id] ?? 0}`}
           value={graph}
@@ -25,5 +27,6 @@ export default function GraphEditor() {
             console.log({updatedGraph});
           }}
         />
+      </NavigatorProvider>
   );
 }

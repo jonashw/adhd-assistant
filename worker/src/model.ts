@@ -13,7 +13,11 @@ export type WireNode = {
     doneAt?: string,
     hidden?: boolean,
     origin?: string,
-    body?: string
+    body?: string,
+    /* its next step fits in 5 minutes */
+    small?: boolean,
+    /* Jon's own interest, 1 to 5 */
+    interest?: number
 };
 export type WireLink = {source: string, target: string, type: typeof linkTypes[number], label?: string};
 export type WireMap = {id: string, revision: number, nodes: WireNode[], links: WireLink[]};
@@ -48,7 +52,9 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             || !optional(n.doneAt, (v): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v))
             || !optional(n.hidden, (v): v is boolean => typeof v === "boolean")
             || !optional(n.origin, (v): v is string => isText(v, 100))
-            || !optional(n.body, (v): v is string => typeof v === "string" && v.length <= 100_000)) {
+            || !optional(n.body, (v): v is string => typeof v === "string" && v.length <= 100_000)
+            || !optional(n.small, (v): v is boolean => typeof v === "boolean")
+            || !optional(n.interest, (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5)) {
             fail(`Place "${n.label}" has a field the map can't store.`);
         }
         return {
@@ -59,7 +65,9 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             doneAt: (n.doneAt ?? undefined) as string | undefined,
             hidden: n.hidden === true,
             origin: (n.origin ?? undefined) as string | undefined,
-            body: (n.body ?? undefined) as string | undefined
+            body: (n.body ?? undefined) as string | undefined,
+            small: n.small === true,
+            interest: (n.interest ?? undefined) as number | undefined
         };
     });
 
