@@ -2,19 +2,24 @@ import React from "react";
 import "./crew.css";
 
 /* The frame every crew drawing shares: sizing by height, a label for screen readers, and the class names the CSS moves */
-export function CrewSvg({width, height, size, label, classes, children}: {
+export function CrewSvg({width, height, size, label, classes, children, x, y}: {
     width: number,
     height: number,
     /* height on screen, in px */
     size: number,
     label: string,
     classes: (string | false | undefined)[],
-    children: React.ReactNode
+    children: React.ReactNode,
+    /* position, when nested inside another drawing (the spider on your string) */
+    x?: number,
+    y?: number
 }) {
     return (
         <svg
             className={["crew", ...classes].filter(Boolean).join(" ")}
             viewBox={`0 0 ${width} ${height}`}
+            x={x}
+            y={y}
             width={size * width / height}
             height={size}
             role="img"

@@ -1,7 +1,8 @@
 import { CrewSvg, Eye, ShutEye } from "./CrewSvg";
 import { Fidget, useFidget } from "./useFidget";
 
-/* The robot spider. It does all the string travel: climbing with notes, tugging, and asking "Gusty up there?" */
+/* The robot spider. It does all the string travel on YOUR string (it spins no web of its own):
+   climbing with notes, tugging, and asking "Gusty up there?". Jon places it on his string; see Jon.tsx. */
 export type SpiderDoing = "idle" | "climb" | "tug" | "ask" | "curled";
 
 const fidgets: Fidget[] = [
@@ -27,18 +28,16 @@ const tuckedLegs = [
     "M31 25 L36 23 L35 29", "M31.5 31 L37 33 L33 36"
 ];
 
-export function Spider({size = 24, doing = "idle"}: {size?: number, doing?: SpiderDoing}) {
+export function Spider({size = 24, doing = "idle", x, y}: {size?: number, doing?: SpiderDoing, x?: number, y?: number}) {
     const curled = doing === "curled";
-    const onString = doing === "climb" || doing === "tug" || doing === "ask";
     const fidget = useFidget(fidgets, [1500, 4500], !curled && doing !== "climb");
-    const label = doing === "tug" ? "Robot spider, tugging the string"
+    const label = doing === "tug" ? "Robot spider, tugging your string"
         : doing === "ask" ? "Robot spider, asking"
-        : doing === "climb" ? "Robot spider, climbing the string"
+        : doing === "climb" ? "Robot spider, climbing your string"
         : curled ? "Robot spider, curled up"
         : "Robot spider";
     return (
-        <CrewSvg width={48} height={48} size={size} label={label} classes={["crew-spider", `doing-${doing}`, fidget]}>
-            {onString && <line x1={24} y1={0} x2={24} y2={17} className="part spider-thread"/>}
+        <CrewSvg width={48} height={48} size={size} x={x} y={y} label={label} classes={["crew-spider", `doing-${doing}`, fidget]}>
             <g className="part spider-body">
                 {curled
                     ? tuckedLegs.map(d => <path key={d} d={d} className="spider-leg"/>)

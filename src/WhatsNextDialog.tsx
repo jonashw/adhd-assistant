@@ -9,7 +9,7 @@ import { MindMap } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { useNavigator } from "./NavigatorContext";
 import { currentWeather, Suggestion, targetPlaces, whatsNext } from "./Navigator";
-import { CrewAtRest, Sloth, Squirrel } from "./Crew";
+import { MindfulScene, Sloth, Squirrel } from "./Crew";
 
 function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: string) => void, testId: string}) {
     return (
@@ -30,8 +30,8 @@ export function Mindful() {
                 <img src="/Enso.svg" alt="" width={180} height={180}/>
                 {/* the enso's top edge is the sloth's branch */}
                 <Box sx={{position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={40} bar={false}/></Box>
-                <Box sx={{position: "absolute", bottom: 30, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
-                    <CrewAtRest size={54}/>
+                <Box sx={{position: "absolute", bottom: 34, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
+                    <MindfulScene size={78}/>
                 </Box>
             </Box>
             <Typography variant="overline">You are here: Mindful</Typography>

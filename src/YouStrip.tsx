@@ -3,10 +3,10 @@ import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, 
 import { MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
-import { Dog, Spider } from "./Crew";
+import { Dog, Jon, YouScene } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
-export const youStripHeight = 52;
+export const youStripHeight = 64;
 
 /* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
 export function YouStrip({graph, onChange, selectNodeId}: {
@@ -56,7 +56,8 @@ export function YouStrip({graph, onChange, selectNodeId}: {
                 }}
                 data-testid="you-strip"
             >
-                <Box sx={{flex: "1 1 auto", minWidth: 0, lineHeight: 1.3}}>
+                <YouScene size={56} aloft={tether.state === "aloft"} stringOut={stringOut(tether)}/>
+                <Box sx={{flex: "1 1 auto", minWidth: 0, lineHeight: 1.3, ml: 0.5}}>
                     {tether.state === "tied"
                         ? <Typography variant="body2" noWrap>Tied off at <b>{labelOf(tether.at)}</b></Typography>
                         : <>
@@ -78,7 +79,7 @@ export function YouStrip({graph, onChange, selectNodeId}: {
             </Stack>
 
             {tugging && <Alert
-                icon={<Spider size={24} doing="tug"/>}
+                icon={<Jon size={52} doing="aloft" stringOut={stringOut(tether)} spider="tug"/>}
                 severity="info"
                 //floats above the map, so the canvas never jumps when the tug comes and goes
                 sx={{position: "fixed", left: 8, right: 8, bottom: 88, zIndex: 1200, boxShadow: 3}}
@@ -94,10 +95,11 @@ export function YouStrip({graph, onChange, selectNodeId}: {
             </Alert>}
 
             <Dialog open={askWeather} data-testid="weather-check">
-                <DialogTitle sx={{display: "flex", gap: 1, alignItems: "center"}}>
-                    <Spider size={36} doing="ask"/> Gusty up there?
-                </DialogTitle>
+                <DialogTitle>Gusty up there?</DialogTitle>
                 <DialogContent>
+                    <Box sx={{display: "flex", justifyContent: "center", mb: 1}}>
+                        <Jon size={120} doing="aloft" stringOut={stringOut(tether)} spider="ask"/>
+                    </Box>
                     <Typography>
                         You've stepped to {recentNew} new places in the last {tunables.gustMinutes} minutes.
                         Only you can tell gusts from a thermal.
