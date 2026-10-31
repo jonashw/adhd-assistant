@@ -23,17 +23,39 @@ function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: 
     );
 }
 
+/* The HOME illustration is drawn at 360px, or narrower when the screen is */
+const mindfulMaxSize = 360;
+
+function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+    const ref = React.useRef<T>(null);
+    const [width, setWidth] = React.useState(0);
+    React.useLayoutEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const update = () => setWidth(el.clientWidth);
+        update();
+        const observer = new ResizeObserver(update);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, []);
+    return [ref, width];
+}
+
 export function Mindful() {
+    const [ref, width] = useWidth<HTMLDivElement>();
+    const size = width > 0 ? Math.min(mindfulMaxSize, width) : 0;
+    //every position below was laid out on a 180px enso, so scale them with it
+    const u = size / 180;
     return (
-        <Stack alignItems="center" gap={2} sx={{py: 3, textAlign: "center"}} data-testid="mindful">
-            <Box sx={{position: "relative", width: 180, height: 180}}>
-                <img src="/Enso.svg" alt="" width={180} height={180}/>
+        <Stack ref={ref} alignItems="center" gap={2} sx={{py: 3, textAlign: "center", width: "100%"}} data-testid="mindful">
+            {size > 0 && <Box sx={{position: "relative", width: size, height: size}}>
+                <img src="/Enso.svg" alt="" width={size} height={size}/>
                 {/* the sloth hooks its claws over the inside edge of the enso's top, so its body hangs against the white */}
-                <Box sx={{position: "absolute", top: 28, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={44} bar={false}/></Box>
-                <Box sx={{position: "absolute", bottom: 34, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
-                    <MindfulScene size={78}/>
+                <Box sx={{position: "absolute", top: 28 * u, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={44 * u} bar={false}/></Box>
+                <Box sx={{position: "absolute", bottom: 34 * u, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
+                    <MindfulScene size={78 * u}/>
                 </Box>
-            </Box>
+            </Box>}
             <Typography variant="overline">You are here: Mindful</Typography>
             <Typography variant="h6">Nothing needs you. You can just stand here.</Typography>
         </Stack>
