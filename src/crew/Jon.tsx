@@ -41,15 +41,23 @@ export function Jon({size = 48, doing = "tied", stringOut = 1, spider}: {
     );
 }
 
+/* Your head is a balloon: the head scouts, floating on the string the body holds */
 function Head({x, y, r}: {x: number, y: number, r: number}) {
+    const cy = y - 1.5;
+    const ry = r;
+    const rx = r * 0.86;
+    const bottom = cy + ry;
     return (
         <g className="part jon-head">
-            <circle cx={x} cy={y} r={r} className="jon-face"/>
+            <path d={`M${x - 1.4} ${bottom + 1.6} L${x} ${bottom - 0.4} L${x + 1.4} ${bottom + 1.6} Z`} className="jon-balloon-knot"/>
+            <ellipse cx={x} cy={cy} rx={rx} ry={ry} className="jon-balloon"/>
+            <ellipse cx={x - rx * 0.42} cy={cy - ry * 0.45} rx={rx * 0.2} ry={ry * 0.32}
+                transform={`rotate(25 ${x - rx * 0.42} ${cy - ry * 0.45})`} className="jon-balloon-shine"/>
             <g className="part eyes">
-                <circle cx={x - r * 0.34} cy={y - r * 0.2} r={r * 0.15} className="crew-ink"/>
-                <circle cx={x + r * 0.34} cy={y - r * 0.2} r={r * 0.15} className="crew-ink"/>
+                <circle cx={x - r * 0.3} cy={cy - r * 0.05} r={r * 0.13} className="crew-ink"/>
+                <circle cx={x + r * 0.3} cy={cy - r * 0.05} r={r * 0.13} className="crew-ink"/>
             </g>
-            <path d={`M${x - r * 0.45} ${y + r * 0.2} q${r * 0.45} ${r * 0.45} ${r * 0.9} 0`} className="jon-smile"/>
+            <path d={`M${x - r * 0.38} ${cy + r * 0.3} q${r * 0.38} ${r * 0.36} ${r * 0.76} 0`} className="jon-smile"/>
         </g>
     );
 }

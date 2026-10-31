@@ -17,7 +17,8 @@
     --crew-sloth-face: #efe3cd;
     --crew-you: #2b5e94;
     --crew-you-legs: #37474f;
-    --crew-face: #ffffff;
+    --crew-balloon: #e53935;
+    --crew-balloon-edge: #b71c1c;
     --crew-work: #f7e1cc;
     --crew-work-edge: #9a5216;
     display: inline-block;
@@ -317,7 +318,9 @@
 .crew-jon .jon-jacket { fill: var(--crew-you); }
 .crew-jon .jon-leg { fill: none; stroke: var(--crew-you-legs); stroke-width: 3; stroke-linecap: round; }
 .crew-jon .jon-arm { fill: none; stroke: var(--crew-you); stroke-width: 2.6; stroke-linecap: round; }
-.crew-jon .jon-face { fill: var(--crew-face); stroke: var(--crew-ink); stroke-width: 1.5; }
+.crew-jon .jon-balloon { fill: var(--crew-balloon); stroke: var(--crew-balloon-edge); stroke-width: 0.8; }
+.crew-jon .jon-balloon-knot { fill: var(--crew-balloon-edge); }
+.crew-jon .jon-balloon-shine { fill: #ffffff; opacity: 0.55; }
 .crew-jon .jon-smile { fill: none; stroke: var(--crew-ink); stroke-width: 1.3; stroke-linecap: round; }
 .crew-jon .jon-knot { fill: none; stroke: var(--crew-eye); stroke-width: 1.4; }
 .crew-jon .jon-string { fill: none; stroke: var(--crew-ink); stroke-width: 1; stroke-linecap: round; }

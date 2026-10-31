@@ -28,8 +28,8 @@ export function Mindful() {
         <Stack alignItems="center" gap={2} sx={{py: 3, textAlign: "center"}} data-testid="mindful">
             <Box sx={{position: "relative", width: 180, height: 180}}>
                 <img src="/Enso.svg" alt="" width={180} height={180}/>
-                {/* the enso's top edge is the sloth's branch */}
-                <Box sx={{position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={40} bar={false}/></Box>
+                {/* the sloth hooks its claws over the inside edge of the enso's top, so its body hangs against the white */}
+                <Box sx={{position: "absolute", top: 28, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={44} bar={false}/></Box>
                 <Box sx={{position: "absolute", bottom: 34, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}>
                     <MindfulScene size={78}/>
                 </Box>
