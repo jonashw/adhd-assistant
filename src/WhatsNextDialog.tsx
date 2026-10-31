@@ -1,11 +1,12 @@
 import React from "react";
 import {
-    Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText,
-    Stack, Typography, useMediaQuery, useTheme
+    Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText,
+    Stack, TextField, Typography, useMediaQuery, useTheme
 } from "@mui/material";
 import { MindMapGraphData } from "./MindMap";
+import { LinkedItem, age } from "./TrailTypes";
 import { useNavigator } from "./NavigatorContext";
-import { currentWeather, Suggestion, whatsNext } from "./Navigator";
+import { currentWeather, Suggestion, targetPlaces, whatsNext } from "./Navigator";
 import { CrewIcon } from "./Crew";
 
 function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: string) => void, testId: string}) {
@@ -36,6 +37,41 @@ function Mindful() {
     );
 }
 
+/* A thread checked in without naming a place: that question is a flare until Jon answers */
+function ClaudeAsks({items, graph}: {items: LinkedItem[], graph: MindMapGraphData}) {
+    const nav = useNavigator();
+    const [error, setError] = React.useState<string>();
+    const choices = targetPlaces(graph);
+    const run = (work: Promise<void>) => work.then(() => setError(undefined)).catch((e: Error) => setError(e.message));
+    return (
+        <Box data-testid="claude-asks" sx={{mb: 2}}>
+            <Typography variant="overline">Flare: Claude asks</Typography>
+            {error && <Alert severity="warning">{error}</Alert>}
+            {items.map(item => (
+                <Stack key={item.id} gap={1} sx={{py: 1}}>
+                    <Typography variant="body2">
+                        Which place does <strong>{item.title}</strong> serve?
+                        {item.lastHeardAt && <Typography component="span" variant="caption" color="text.secondary"> {age(item.lastHeardAt, nav.now)}</Typography>}
+                    </Typography>
+                    <Stack direction="row" gap={1} alignItems="center">
+                        <Autocomplete
+                            size="small"
+                            sx={{flex: 1}}
+                            options={choices}
+                            getOptionLabel={n => n.label}
+                            value={null}
+                            blurOnSelect
+                            onChange={(_, chosen) => chosen && run(nav.placeItem(item.id, chosen.id))}
+                            renderInput={params => <TextField {...params} label="Pick a place"/>}
+                        />
+                        <Button size="small" onClick={() => run(nav.forgetItem(item.id))}>Not on the map</Button>
+                    </Stack>
+                </Stack>
+            ))}
+        </Box>
+    );
+}
+
 /* What's next: the app suggests where Jon's feet go; Jon picks */
 export function WhatsNextDialog({open, graph, onClose, onGo}: {
     open: boolean,
@@ -55,7 +91,8 @@ export function WhatsNextDialog({open, graph, onClose, onGo}: {
         lastArrivedAt: nav.trail.lastArrivedAt,
         tether: nav.tether,
         weather,
-        now: nav.now
+        now: nav.now,
+        items: nav.trail.items
     }), [graph, nav.trail, nav.tether, weather, nav.now]);
 
     React.useEffect(() => {
@@ -71,6 +108,7 @@ export function WhatsNextDialog({open, graph, onClose, onGo}: {
         <Dialog open={open} onClose={onClose} fullScreen={fullScreen} fullWidth maxWidth="sm" data-testid="whats-next">
             <DialogTitle>What's next</DialogTitle>
             <DialogContent>
+                {!standing && nav.trail.unplaced.length > 0 && <ClaudeAsks items={nav.trail.unplaced} graph={graph}/>}
                 {standing ? <Mindful/>
                 : result.kind === "mindful" ? <Mindful/>
                 : result.kind === "small" ? (

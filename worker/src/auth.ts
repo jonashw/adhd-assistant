@@ -3,6 +3,11 @@ import { HttpError, cookie, getCookie, randomToken, sha256 } from "./http";
 
 const sessionCookie = "__Host-session";
 const stateCookie = "__Host-oauth_state";
+const nextCookie = "__Host-next";
+
+/* Where to go after signing in: only a path on this site, such as the connector's consent page */
+const safeNext = (next: string | null | undefined) =>
+    next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
 const sessionDays = 30;
 
 const redirect = (location: string, setCookies: string[] = []) => {
@@ -63,7 +68,10 @@ export async function handleAuth(request: Request, env: Env, url: URL): Promise<
             state,
             prompt: "select_account"
         }).toString();
-        return redirect(google.toString(), [cookie(stateCookie, state, 600)]);
+        return redirect(google.toString(), [
+            cookie(stateCookie, state, 600),
+            cookie(nextCookie, safeNext(url.searchParams.get("next")), 600)
+        ]);
     }
 
     if (url.pathname === "/auth/callback") {
@@ -99,7 +107,9 @@ export async function handleAuth(request: Request, env: Env, url: URL): Promise<
         if (!valid || !email || email !== env.ALLOWED_EMAIL.toLowerCase()) {
             return page(403, "This Google account can't use ADHD Assist.");
         }
-        return redirect("/", [await startSession(env, email), cookie(stateCookie, "", 0)]);
+        return redirect(safeNext(getCookie(request, nextCookie)), [
+            await startSession(env, email), cookie(stateCookie, "", 0), cookie(nextCookie, "", 0)
+        ]);
     }
 
     if (url.pathname === "/auth/logout" && request.method === "POST") {
@@ -112,7 +122,7 @@ export async function handleAuth(request: Request, env: Env, url: URL): Promise<
 
     // For local development only: wrangler dev with DEV_LOGIN=1 in .dev.vars
     if (url.pathname === "/auth/dev-login" && env.DEV_LOGIN === "1" && ["localhost", "127.0.0.1"].includes(url.hostname)) {
-        return redirect("/", [await startSession(env, env.ALLOWED_EMAIL.toLowerCase())]);
+        return redirect(safeNext(url.searchParams.get("next")), [await startSession(env, env.ALLOWED_EMAIL.toLowerCase())]);
     }
 
     throw new HttpError(404, "Not found.");

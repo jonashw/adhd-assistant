@@ -31,6 +31,7 @@ import { MindMap, MindMapGraphData } from './MindMap';
 import { exportGraph, readGraphFile } from './GraphFile';
 import { ServerApi } from './ServerApi';
 import { sampleGraphs } from './sampleGraphs';
+import { ConnectedAppsDialog } from './ConnectedAppsDialog';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
 
@@ -47,6 +48,7 @@ export function GraphList() {
     const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
     const [idOfGraphToDelete,setIdOfGraphToDelete] = React.useState<string>();
     const [speedDialOpen, setSpeedDialOpen] = React.useState(false);
+    const [connectedAppsOpen, setConnectedAppsOpen] = React.useState(false);
     const importInputRef = React.useRef<HTMLInputElement>(null);
     function handleImport(file: File){
         readGraphFile(file)
@@ -63,16 +65,23 @@ export function GraphList() {
         <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
             <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between' }}>
                 <span>ADHD Assist</span>
-                {GraphContext.status?.mode === "server" && <Button
-                    color="inherit"
-                    size="small"
-                    title={`Signed in as ${GraphContext.status.email}`}
-                    onClick={() => ServerApi.signOut().then(() => window.location.reload())}
-                >
-                    Sign out
-                </Button>}
+                {GraphContext.status?.mode === "server" && <Stack direction="row" gap={1}>
+                    <Button color="inherit" size="small" onClick={() => setConnectedAppsOpen(true)}>
+                        Connected apps
+                    </Button>
+                    <Button
+                        color="inherit"
+                        size="small"
+                        title={`Signed in as ${GraphContext.status.email}`}
+                        onClick={() => ServerApi.signOut().then(() => window.location.reload())}
+                    >
+                        Sign out
+                    </Button>
+                </Stack>}
             </Toolbar>
         </AppBar>
+
+        <ConnectedAppsDialog open={connectedAppsOpen} onClose={() => setConnectedAppsOpen(false)}/>
 
         {scanningModalVisible && <ScanningModal
             open={scanningModalVisible}

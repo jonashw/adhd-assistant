@@ -9,6 +9,8 @@ export type ServerStatus =
     /* no server behind this site (the Netlify build), so maps stay in this browser */
     | {mode: "local"};
 
+export type Connection = {id: string, name: string, connectedAt: string};
+
 export class ConflictError extends Error {
     constructor(message: string, public readonly latest: ServerMap | null) {
         super(message);
@@ -63,5 +65,7 @@ export const ServerApi = {
             body: JSON.stringify({revision, nodes: graph.nodes, links: graph.links})
         }),
     deleteMap: (id: string) => request<void>(`/api/maps/${encodeURIComponent(id)}`, {method: "DELETE"}),
-    signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"})
+    signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
+    listConnections: () => request<Connection[]>("/api/connections"),
+    revokeConnection: (id: string) => request<void>(`/api/connections/${encodeURIComponent(id)}/revoke`, {method: "POST"})
 };

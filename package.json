@@ -13,16 +13,20 @@
     "worker:deploy": "npm run build && wrangler d1 migrations apply adhd-assist --remote && wrangler deploy"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.4",
+    "@cloudflare/workers-oauth-provider": "^1.2.3",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@google-cloud/speech": "5.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@mui/icons-material": "^5.11.16",
     "@mui/material": "^5.13.5",
     "@types/dom-speech-recognition": "^0.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-force-graph-2d": "^1.25.5",
-    "react-router-dom": "^6.23.1"
+    "react-router-dom": "^6.23.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261031.1",

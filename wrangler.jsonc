@@ -1,4 +1,4 @@
-// One Worker serves the app's static files, /api and /auth, with the map in D1.
+// One Worker serves the app's static files, /api, /auth and the Claude connector (/mcp), with the map in D1.
 // Setup steps: docs/cloudflare.md
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -9,7 +9,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/auth/*"]
+    "run_worker_first": ["/api/*", "/auth/*", "/mcp", "/mcp/*", "/authorize", "/oauth/*", "/.well-known/*"]
   },
   "d1_databases": [
     {
@@ -17,6 +17,14 @@
       "database_name": "adhd-assist",
       "database_id": "423eeb20-4d2d-46a1-a096-79ebe645a028",
       "migrations_dir": "worker/migrations"
+    }
+  ],
+  // Grants and tokens for the Claude connector (Cloudflare's OAuth library). Create with:
+  //   npx wrangler kv namespace create OAUTH_KV
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "REPLACE_WITH_OAUTH_KV_ID"
     }
   ],
   "observability": { "enabled": true }

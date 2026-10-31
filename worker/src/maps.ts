@@ -79,6 +79,11 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
         env.DB.prepare("DELETE FROM notes WHERE map_id = ? AND id NOT IN (SELECT value FROM json_each(?))")
             .bind(id, JSON.stringify(nodes.map(n => n.id))),
         env.DB.prepare("DELETE FROM links WHERE map_id = ?").bind(id),
+        // linked items and signals at places that are gone let go of them
+        env.DB.prepare("DELETE FROM item_places WHERE map_id = ? AND note_id NOT IN (SELECT value FROM json_each(?))")
+            .bind(id, JSON.stringify(nodes.map(n => n.id))),
+        env.DB.prepare("UPDATE signals SET cleared_at = ? WHERE map_id = ? AND cleared_at IS NULL AND note_id NOT IN (SELECT value FROM json_each(?))")
+            .bind(now, id, JSON.stringify(nodes.map(n => n.id))),
         // origin_id and created_at are written once and never updated
         ...nodes.map((n, position) => env.DB.prepare(
             `INSERT INTO notes (map_id, id, type, label, body, status, done_at, hidden, parent_id, origin_id, small, interest, position, created_at, updated_at)

@@ -410,6 +410,24 @@ export default function MindMapGraph({
                                 ctx.fillText(text.length > 24 ? `${text.slice(0, 23)}…` : text, node.x!, node.y! - nodeRadius - 1);
                                 ctx.restore();
                             }
+                            //flares, smoke and fresh tracks sit just under their place; a thread's question is a flare at HOME
+                            const signals = nav.signalsAt(node.id);
+                            const glyph =
+                                signals.some(x => x.kind === "request") ? "✴ flare"
+                                : node.type === "HOME" && nav.trail.unplaced.length > 0 ? "✴ Claude asks"
+                                : signals.some(x => x.kind === "trouble") ? "≋ smoke"
+                                : signals.some(x => x.kind === "news") ? "∴ fresh tracks"
+                                : undefined;
+                            if (glyph) {
+                                ctx.save();
+                                const fontSize = Math.max(5, 10 / globalScale);
+                                ctx.font = `${fontSize}px Sans-Serif`;
+                                ctx.textAlign = 'center';
+                                ctx.textBaseline = 'top';
+                                ctx.fillStyle = glyph.startsWith("✴") ? 'hsl(25 85 40)' : glyph.startsWith("≋") ? 'hsl(0 0 35)' : 'hsl(140 40 30)';
+                                ctx.fillText(glyph, node.x!, node.y! + nodeRadius + 1);
+                                ctx.restore();
+                            }
                         }}
                         linkCanvasObjectMode={() => "after"}
                         linkCanvasObject={(link,ctx,globalScale) => {
