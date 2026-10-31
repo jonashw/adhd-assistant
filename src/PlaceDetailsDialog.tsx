@@ -7,6 +7,10 @@ import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from "
 import { useNavigator } from "./NavigatorContext";
 import { formatDue, targetPlaces } from "./Navigator";
 import { age, isSilent, LinkedItem } from "./TrailTypes";
+import { NoteEditor } from "./NoteEditor";
+import { NoteBody } from "./NoteBody";
+import { GraphRepositoryContext } from "./GraphRepositoryContext";
+import { ServerApi } from "./ServerApi";
 
 const kindNames: {[kind in LinkedItem["kind"]]: string} = {
     "claude.thread": "Claude thread",
@@ -93,6 +97,7 @@ export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
     onClose: () => void
 }) {
     const nav = useNavigator();
+    const {status} = React.useContext(GraphRepositoryContext);
     const [flagLabel, setFlagLabel] = React.useState("");
     const [flagDue, setFlagDue] = React.useState("");
     const [error, setError] = React.useState<string>();
@@ -127,6 +132,18 @@ export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
             <DialogContent>
                 <Stack gap={3} sx={{pt: 1}}>
                     {error && <Alert severity="warning">{error}</Alert>}
+
+                    <NoteEditor
+                        body={current.body}
+                        onChange={body => onChange(MindMap.setBody(graph, node.id, body))}
+                        onPromote={(index, text) => {
+                            const withoutItem = MindMap.setBody(graph, node.id, NoteBody.remove(current.body, index));
+                            onChange(MindMap.rabbitHole(withoutItem, node.id, text.trim())[0]);
+                        }}
+                        uploadPhoto={status?.mode === "server"
+                            ? photo => ServerApi.uploadMedia(nav.mapId, node.id, photo).then(r => r.url)
+                            : undefined}
+                    />
 
                     <Box>
                         <Typography variant="overline">Flag</Typography>

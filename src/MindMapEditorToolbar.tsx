@@ -171,7 +171,7 @@ export function MindMapEditorToolbar({
 
                                 <Button
                                     variant="contained"
-                                    title="Flag, blocked by, small and interest"
+                                    title="Note, flag, blocked by, small and interest"
                                     aria-label="Place details"
                                     color="info"
                                     onClick={() => setDetailsVisible(true)}
