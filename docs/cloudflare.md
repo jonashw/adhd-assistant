@@ -37,6 +37,11 @@ working as before and stores maps in the browser only.
 
    If the migration step fails with an auth error, give the build's API token D1 Edit.
 
+   For pull requests (Settings → Build → Previews), set the preview command to
+   `npx wrangler deploy --dry-run`. It checks that the Worker builds and bundles, and deploys
+   nothing. The default, `npx wrangler preview`, fails until the config names a separate
+   preview database, and it must never run migrations against the live one.
+
 6. **Bring maps over.** On the old site, export each mind map (download button in the list).
    On the new site, sign in and use + → Import.
 
