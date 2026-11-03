@@ -18,6 +18,19 @@ export type ClaudeThread = {
     inLatest: boolean
 };
 
+/* Something a project's threads published. Claude lists these per project, so they belong to the project. */
+export type ClaudeArtifact = {
+    id: string,
+    title: string,
+    url: string,
+    updatedAt?: string,
+    firstSeenAt: string,
+    /* when Jon last opened it from the map */
+    openedAt?: string,
+    /* the platform's latest list for the project still had it */
+    inLatest: boolean
+};
+
 export type ClaudeProject = {
     id: string,
     name: string,
@@ -26,7 +39,8 @@ export type ClaudeProject = {
     hidden: boolean,
     firstSeenAt: string,
     lastSyncedAt: string,
-    threads: ClaudeThread[]
+    threads: ClaudeThread[],
+    artifacts: ClaudeArtifact[]
 };
 
 /* After this long with no snapshot, a project's open threads read "Not heard lately" */
@@ -62,3 +76,19 @@ export function badgeFor(thread: ClaudeThread, project: ClaudeProject, now = Dat
 
 /* Most urgent first, for lists and for a project's summary */
 export const badgeOrder: ClaudeBadgeKind[] = ["blocked", "failed", "review_ready", "working", "stale", "gone", "stopped", "done"];
+
+/* "new": appeared after the project joined the map and Jon hasn't opened it.
+   "updated": changed since Jon last opened it. Otherwise nothing to flag. */
+export type ArtifactFlag = "new" | "updated" | undefined;
+export function artifactFlag(artifact: ClaudeArtifact, project: ClaudeProject): ArtifactFlag {
+    // everything already there when the project first synced isn't news
+    const joined = new Date(Date.parse(project.firstSeenAt) + 5 * 60000).toISOString();
+    if (!artifact.openedAt && artifact.firstSeenAt > joined) {
+        return "new";
+    }
+    const since = artifact.openedAt ?? joined;
+    return artifact.updatedAt && artifact.updatedAt > since ? "updated" : undefined;
+}
+
+/* How many artifacts a project shows on the map; the list view shows them all */
+export const artifactsOnMap = 6;

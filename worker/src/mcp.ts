@@ -23,7 +23,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
-- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project with the project's whole thread list when you start work, whenever you call check_in or report_state, and as the last step of every turn. Send every thread, not just your own: any one sync brings the whole project up to date.`;
+- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project with the project's whole thread list (and its artifacts, if you can list them) when you start work, whenever you call check_in or report_state, and as the last step of every turn. Send every thread, not just your own: any one sync brings the whole project up to date.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
 
@@ -96,7 +96,13 @@ function buildServer(env: Env): McpServer {
                 state: z.enum(claudeThreadStates).describe("The platform's state for it: working, blocked (needs Jon), review_ready, done, failed or stopped"),
                 created_at: z.string().max(40).optional(),
                 last_activity_at: z.string().max(40).optional()
-            })).max(500)
+            })).max(500),
+            artifacts: z.array(z.object({
+                artifact_id: z.string().min(1).max(100),
+                title: z.string().min(1).max(300),
+                url: z.string().max(500).describe("Its claude.ai link"),
+                updated_at: z.string().max(40).optional()
+            })).max(500).optional().describe("The project's artifacts, for example from list_project_artifacts. Leave out if you can't list them.")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(() => syncProject(env, args)));

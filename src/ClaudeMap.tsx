@@ -5,9 +5,10 @@ import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
     Paper, Stack, Tab, Tabs, Toolbar, Typography
 } from "@mui/material";
-import { ArrowBack, Close, OpenInNew, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Close, Description, OpenInNew, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
-    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeStaleHours
+    ArtifactFlag, ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, artifactFlag, artifactsOnMap,
+    badgeFor, badgeOrder, claudeBadges, claudeStaleHours
 } from "./ClaudeMapTypes";
 import { ServerApi } from "./ServerApi";
 import { useElementSize } from "./useContainerWidth";
@@ -28,15 +29,31 @@ const refreshMs = 30_000;
 
 type MapNode = {
     id: string,
-    kind: "root" | "project" | "thread",
+    kind: "root" | "project" | "thread" | "artifact",
     label: string,
     badge?: ClaudeBadgeKind,
     /* the project's summary, like "2 need you" */
     badgeText?: string,
     url?: string,
     project?: ClaudeProject,
-    thread?: ClaudeThread
+    thread?: ClaudeThread,
+    artifact?: ClaudeArtifact,
+    /* an artifact's pill, in place of a state badge */
+    pill?: Pill
 };
+
+type Pill = {text: string, bg: string, fg: string, outline?: string};
+
+/* New is loud, Updated is warm, anything else just says how old it is */
+export function artifactPill(artifact: ClaudeArtifact, flag: ArtifactFlag): Pill {
+    const age = artifact.updatedAt ? `Updated ${ago(artifact.updatedAt)}` : "Artifact";
+    return flag === "new" ? {text: "New", bg: "#7C3AED", fg: "#FFFFFF"}
+        : flag === "updated" ? {text: age, bg: "#F3E8FF", fg: "#5B21B6", outline: "#7C3AED"}
+        : {text: age, bg: "#F3F4F6", fg: "#4B5563"};
+}
+
+const byRecent = (a: ClaudeArtifact, b: ClaudeArtifact) =>
+    (b.updatedAt ?? b.firstSeenAt).localeCompare(a.updatedAt ?? a.firstSeenAt);
 
 export function ago(iso: string | undefined, now = Date.now()): string {
     if (!iso) {
@@ -68,7 +85,7 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
 
 const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
 
-function graphOf(projects: ClaudeProject[]): {nodes: MapNode[], links: {source: string, target: string}[]} {
+function graphOf(projects: ClaudeProject[], hideDone: boolean): {nodes: MapNode[], links: {source: string, target: string}[]} {
     const nodes: MapNode[] = [{id: "claude", kind: "root", label: "Claude"}];
     const links: {source: string, target: string}[] = [];
     for (const p of projects) {
@@ -77,8 +94,17 @@ function graphOf(projects: ClaudeProject[]): {nodes: MapNode[], links: {source: 
         links.push({source: "claude", target: p.id});
         for (const t of p.threads) {
             const badge = badgeFor(t, p);
+            if (hideDone && badge === "done") {
+                continue;
+            }
             nodes.push({id: t.id, kind: "thread", label: t.title, badge, url: t.url, project: p, thread: t});
             links.push({source: p.id, target: t.id});
+        }
+        // artifacts belong to the project, so they stay when the thread that made them is done or hidden
+        for (const a of [...p.artifacts].filter(a => a.inLatest).sort(byRecent).slice(0, artifactsOnMap)) {
+            nodes.push({id: `artifact:${a.id}`, kind: "artifact", label: a.title, url: a.url, project: p, artifact: a,
+                pill: artifactPill(a, artifactFlag(a, p))});
+            links.push({source: p.id, target: `artifact:${a.id}`});
         }
     }
     return {nodes, links};
@@ -128,7 +154,7 @@ function wrap(text: string, width: number): string[] {
     return lines.map(l => l.length > width + 4 ? `${l.slice(0, width + 3)}…` : l);
 }
 
-const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "project" ? 7 : 5;
+const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "project" ? 7 : kind === "artifact" ? 4.5 : 5;
 
 function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, selectedId?: string) {
     const x = node.x ?? 0, y = node.y ?? 0;
@@ -150,7 +176,18 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     }
 
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    if (node.kind === "artifact") {
+        // a page with a folded corner, so artifacts never read as threads
+        const fold = r * 0.6;
+        ctx.moveTo(x - r, y - r);
+        ctx.lineTo(x + r - fold, y - r);
+        ctx.lineTo(x + r, y - r + fold);
+        ctx.lineTo(x + r, y + r);
+        ctx.lineTo(x - r, y + r);
+        ctx.closePath();
+    } else {
+        ctx.arc(x, y, r, 0, 2 * Math.PI);
+    }
     ctx.fillStyle = node.kind === "root" ? claudeStyle.ring : claudeStyle.fill;
     ctx.fill();
     ctx.lineWidth = node.id === selectedId ? 2.2 : 1.2;
@@ -170,7 +207,8 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     }
 
     // label: up to two short lines, so neighbours don't collide
-    const fontSize = node.kind === "thread" ? 3.6 : 4.4;
+    const small = node.kind === "thread" || node.kind === "artifact";
+    const fontSize = small ? 3.6 : 4.4;
     ctx.textAlign = "center";
     if (node.kind === "root") {
         ctx.font = `600 3.6px ${claudeStyle.font}`;
@@ -178,11 +216,42 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
         ctx.textBaseline = "middle";
         ctx.fillText(node.label, x, y);
     } else {
-        ctx.font = `${node.kind === "thread" ? 500 : 600} ${fontSize}px ${claudeStyle.font}`;
+        ctx.font = `${small ? 500 : 600} ${fontSize}px ${claudeStyle.font}`;
         ctx.fillStyle = claudeStyle.ink;
         ctx.textBaseline = "top";
         const lines = wrap(node.label, node.kind === "project" ? 20 : 18);
         lines.forEach((line, i) => ctx.fillText(line, x, y + r + 1.5 + i * fontSize * 1.1));
+        // artifacts: lines on the page, then their pill
+        if (node.kind === "artifact") {
+            ctx.strokeStyle = claudeStyle.ring;
+            ctx.lineWidth = 0.5;
+            for (const dy of [-1.5, 0, 1.5]) {
+                ctx.beginPath();
+                ctx.moveTo(x - r * 0.55, y + dy);
+                ctx.lineTo(x + r * 0.45, y + dy);
+                ctx.stroke();
+            }
+        }
+        const pill = node.pill;
+        if (pill) {
+            const pillFont = fontSize * 0.78;
+            ctx.font = `600 ${pillFont}px system-ui, sans-serif`;
+            const w = ctx.measureText(pill.text).width + pillFont;
+            const h = pillFont * 1.5;
+            const top = y + r + 2.5 + lines.length * fontSize * 1.1;
+            ctx.fillStyle = pill.bg;
+            ctx.beginPath();
+            ctx.roundRect(x - w / 2, top, w, h, h / 2);
+            ctx.fill();
+            if (pill.outline) {
+                ctx.strokeStyle = pill.outline;
+                ctx.lineWidth = 0.3;
+                ctx.stroke();
+            }
+            ctx.fillStyle = pill.fg;
+            ctx.textBaseline = "middle";
+            ctx.fillText(pill.text, x, top + h / 2);
+        }
         // badge pill under the label
         if (node.badge) {
             const badge = claudeBadges[node.badge];
@@ -246,10 +315,10 @@ const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: 
 /* Keeps the same node objects (and so their positions) across refreshes. A refresh that only changes
    states or titles updates the nodes in place and leaves the layout alone; new nodes start next to
    their parent, so only they and their neighbours move. */
-function useStableGraph(projects: ClaudeProject[]): GraphData {
+function useStableGraph(projects: ClaudeProject[], hideDone: boolean): GraphData {
     const current = React.useRef<{data: GraphData, structure: string}>();
     return React.useMemo(() => {
-        const fresh = graphOf(projects);
+        const fresh = graphOf(projects, hideDone);
         const structure = structureOf(fresh);
         const previous = current.current;
         const byId = new Map((previous?.data.nodes ?? []).map(n => [n.id, n]));
@@ -285,7 +354,28 @@ function useStableGraph(projects: ClaudeProject[]): GraphData {
         const data: GraphData = {nodes, links: fresh.links.map(l => ({...l})), pins};
         current.current = {data, structure};
         return data;
-    }, [projects]);
+    }, [projects, hideDone]);
+}
+
+/* A per-device preference, kept in this browser; falls back to the default when storage is off */
+function useRemembered(key: string, fallback: boolean): [boolean, (v: boolean) => void] {
+    const [value, setValue] = React.useState<boolean>(() => {
+        try {
+            const stored = window.localStorage.getItem(key);
+            return stored === null ? fallback : stored === "true";
+        } catch {
+            return fallback;
+        }
+    });
+    const set = (v: boolean) => {
+        setValue(v);
+        try {
+            window.localStorage.setItem(key, String(v));
+        } catch {
+            // private window: the choice lasts for this visit only
+        }
+    };
+    return [value, set];
 }
 
 function useClaudeMap(demo: boolean) {
@@ -326,13 +416,14 @@ export function ClaudeMap() {
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
     const [view, setView] = React.useState<"map" | "list">("map");
     const [showHidden, setShowHidden] = React.useState(false);
+    const [hideDone, setHideDone] = useRemembered("claudeMap.hideDone", false);
     const [selectedId, setSelectedId] = React.useState<string>();
     const [rect, sizeRef] = useElementSize();
     const graphRef = React.useRef<ForceGraphMethods<NodeObject<MapNode>>>();
     const lastClick = React.useRef<{id: string, at: number}>();
 
     const visible = React.useMemo(() => (projects ?? []).filter(p => showHidden || !p.hidden), [projects, showHidden]);
-    const graphData = useStableGraph(visible);
+    const graphData = useStableGraph(visible, hideDone);
     if (demo) {
         // lets the demo's layout be inspected from the console
         (window as unknown as {claudeMapNodes: unknown}).claudeMapNodes = graphData.nodes;
@@ -353,6 +444,18 @@ export function ClaudeMap() {
     }, [showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
+
+    /* Opening an artifact from the map clears its New or Updated flag */
+    const openNode = (url: string | undefined, artifact?: ClaudeArtifact) => {
+        open(url);
+        if (artifact) {
+            const openedAt = new Date().toISOString();
+            setProjects(ps => ps?.map(p => ({...p, artifacts: p.artifacts.map(a => a.id === artifact.id ? {...a, openedAt} : a)})));
+            if (!demo) {
+                ServerApi.markClaudeArtifactOpened(artifact.id).catch(() => reload());
+            }
+        }
+    };
 
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
@@ -382,6 +485,16 @@ export function ClaudeMap() {
                 </Tabs>
             </Toolbar>
         </AppBar>
+
+        <Stack direction="row" alignItems="center" gap={1} sx={{px: 2, py: 0.5, bgcolor: "#fff", borderBottom: `1px solid ${claudeStyle.link}`}}>
+            <Chip
+                size="small"
+                variant={hideDone ? "filled" : "outlined"}
+                label={hideDone ? "Done threads hidden" : "Hide done threads"}
+                onClick={() => setHideDone(!hideDone)}
+                sx={hideDone ? {bgcolor: claudeStyle.ring, color: "#fff"} : {borderColor: claudeStyle.ring, color: claudeStyle.ink}}
+            />
+        </Stack>
 
         {error && <Alert severity="warning" sx={{borderRadius: 0}}>Couldn't refresh the Claude map. {error}</Alert>}
         {demo && <Alert severity="info" sx={{borderRadius: 0}}>Sample data. Nothing here is real.</Alert>}
@@ -446,14 +559,14 @@ export function ClaudeMap() {
                     lastClick.current = {id: n.id, at: now};
                     setSelectedId(n.kind === "root" ? undefined : n.id);
                     if (doubled) {
-                        open(n.url);
+                        openNode(n.url, n.artifact);
                     }
                 }}
                 onBackgroundClick={() => setSelectedId(undefined)}
             />}
 
             {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
-                {(projects ?? []).filter(p => showHidden || !p.hidden).map(p => <React.Fragment key={p.id}>
+                {visible.map(p => <React.Fragment key={p.id}>
                     <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
                         <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
                             {projectLabel(p)}
@@ -464,7 +577,7 @@ export function ClaudeMap() {
                             {p.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}
                         </IconButton>
                     </ListSubheader>
-                    {[...p.threads]
+                    {p.threads.filter(t => !(hideDone && badgeFor(t, p) === "done"))
                         .sort((a, b) => byUrgency(badgeFor(a, p), badgeFor(b, p)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
                         .map(t => <ListItemButton key={t.id} onClick={() => open(t.url)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
                             <BadgeChip kind={badgeFor(t, p)}/>
@@ -473,6 +586,15 @@ export function ClaudeMap() {
                                 secondary={t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`}
                             />
                         </ListItemButton>)}
+                    {p.artifacts.filter(a => a.inLatest).sort(byRecent).map(a => {
+                        const flag = artifactFlag(a, p);
+                        const pill = artifactPill(a, flag);
+                        return <ListItemButton key={a.id} onClick={() => openNode(a.url, a)} sx={{gap: 1.5}}>
+                            <Description sx={{color: claudeStyle.ring}}/>
+                            <ListItemText primary={a.title} secondary={flag ? undefined : pill.text}/>
+                            {flag && <Chip size="small" label={pill.text} sx={{bgcolor: pill.bg, color: pill.fg, fontWeight: 600, border: pill.outline ? `1px solid ${pill.outline}` : undefined}}/>}
+                        </ListItemButton>;
+                    })}
                 </React.Fragment>)}
                 {hiddenCount > 0 && <Box sx={{p: 2}}>
                     <Button size="small" onClick={() => setShowHidden(s => !s)}>
@@ -492,8 +614,10 @@ export function ClaudeMap() {
                         {selected.label}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                        {selected.kind === "thread" && selected.project ? `${projectLabel(selected.project)} · ` : ""}
-                        {selected.kind === "thread"
+                        {(selected.kind === "thread" || selected.kind === "artifact") && selected.project ? `${projectLabel(selected.project)} · ` : ""}
+                        {selected.kind === "artifact"
+                            ? (selected.pill?.text === "New" ? "new artifact" : `artifact · ${selected.pill?.text.toLowerCase()}`)
+                            : selected.kind === "thread"
                             ? (selected.thread!.inLatest ? `last active ${ago(selected.thread!.lastActivityAt)}` : `not seen since ${ago(selected.thread!.lastSeenAt)}`)
                             : `${selected.project!.threads.length} threads · synced ${ago(selected.project!.lastSyncedAt)}`}
                     </Typography>
@@ -502,13 +626,14 @@ export function ClaudeMap() {
             </Stack>
             <Stack direction="row" alignItems="center" gap={1} sx={{mt: 1}}>
                 {selected.badge && <BadgeChip kind={selected.badge} text={selected.badgeText}/>}
+                {selected.pill && <Chip size="small" label={selected.pill.text} sx={{bgcolor: selected.pill.bg, color: selected.pill.fg, fontWeight: 600}}/>}
                 <Box sx={{flexGrow: 1}}/>
                 <Button
                     variant="contained"
                     size="small"
                     endIcon={<OpenInNew/>}
                     sx={{bgcolor: claudeStyle.ring, "&:hover": {bgcolor: "#C4623F"}}}
-                    onClick={() => open(selected.url)}
+                    onClick={() => openNode(selected.url, selected.artifact)}
                 >
                     Open in Claude
                 </Button>

@@ -1,7 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import {
-    ClaudeProject, ClaudeThreadState, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
+    ClaudeArtifact, ClaudeProject, ClaudeThreadState, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
 /* The Claude map. Any Claude in a project sends a snapshot of the project's threads, as the platform
@@ -15,15 +15,27 @@ export type SnapshotThread = {
     created_at?: string,
     last_activity_at?: string
 };
+export type SnapshotArtifact = {
+    artifact_id: string,
+    title: string,
+    url: string,
+    updated_at?: string
+};
 export type Snapshot = {
     project_id: string,
     project_name: string,
     short_name?: string,
-    threads: SnapshotThread[]
+    threads: SnapshotThread[],
+    /* the project's artifacts, as the platform lists them; left out means "not sent", not "none" */
+    artifacts?: SnapshotArtifact[]
 };
 
 type ProjectRow = {
     id: string, name: string, short_name: string | null, hidden: number, first_seen_at: string, last_synced_at: string
+};
+type ArtifactRow = {
+    id: string, project_id: string, title: string, url: string, updated_at: string | null,
+    first_seen_at: string, last_seen_at: string, opened_at: string | null
 };
 type ThreadRow = {
     id: string, project_id: string, title: string, state: ClaudeThreadState, created_at: string | null,
@@ -57,6 +69,19 @@ export function checkSnapshot(input: Snapshot): Snapshot {
         }
         if ((t.created_at !== undefined && !isTime(t.created_at)) || (t.last_activity_at !== undefined && !isTime(t.last_activity_at))) {
             fail(`Thread ${t.thread_id} has a time that isn't a date.`);
+        }
+    }
+    const artifactIds = new Set<string>();
+    for (const a of input.artifacts ?? []) {
+        if (!idPattern.test(a.artifact_id) || artifactIds.has(a.artifact_id)) {
+            fail(`Artifact id "${a.artifact_id}" isn't valid or is listed twice.`);
+        }
+        artifactIds.add(a.artifact_id);
+        if (!/^https:\/\/claude\.ai\//.test(a.url)) {
+            fail(`Artifact ${a.artifact_id} needs a claude.ai link.`);
+        }
+        if (a.updated_at !== undefined && !isTime(a.updated_at)) {
+            fail(`Artifact ${a.artifact_id} has a time that isn't a date.`);
         }
     }
     return input;
@@ -99,6 +124,15 @@ export async function syncProject(env: Env, input: Snapshot): Promise<{project: 
                 created_at = COALESCE(claude_threads.created_at, excluded.created_at),
                 last_seen_at = excluded.last_seen_at`
         ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, now, now)),
+        ...(snapshot.artifacts ?? []).map(a => env.DB.prepare(
+            `INSERT INTO claude_artifacts (id, project_id, title, url, updated_at, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET project_id = excluded.project_id, title = excluded.title, url = excluded.url,
+                updated_at = COALESCE(MAX(excluded.updated_at, claude_artifacts.updated_at), excluded.updated_at, claude_artifacts.updated_at),
+                last_seen_at = excluded.last_seen_at`
+        ).bind(a.artifact_id, snapshot.project_id, a.title, a.url, a.updated_at ?? null, now, now)),
+        // a snapshot without artifacts says nothing about them, so they still count as seen
+        ...(snapshot.artifacts ? [] : [env.DB.prepare("UPDATE claude_artifacts SET last_seen_at = ? WHERE project_id = ?").bind(now, snapshot.project_id)]),
         env.DB.prepare("UPDATE claude_snapshots SET applied_at = ? WHERE hash = ?").bind(now, hash)
     ];
     await env.DB.batch(statements);
@@ -115,11 +149,13 @@ const newer = `(excluded.last_activity_at IS NULL OR claude_threads.last_activit
     OR excluded.last_activity_at >= claude_threads.last_activity_at)`;
 
 export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
-    const [projects, threads] = await env.DB.batch([
+    const [projects, threads, artifacts] = await env.DB.batch([
         env.DB.prepare("SELECT * FROM claude_projects ORDER BY last_synced_at DESC"),
-        env.DB.prepare("SELECT * FROM claude_threads ORDER BY created_at")
+        env.DB.prepare("SELECT * FROM claude_threads ORDER BY created_at"),
+        env.DB.prepare("SELECT * FROM claude_artifacts ORDER BY COALESCE(updated_at, first_seen_at) DESC")
     ]);
     const threadRows = threads.results as ThreadRow[];
+    const artifactRows = artifacts.results as ArtifactRow[];
     return (projects.results as ProjectRow[]).map(p => {
         const project: ClaudeProject = {
             id: p.id,
@@ -140,6 +176,15 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
                 if (t.created_at) thread.createdAt = t.created_at;
                 if (t.last_activity_at) thread.lastActivityAt = t.last_activity_at;
                 return thread;
+            }),
+            artifacts: artifactRows.filter(a => a.project_id === p.id).map(a => {
+                const artifact: ClaudeArtifact = {
+                    id: a.id, title: a.title, url: a.url, firstSeenAt: a.first_seen_at,
+                    inLatest: a.last_seen_at >= p.last_synced_at
+                };
+                if (a.updated_at) artifact.updatedAt = a.updated_at;
+                if (a.opened_at) artifact.openedAt = a.opened_at;
+                return artifact;
             })
         };
         if (p.short_name) project.shortName = p.short_name;
@@ -151,5 +196,14 @@ export async function setProjectHidden(env: Env, projectId: string, hidden: bool
     const result = await env.DB.prepare("UPDATE claude_projects SET hidden = ? WHERE id = ?").bind(hidden ? 1 : 0, projectId).run();
     if (!result.meta.changes) {
         throw new HttpError(404, "There is no such project on the Claude map.");
+    }
+}
+
+/* Jon opened it from the map: it stops reading "New" or "Updated" until it changes again */
+export async function markArtifactOpened(env: Env, artifactId: string): Promise<void> {
+    const result = await env.DB.prepare("UPDATE claude_artifacts SET opened_at = ? WHERE id = ?")
+        .bind(new Date().toISOString(), artifactId).run();
+    if (!result.meta.changes) {
+        throw new HttpError(404, "There is no such artifact on the Claude map.");
     }
 }

@@ -79,6 +79,11 @@ each with a badge (Needs you, Ready to review, Working, Stuck, Stopped, Done). D
 and press **Open in Claude**, to jump to that thread. Jon only reads it, and can hide a project from the list
 view. Try it without a server at `/claude?demo`.
 
+Artifacts show too, as page-shaped nodes on their project (Claude lists artifacts per project, not per thread,
+so they stay put when the thread that made one is done or hidden). "New" means it appeared after the project
+joined the map and hasn't been opened from the map; "Updated Xm ago" is highlighted when it changed since it was
+last opened. **Hide done threads** (off by default) remembers its setting on each device.
+
 **Opting a project in.** Threads do the syncing: project coordinators don't get the connector, so they can't.
 This repo's `CLAUDE.md` opts in every project that has the repo attached. For any other project, paste this
 into its project instructions (or into Settings → Your Claude → Instructions to cover every project):
@@ -86,8 +91,8 @@ into its project instructions (or into Settings → Your Claude → Instructions
 > ADHD Assist Claude map: if you are a thread in a Claude project and have both a list_threads tool and the
 > ADHD Assist sync_project tool, call sync_project when you start work, whenever you call check_in or
 > report_state, and as the last step of every turn, with the project's id and name and every one of its
-> threads as list_threads gives them (id, title, state, created and last-activity times). If either tool is
-> missing, skip this silently.
+> threads as list_threads gives them (id, title, state, created and last-activity times), plus its artifacts
+> from list_project_artifacts if you have it. If either of the first two tools is missing, skip this silently.
 
 **What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
 so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours
