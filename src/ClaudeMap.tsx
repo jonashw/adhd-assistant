@@ -233,7 +233,12 @@ const open = (url?: string) => {
     }
 };
 
-type GraphData = {nodes: NodeObject<MapNode>[], links: {source: string, target: string}[]};
+type GraphData = {
+    nodes: NodeObject<MapNode>[],
+    links: {source: string, target: string}[],
+    /* where to hold existing nodes while new ones settle; emptied once applied */
+    pins?: Map<string, {x: number, y: number}>
+};
 
 const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: string}[]}) =>
     JSON.stringify([g.nodes.map(n => n.id), g.links.map(l => `${l.source}>${l.target}`)]);
@@ -255,6 +260,18 @@ function useStableGraph(projects: ClaudeProject[]): GraphData {
             return previous.data;
         }
         const parentOf = new Map(fresh.links.map(l => [l.target, l.source]));
+        // While new nodes find their place, everything else holds still except their siblings,
+        // which make room. The graph's own layout pass clears pins, so they go on at the first tick
+        // after it (see onEngineTick) and come off when the layout settles (see onEngineStop).
+        const newParents = new Set(fresh.nodes.filter(n => !byId.has(n.id)).map(n => parentOf.get(n.id)));
+        const pins = new Map<string, {x: number, y: number}>();
+        if (previous) {
+            for (const kept of byId.values()) {
+                if (!newParents.has(parentOf.get(kept.id)) && kept.x !== undefined && kept.y !== undefined) {
+                    pins.set(kept.id, {x: kept.x, y: kept.y});
+                }
+            }
+        }
         const nodes = fresh.nodes.map(node => {
             const kept = byId.get(node.id);
             if (kept) {
@@ -265,7 +282,7 @@ function useStableGraph(projects: ClaudeProject[]): GraphData {
                 ? {...node, x: parent.x + (Math.random() - 0.5) * 10, y: (parent.y ?? 0) + (Math.random() - 0.5) * 10}
                 : node;
         });
-        const data = {nodes, links: fresh.links.map(l => ({...l}))};
+        const data: GraphData = {nodes, links: fresh.links.map(l => ({...l})), pins};
         current.current = {data, structure};
         return data;
     }, [projects]);
@@ -275,9 +292,10 @@ function useClaudeMap(demo: boolean) {
     const [projects, setProjects] = React.useState<ClaudeProject[]>();
     const [error, setError] = React.useState<string>();
     const tick = React.useRef(0);
-    const load = React.useCallback(() => {
+    const load = React.useCallback((advance = false) => {
         if (demo) {
-            setProjects(demoClaudeMap(tick.current++));
+            // like a real refresh, coming back to the window shows the same data; only the timer moves it on
+            setProjects(demoClaudeMap(advance ? ++tick.current : tick.current));
             return;
         }
         ServerApi.claudeMap()
@@ -288,13 +306,14 @@ function useClaudeMap(demo: boolean) {
             .catch((e: Error) => setError(e.message));
     }, [demo]);
     React.useEffect(() => {
+        const refocus = () => load();
         load();
         // the demo refreshes faster, so changes are easy to watch
-        const timer = window.setInterval(load, demo ? 8000 : refreshMs);
-        window.addEventListener("focus", load);
+        const timer = window.setInterval(() => load(true), demo ? 8000 : refreshMs);
+        window.addEventListener("focus", refocus);
         return () => {
             window.clearInterval(timer);
-            window.removeEventListener("focus", load);
+            window.removeEventListener("focus", refocus);
         };
     }, [load, demo]);
     return {projects, error, reload: load, setProjects};
@@ -314,20 +333,24 @@ export function ClaudeMap() {
 
     const visible = React.useMemo(() => (projects ?? []).filter(p => showHidden || !p.hidden), [projects, showHidden]);
     const graphData = useStableGraph(visible);
-    // forces are set once per mounted graph; a data refresh never restarts the whole layout
+    if (demo) {
+        // lets the demo's layout be inspected from the console
+        (window as unknown as {claudeMapNodes: unknown}).claudeMapNodes = graphData.nodes;
+    }
+    // forces are set once each time the graph mounts; a data refresh never restarts the whole layout.
+    // (The graph's handle is a new object on every render, so it can't tell mounts apart; this can.)
     const fitted = React.useRef(false);
-    const mountedGraph = React.useRef<unknown>();
+    const showingGraph = view === "map" && rect.width > 0 && visible.length > 0;
     React.useEffect(() => {
         const graph = graphRef.current;
-        if (!graph || mountedGraph.current === graph) {
+        if (!showingGraph || !graph) {
             return;
         }
-        mountedGraph.current = graph;
         fitted.current = false;
         graph.d3Force("collide", collide(26));
         graph.d3Force("charge")?.strength(-160);
         graph.d3ReheatSimulation();
-    });
+    }, [showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
 
@@ -372,7 +395,7 @@ export function ClaudeMap() {
         </Paper>}
 
         <Box ref={sizeRef} sx={{flexGrow: 1, minHeight: 0, position: "relative", overflow: "auto"}}>
-            {view === "map" && rect.width > 0 && visible.length > 0 && <ForceGraph2D<MapNode>
+            {showingGraph && <ForceGraph2D<MapNode>
                 ref={graphRef}
                 width={rect.width}
                 height={rect.height}
@@ -394,7 +417,23 @@ export function ClaudeMap() {
                 }}
                 autoPauseRedraw={false}
                 cooldownTime={2500}
+                onEngineTick={() => {
+                    if (graphData.pins?.size) {
+                        graphData.nodes.forEach(n => {
+                            const pin = graphData.pins!.get(n.id);
+                            if (pin) {
+                                n.fx = n.x = pin.x;
+                                n.fy = n.y = pin.y;
+                            }
+                        });
+                        graphData.pins.clear();
+                    }
+                }}
                 onEngineStop={() => {
+                    graphData.nodes.forEach(n => {
+                        n.fx = undefined;
+                        n.fy = undefined;
+                    });
                     // fit once; after that, leave the view where Jon put it
                     if (!fitted.current) {
                         fitted.current = true;
