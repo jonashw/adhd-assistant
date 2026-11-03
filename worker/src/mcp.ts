@@ -23,7 +23,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
-- Claude map: if this thread is in a Claude project whose instructions opt it into the Claude map, call sync_project with the project's whole thread list, as you can list it, whenever you call check_in or report_state, and once at the end of every coordinator turn. Send every thread, not just your own: any one sync brings the whole project up to date.`;
+- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project with the project's whole thread list when you start work, whenever you call check_in or report_state, and as the last step of every turn. Send every thread, not just your own: any one sync brings the whole project up to date.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
 

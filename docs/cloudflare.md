@@ -79,14 +79,20 @@ each with a badge (Needs you, Ready to review, Working, Stuck, Stopped, Done). D
 and press **Open in Claude**, to jump to that thread. Jon only reads it, and can hide a project from the list
 view. Try it without a server at `/claude?demo`.
 
-**Opting a project in.** Paste this into the project's instructions (set the short name or leave that sentence out):
+**Opting a project in.** Threads do the syncing: project coordinators don't get the connector, so they can't.
+This repo's `CLAUDE.md` opts in every project that has the repo attached. For any other project, paste this
+into its project instructions (or into Settings → Your Claude → Instructions to cover every project):
 
-> ADHD Assist Claude map: this project is opted in. Its short name is "Multitask". Whenever you call
-> check_in or report_state, and at the end of every turn as this project's coordinator, call sync_project
-> with this project's id and name and every one of its threads as list_threads gives them (id, title,
-> state, created and last-activity times).
+> ADHD Assist Claude map: if you are a thread in a Claude project and have both a list_threads tool and the
+> ADHD Assist sync_project tool, call sync_project when you start work, whenever you call check_in or
+> report_state, and as the last step of every turn, with the project's id and name and every one of its
+> threads as list_threads gives them (id, title, state, created and last-activity times). If either tool is
+> missing, skip this silently.
 
-Delete the line to opt out. The project then stops syncing and fades to "Not heard lately" after 4 hours.
+**What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
+so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours
+its open threads read "Not heard lately". A thread's last sync comes just before its turn ends, so it may still
+read Working after it finishes, until another thread in the project syncs or the 4 hours pass.
 
 **How it stays right.** Every snapshot carries the whole project, so any one Claude remembering brings every
 thread up to date. Snapshots land in the `claude_snapshots` inbox before they are applied, and an older
