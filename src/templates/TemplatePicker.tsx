@@ -6,6 +6,7 @@ import {
     TableContainer, TableHead, TableRow, Toolbar, Typography
 } from "@mui/material";
 import { visuallyHidden } from "@mui/utils";
+import { alpha } from "@mui/material/styles";
 import { ArrowBack, CheckCircleOutline, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
 import { ClaudeMapIcon } from "../ClaudeMapIcon";
@@ -84,12 +85,14 @@ function Walkthrough({template}: {template: StarterTemplate}) {
     const graph = React.useMemo(() => graphAtStep(template, step), [template, step]);
     const last = step === steps.length - 1;
     return (
+        <Paper variant="outlined" sx={{p: 1.5, borderRadius: 2, height: "100%"}}>
         <Stack gap={1}>
-            <Paper variant="outlined" sx={{p: 1, overflowX: "auto"}}>
+            <Box sx={{overflowX: "auto"}}>
                 {template.crew === "rabbit"
                     ? <RabbitBurrow size={260} graph={graph} at={steps[step].focus}/>
                     : <TemplatePreview graph={graph} focus={steps[step].focus} title={template.name}/>}
-            </Paper>
+            </Box>
+            <Divider/>
             <Typography variant="overline" color="text.secondary" sx={{lineHeight: 1.5}}>
                 Try it · step {step + 1} of {steps.length}
             </Typography>
@@ -110,12 +113,14 @@ function Walkthrough({template}: {template: StarterTemplate}) {
                 </Typography>
                 : <PreviewLegend/>}
         </Stack>
+        </Paper>
     );
 }
 
 function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (t: StarterTemplate) => void}) {
     return (
-        <Card id={sectionId(template)} variant="outlined" sx={{scrollMarginTop: 72}}>
+        <Card id={sectionId(template)} variant="outlined"
+            sx={{scrollMarginTop: 72, bgcolor: theme => alpha(theme.palette.primary.main, 0.06)}}>
             <CardHeader
                 avatar={<Box sx={{width: 56, display: "flex", justifyContent: "center"}}><CrewFace crew={template.crew} size={48}/></Box>}
                 title={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
@@ -125,12 +130,12 @@ function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (
                 subheader={`Pick it when you're thinking ${template.pickWhen}`}
             />
             <CardContent sx={{pt: 0}}>
-                <Grid container spacing={3}>
+                <Grid container spacing={2}>
                     <Grid item xs={12} md={7}>
                         <Walkthrough template={template}/>
                     </Grid>
                     <Grid item xs={12} md={5}>
-                        <Stack gap={1.5}>
+                        <Stack gap={1.5} component={Paper} variant="outlined" sx={{p: 2, borderRadius: 2, height: "100%"}}>
                             <Typography variant="body1">{template.summary}</Typography>
                             <Box>
                                 <Typography variant="overline" color="text.secondary">Why pick it</Typography>
@@ -161,7 +166,7 @@ function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (
                 </Grid>
             </CardContent>
             <Divider/>
-            <CardActions sx={{justifyContent: "flex-end", px: 2}}>
+            <CardActions sx={{justifyContent: "flex-end", px: 2, bgcolor: "background.paper"}}>
                 <Typography variant="body2" color="text.secondary" sx={{mr: "auto"}}>
                     {placeCount(template)} places · {template.keep}
                 </Typography>
