@@ -65,6 +65,20 @@ export const ServerApi = {
             body: JSON.stringify({revision, nodes: graph.nodes, links: graph.links})
         }),
     deleteMap: (id: string) => request<void>(`/api/maps/${encodeURIComponent(id)}`, {method: "DELETE"}),
+    /* A photo for a place's note; answers the URL the note points at */
+    uploadMedia: async (mapId: string, noteId: string, photo: Blob): Promise<{id: string, url: string}> => {
+        const response = await fetch(`/api/maps/${encodeURIComponent(mapId)}/media?place=${encodeURIComponent(noteId)}`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {"content-type": photo.type || "image/jpeg"},
+            body: photo
+        });
+        const body = isJson(response) ? await response.json() : undefined;
+        if (!response.ok) {
+            throw new Error(body?.error ?? `The server answered ${response.status}.`);
+        }
+        return body;
+    },
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
     listConnections: () => request<Connection[]>("/api/connections"),
     revokeConnection: (id: string) => request<void>(`/api/connections/${encodeURIComponent(id)}/revoke`, {method: "POST"})

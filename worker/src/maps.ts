@@ -103,5 +103,8 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
 }
 
 export async function deleteMap(env: Env, id: string): Promise<void> {
-    await env.DB.prepare("DELETE FROM maps WHERE id = ?").bind(id).run();
+    await env.DB.batch([
+        env.DB.prepare("DELETE FROM maps WHERE id = ?").bind(id),
+        env.DB.prepare("DELETE FROM media WHERE map_id = ?").bind(id)
+    ]);
 }

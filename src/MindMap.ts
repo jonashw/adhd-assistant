@@ -78,7 +78,9 @@ export type MindMapGraphNode = {
     /* its next step fits in 5 minutes */
     small?: boolean,
     /* Jon's own interest, 1 to 5; unset is neutral */
-    interest?: number
+    interest?: number,
+    /* the place's note: markdown text, checklist items and photos (see NoteBody) */
+    body?: string
 }
 
 export type MindMapGraphLink = {type: MindMapGraphLinkType, label?: string};
@@ -125,6 +127,12 @@ export const MindMap = {
         updateNode(graph, nodeId, n => {
             const {interest: _, ...rest} = n;
             return interest ? {...rest, interest} : rest;
+        }),
+    /* Replaces a place's note (markdown with checklist items and photos; see NoteBody) */
+    setBody: (graph: MindMapGraphData, nodeId: string, body: string): MindMapGraphData =>
+        updateNode(graph, nodeId, n => {
+            const {body: _, ...rest} = n;
+            return body.trim() ? {...rest, body} : rest;
         }),
     /* The places this one waits on (its BLOCKED_BY links) */
     blockersOf: (graph: MindMapGraphData, nodeId: string): string[] =>
