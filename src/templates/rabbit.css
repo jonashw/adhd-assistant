@@ -1,0 +1,35 @@
+.rabbit-holes .rabbit-ground-0 { fill: #b08a5f; }
+.rabbit-holes .rabbit-ground-1 { fill: #8f6a45; }
+.rabbit-holes .rabbit-ground-2 { fill: #6e4f33; }
+.rabbit-holes .rabbit-grass { fill: #7aa35a; }
+.rabbit-holes .rabbit-hole { fill: #2b1d12; }
+.rabbit-holes .rabbit-home { fill: none; stroke: #222; stroke-width: 1.4; }
+.rabbit-holes .rabbit-string { stroke: #c0392b; stroke-width: 1.3; stroke-dasharray: 2.4 1.6; }
+.rabbit-holes .rabbit-body { fill: #d9dde3; stroke: #8a929c; stroke-width: 0.5; }
+.rabbit-holes .rabbit-inner { fill: #f2b8c6; }
+.rabbit-holes .rabbit-visor { fill: #2e3440; }
+.rabbit-holes .rabbit-nose { fill: #e57a93; }
+
+/* it pops up through each hole in turn, then starts again */
+.rabbit-holes .rabbit-pop { animation: rabbit-pop 6s ease-in-out infinite; opacity: 0; }
+.rabbit-holes .rabbit-at-1 { animation-delay: 2s; }
+.rabbit-holes .rabbit-at-2 { animation-delay: 4s; }
+.rabbit-holes .rabbit-ears { animation: rabbit-ears 2s ease-in-out infinite; transform-origin: 0 -8px; transform-box: fill-box; }
+
+@keyframes rabbit-pop {
+    0% { opacity: 0; transform: translateY(8px); }
+    6% { opacity: 1; transform: translateY(0); }
+    28% { opacity: 1; transform: translateY(0); }
+    34% { opacity: 0; transform: translateY(8px); }
+    100% { opacity: 0; transform: translateY(8px); }
+}
+@keyframes rabbit-ears {
+    0%, 70%, 100% { transform: rotate(0); }
+    80% { transform: rotate(-6deg); }
+    90% { transform: rotate(4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .rabbit-holes .rabbit-pop, .rabbit-holes .rabbit-ears { animation: none; }
+    .rabbit-holes .rabbit-at-2 { opacity: 1; }
+}

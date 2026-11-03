@@ -3,7 +3,7 @@ import { MindMap, MindMapGraphData, MindMapGraphLinkType, MindMapGraphNode, Node
 /* Starter maps for the "Help me pick" page. Each template is a small tree of places with notes,
    plus a walkthrough: a few typical edits played on a preview, so you see how the map is meant to be used. */
 
-export type CrewLead = "tour" | "dog" | "spider" | "squirrel" | "sloth" | "none";
+export type CrewLead = "tour" | "dog" | "spider" | "squirrel" | "sloth" | "rabbit" | "claude" | "none";
 
 type PlaceSpec = {
     id: string,
@@ -114,7 +114,7 @@ export const starterTemplates: StarterTemplate[] = [
     {
         id: "rabbit-hole",
         name: "Rabbit hole, round trip",
-        crew: "spider",
+        crew: "rabbit",
         pickWhen: "\"I keep losing my way.\"",
         teaches: "Finding your way home, where a place came from, and Blocked by",
         keep: "A demo for showing people",
@@ -240,7 +240,7 @@ export const starterTemplates: StarterTemplate[] = [
     {
         id: "claude-projects",
         name: "My Claude projects",
-        crew: "spider",
+        crew: "claude",
         pickWhen: "\"Where are all my Claude threads?\"",
         teaches: "Regions, places Claude threads check into, signals at a stake",
         keep: "Keep it as your Claude map",

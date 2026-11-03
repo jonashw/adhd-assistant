@@ -5,8 +5,11 @@ import {
     List, ListItem, ListItemIcon, ListItemText, MobileStepper, Paper, Stack, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, Toolbar, Typography
 } from "@mui/material";
+import { visuallyHidden } from "@mui/utils";
 import { ArrowBack, CheckCircleOutline, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
+import { ClaudeMapIcon } from "../ClaudeMapIcon";
+import { RabbitHoles } from "./RabbitHoles";
 import { GraphRepositoryContext } from "../GraphRepositoryContext";
 import { MindMap } from "../MindMap";
 import { CrewLead, StarterTemplate, graphAtStep, instantiate, placeCount, starterTemplates } from "./templates";
@@ -21,6 +24,8 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
         case "dog": return <Dog size={size * 0.8}/>;
         case "spider": return <Spider size={size * 0.6}/>;
         case "squirrel": return <Squirrel size={size * 0.7}/>;
+        case "rabbit": return <RabbitHoles size={size}/>;
+        case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
         case "none": return <img src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
     }
@@ -28,7 +33,7 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
 
 const sectionId = (t: StarterTemplate) => `template-${t.id}`;
 
-function ComparisonTable({onPick}: {onPick: (t: StarterTemplate) => void}) {
+function ComparisonTable({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
     const wide = {display: {xs: "none", sm: "table-cell"}};
     return (
         <TableContainer component={Paper} variant="outlined">
@@ -40,6 +45,7 @@ function ComparisonTable({onPick}: {onPick: (t: StarterTemplate) => void}) {
                         <TableCell sx={wide}>What it teaches</TableCell>
                         <TableCell align="right" sx={wide}>Places</TableCell>
                         <TableCell sx={wide}>Afterwards</TableCell>
+                        <TableCell align="right"><Box component="span" sx={visuallyHidden}>Start</Box></TableCell>
                     </TableRow>
                 </TableHead>
                 <TableBody>
@@ -47,7 +53,7 @@ function ComparisonTable({onPick}: {onPick: (t: StarterTemplate) => void}) {
                         <TableRow key={t.id} hover sx={{cursor: "pointer"}} onClick={() => onPick(t)}>
                             <TableCell>
                                 <Stack direction="row" alignItems="center" gap={1}>
-                                    <Box sx={{width: 44, display: "flex", justifyContent: "center", flexShrink: 0}}><CrewFace crew={t.crew} size={32}/></Box>
+                                    <Box sx={{width: 48, display: "flex", justifyContent: "center", flexShrink: 0}}><CrewFace crew={t.crew} size={32}/></Box>
                                     <Stack>
                                         <Typography variant="body2" fontWeight={500}>{t.name}</Typography>
                                         {t.badge && <Chip label={t.badge} size="small" color="primary" sx={{alignSelf: "flex-start", height: 20}}/>}
@@ -58,6 +64,12 @@ function ComparisonTable({onPick}: {onPick: (t: StarterTemplate) => void}) {
                             <TableCell sx={wide}>{t.teaches}</TableCell>
                             <TableCell align="right" sx={wide}>{placeCount(t)}</TableCell>
                             <TableCell sx={wide}>{t.keep}</TableCell>
+                            <TableCell align="right">
+                                <Button size="small" variant="outlined" aria-label={`Start with ${t.name}`}
+                                    onClick={e => { e.stopPropagation(); onUse(t); }}>
+                                    Start
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     )}
                 </TableBody>
@@ -186,7 +198,7 @@ export function TemplatePicker() {
                             </Typography>
                         </Box>
                     </Stack>
-                    <ComparisonTable onPick={jump}/>
+                    <ComparisonTable onPick={jump} onUse={use}/>
                     {starterTemplates.map(t => <TemplateSection key={t.id} template={t} onUse={use}/>)}
                 </Stack>
             </Container>
