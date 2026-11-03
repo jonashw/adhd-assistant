@@ -333,6 +333,11 @@
 .crew-jon .spider-mini { fill: var(--crew-spider-dark); }
 .crew-jon .spider-mini-leg { fill: none; stroke: var(--crew-spider-dark); stroke-width: 0.8; stroke-linecap: round; }
 .crew-jon .jon-head { transform-origin: 50% 100%; }
+/* the face's expressions are layers in art/you/face.svg: calm, and blink for the moment of a blink */
+.crew-jon .face-blink { display: none; }
+.crew-jon.is-blink .face-blink { display: inline; }
+.crew-jon.is-blink .face-calm { display: none; }
+.crew-jon.is-blink .eyes { animation: none; }
 .crew-jon .jon-bob { transform-origin: 50% 100%; animation: jon-bob 4s ease-in-out infinite; }
 .crew-jon .jon-breathe { transform-origin: 50% 100%; animation: jon-bob 6s ease-in-out infinite; }
 .crew-jon .jon-kite { transform-origin: 0% 100%; animation: jon-kite 5s ease-in-out infinite alternate; }

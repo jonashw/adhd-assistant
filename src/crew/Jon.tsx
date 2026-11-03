@@ -1,6 +1,7 @@
 import { CrewSvg } from "./CrewSvg";
 import { Fidget, useFidget } from "./useFidget";
 import { Spider } from "./Spider";
+import { art } from "./art.generated";
 
 /* You, the scout. The head scouts, the body does: tied off, both hands hold the work and the head stays close;
    aloft, one hand holds the string and the head floats up, higher the more string is out. Mindful: hands empty. */
@@ -142,23 +143,25 @@ function Walk() {
     );
 }
 
-/* Your head is a balloon: the head scouts, floating on the string the body holds */
+/* Your head is a balloon: the head scouts, floating on the string the body holds.
+   Drawn from Jon's own art: art/you/balloon.svg, wearing art/you/face.svg (see art/README.md). */
+const balloonFace = (() => {
+    const box = art.balloon.anchors.face;
+    const [fx, fy, fw, fh] = art.face.viewBox;
+    const scale = Math.min(box.width / fw, box.height / fh);
+    //centre the face's frame on the balloon's face box
+    return `translate(${box.x + box.width / 2} ${box.y + box.height / 2}) scale(${scale}) translate(${-(fx + fw / 2)} ${-(fy + fh / 2)})`;
+})();
+const faceMarkup = Object.values(art.face.layers).join("");
+
 function Head({x, y, r}: {x: number, y: number, r: number}) {
-    const cy = y - 1.5;
-    const ry = r;
-    const rx = r * 0.86;
-    const bottom = cy + ry;
+    //the balloon's art is drawn with its centre at 0,0 and a radius of 10
     return (
         <g className="part jon-head">
-            <path d={`M${x - 1.4} ${bottom + 1.6} L${x} ${bottom - 0.4} L${x + 1.4} ${bottom + 1.6} Z`} className="jon-balloon-knot"/>
-            <ellipse cx={x} cy={cy} rx={rx} ry={ry} className="jon-balloon"/>
-            <ellipse cx={x - rx * 0.42} cy={cy - ry * 0.45} rx={rx * 0.2} ry={ry * 0.32}
-                transform={`rotate(25 ${x - rx * 0.42} ${cy - ry * 0.45})`} className="jon-balloon-shine"/>
-            <g className="part eyes">
-                <circle cx={x - r * 0.3} cy={cy - r * 0.08} r={r * 0.17} className="jon-face-ink"/>
-                <circle cx={x + r * 0.3} cy={cy - r * 0.08} r={r * 0.17} className="jon-face-ink"/>
+            <g transform={`translate(${x} ${y - 1.5}) scale(${r / 10})`}>
+                <g dangerouslySetInnerHTML={{__html: art.balloon.art}}/>
+                <g transform={balloonFace} dangerouslySetInnerHTML={{__html: faceMarkup}}/>
             </g>
-            <path d={`M${x - r * 0.38} ${cy + r * 0.3} q${r * 0.38} ${r * 0.36} ${r * 0.76} 0`} className="jon-smile" style={{strokeWidth: Math.max(1.2, r * 0.2)}}/>
         </g>
     );
 }

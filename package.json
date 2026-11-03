@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "build": "tsc && tsc -p worker && vite build",
+    "build": "node scripts/build-art.mjs && tsc && tsc -p worker && vite build",
+    "art": "node scripts/build-art.mjs",
     "art:check": "node scripts/check-art.mjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
@@ -37,6 +38,7 @@
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-basic-ssl": "^1.1.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@xmldom/xmldom": "^0.8.10",
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.6",
