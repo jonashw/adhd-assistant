@@ -20,8 +20,8 @@ const colW = 36;
 const bandH = 30;
 const sky = 22;
 const pad = 8;
-const chamberW = 26;
-const chamberH = 17;
+const chamberW = 30;
+const chamberH = 15;
 
 type Chamber = {node: MindMapGraphNode, x: number, depth: number, floor: number, parent?: string};
 type Burrow = {chambers: Map<string, Chamber>, rootId: string, width: number, height: number, depth: number, signature: string};
@@ -67,6 +67,23 @@ function holeX(b: Burrow, child: Chamber): number {
         return child.x;
     }
     return parent.x + Math.max(-chamberW / 2 + 4, Math.min(chamberW / 2 - 4, child.x - parent.x));
+}
+
+/* A shaft: a gently winding tunnel from the parent's floor (or the surface) to the top of the child's chamber */
+function shaftPath(b: Burrow, c: Chamber): string {
+    const parent = b.chambers.get(c.parent!)!;
+    const x0 = holeX(b, c), y0 = parent.depth === 0 ? sky + 1.5 : parent.floor;
+    const x1 = c.x, y1 = c.floor - chamberH + 3;
+    const h = y1 - y0;
+    const lean = x1 === x0 ? 4 : 0;
+    return `M${x0} ${y0} C${x0 + lean} ${y0 + h / 3} ${x1 - lean} ${y0 + h * 2 / 3} ${x1} ${y1}`;
+}
+
+/* A chamber: a wide, low hollow with a flat floor and a lopsided roof, like a dug-out den */
+function chamberPath(c: Chamber): string {
+    const l = c.x - chamberW / 2, r = c.x + chamberW / 2;
+    const f = c.floor + 2, t = c.floor - chamberH + 2;
+    return `M${l + 3} ${f} L${r - 2} ${f} Q${r + 1} ${f} ${r} ${f - 4} Q${r - 2} ${t + 1} ${c.x + 4} ${t} Q${c.x - 6} ${t - 0.5} ${l + 2} ${t + 4} Q${l - 1} ${f - 3} ${l + 3} ${f} Z`;
 }
 
 /* The chamber ids from HOME down to a place */
@@ -245,10 +262,8 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
             <rect x={0} y={sky - 1.2} width={b.width} height={2.4} className="burrow-grass"/>
             {/* shafts first, so the chambers sit over their ends */}
             {chambers.map(c => {
-                const parent = b.chambers.get(c.parent!)!;
-                const hx = holeX(b, c);
                 const tucked = !visible.has(c.node.id);
-                return <path key={`shaft-${c.node.id}`} d={`M${hx} ${parent.floor - 1} L${c.x} ${c.floor - chamberH / 2}`}
+                return <path key={`shaft-${c.node.id}`} d={shaftPath(b, c)}
                     className={tucked ? "burrow-shaft is-filled" : "burrow-shaft"} fill="none"/>;
             })}
             {chambers.map(c => {
@@ -257,7 +272,7 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
                 return <g key={c.node.id} className={["burrow-chamber", tucked && "is-filled", status === "someday" && "is-someday", onPick && "is-pickable"].filter(Boolean).join(" ")}
                     onClick={onPick ? () => onPick(c.node.id) : undefined}>
                     <title>{c.node.label}{status ? ` (${status})` : ""}</title>
-                    <rect x={c.x - chamberW / 2} y={c.floor - chamberH + 2} width={chamberW} height={chamberH} rx={7} className="burrow-tunnel"/>
+                    <path d={chamberPath(c)} className="burrow-tunnel"/>
                     {!tucked && <FloorThings x={c.x} floor={c.floor} body={c.node.body}/>}
                     {status === "active" && !tucked && <g className="burrow-lantern">
                         <line x1={c.x + 8} y1={c.floor - chamberH + 2} x2={c.x + 8} y2={c.floor - chamberH + 6} className="burrow-lantern-cord"/>
@@ -279,11 +294,8 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
                     <stop offset="100%" stopColor="#9ff3ff" stopOpacity={0}/>
                 </radialGradient>
                 <mask id={`${uid}-tunnels`} maskUnits="userSpaceOnUse" x={0} y={0} width={b.width} height={b.height}>
-                    {chambers.map(c => <rect key={c.node.id} x={c.x - chamberW / 2} y={c.floor - chamberH + 2} width={chamberW} height={chamberH} rx={7} fill="#fff"/>)}
-                    {chambers.map(c => {
-                        const parent = b.chambers.get(c.parent!)!;
-                        return <path key={`m-${c.node.id}`} d={`M${holeX(b, c)} ${parent.floor - 1} L${c.x} ${c.floor - chamberH / 2}`} stroke="#fff" strokeWidth={7} strokeLinecap="round"/>;
-                    })}
+                    {chambers.map(c => <path key={c.node.id} d={chamberPath(c)} fill="#fff"/>)}
+                    {chambers.map(c => <path key={`m-${c.node.id}`} d={shaftPath(b, c)} stroke="#fff" strokeWidth={6} fill="none"/>)}
                 </mask>
             </defs>
             <g mask={`url(#${uid}-tunnels)`} style={{pointerEvents: "none"}}>
@@ -292,7 +304,10 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
                 {pose.y > sky + 1 && <circle cx={pose.x + pose.facing * 6} cy={pose.y - 11} r={12} fill={`url(#${uid}-cool)`}/>}
             </g>
             {/* surface holes for the places right under HOME */}
-            {chambers.filter(c => c.depth === 1).map(c => <ellipse key={`hole-${c.node.id}`} cx={c.x} cy={sky} rx={5} ry={1.8} className="burrow-hole"/>)}
+            {chambers.filter(c => c.depth === 1).map(c => <g key={`hole-${c.node.id}`}>
+                <path d={`M${c.x + 4} ${sky - 0.6} Q${c.x + 8} ${sky - 3.2} ${c.x + 12} ${sky - 0.6} Z`} className="burrow-spoil"/>
+                <path d={`M${c.x - 4} ${sky - 0.8} L${c.x + 4} ${sky - 0.8} L${c.x + 3} ${sky + 1.6} L${c.x - 3} ${sky + 1.6} Z`} className="burrow-hole"/>
+            </g>)}
             <circle cx={b.chambers.get(b.rootId)?.x ?? pad} cy={sky - 5} r={4.2} className="burrow-home"/>
             <path d={d(pose.string)} className="burrow-string" fill="none"/>
             <g transform={`translate(${pose.x} ${pose.y + hop})`} style={{pointerEvents: "none"}}>

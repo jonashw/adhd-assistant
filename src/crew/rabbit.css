@@ -7,7 +7,7 @@
 .crew-rabbit .burrow-grass { fill: #7aa35a; }
 .crew-rabbit .burrow-tunnel { fill: #2e2016; }
 .crew-rabbit .burrow-sky { fill: #dcefff; }
-.crew-rabbit .burrow-shaft { stroke: #2e2016; stroke-width: 7; stroke-linecap: round; }
+.crew-rabbit .burrow-shaft { stroke: #2e2016; stroke-width: 6; stroke-linecap: butt; }
 .crew-rabbit .burrow-shaft.is-filled { stroke: #8a6a4b; stroke-dasharray: 2 2; stroke-width: 6; }
 /* done or tucked away: backfilled with loose earth */
 .crew-rabbit .burrow-chamber.is-filled .burrow-tunnel { fill: #8a6a4b; stroke: #6b4f35; stroke-width: 0.6; stroke-dasharray: 2 1.5; }
@@ -27,6 +27,7 @@
 .crew-rabbit .thing-page { fill: #f7f1e3; stroke: #b9a98a; stroke-width: 0.35; }
 .crew-rabbit .thing-lines { stroke: #8f8f8f; stroke-width: 0.3; }
 .crew-rabbit .burrow-hole { fill: #2b1d12; }
+.crew-rabbit .burrow-spoil { fill: #a07a52; }
 .crew-rabbit .burrow-home { fill: none; stroke: #222; stroke-width: 1.6; stroke-dasharray: 22 4; }
 .crew-rabbit .burrow-string { stroke: #e2574c; stroke-width: 1.2; stroke-dasharray: 2.6 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
