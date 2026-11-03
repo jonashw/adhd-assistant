@@ -69,7 +69,7 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
             .catch((e: Error) => {
                 if (e instanceof ConflictError) {
                     revisions.current[id] = e.latest?.revision ?? null;
-                    replaceFromServer(id, e.latest && {id: e.latest.id, nodes: e.latest.nodes, links: e.latest.links},
+                    replaceFromServer(id, e.latest && {id: e.latest.id, title: e.latest.title, nodes: e.latest.nodes, links: e.latest.links},
                         e.latest
                             ? `${e.message} Showing the newer version.`
                             : e.message);
@@ -111,7 +111,7 @@ export function GraphRepositoryContextProvider({children}:{children:React.JSX.El
                 for (const map of maps) {
                     revisions.current[map.id] = map.revision;
                 }
-                setLoaded(maps.map(({id, nodes, links}) => MindMap.normalize({id, nodes, links})));
+                setLoaded(maps.map(({id, title, nodes, links}) => MindMap.normalize({id, title, nodes, links})));
             } else if (status.mode === "local") {
                 const db = await DB.openDatabase();
                 const stored = await db.graph.getAll();

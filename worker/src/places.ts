@@ -35,7 +35,8 @@ function pathOf(map: WireMap, noteId: string): string[] {
     return path;
 }
 
-const homeLabel = (map: WireMap) => map.nodes.find(n => n.type === "HOME")?.label ?? map.id;
+/* a map goes by its title when it has one, so Claude sees the same name as the list */
+const homeLabel = (map: WireMap) => map.title ?? map.nodes.find(n => n.type === "HOME")?.label ?? map.id;
 
 export type FoundPlace = {place: string, map: string, path: string, status: string, canTarget: boolean};
 

@@ -20,7 +20,7 @@ export type WireNode = {
     interest?: number
 };
 export type WireLink = {source: string, target: string, type: typeof linkTypes[number], label?: string};
-export type WireMap = {id: string, revision: number, nodes: WireNode[], links: WireLink[]};
+export type WireMap = {id: string, revision: number, title?: string, nodes: WireNode[], links: WireLink[]};
 
 const fail = (message: string): never => {
     throw new HttpError(422, message);
@@ -33,11 +33,17 @@ const optional = <T>(value: unknown, check: (v: unknown) => v is T): value is T 
     value === undefined || value === null || check(value);
 
 /* Checks a map against the model: one HOME, one parent for every other place, no loops in PART_OF or BLOCKED_BY */
-export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink[]} {
-    const body = input as {nodes?: unknown, links?: unknown};
+/* title: text to set, null to clear, undefined (left out) to keep what's stored, so an older app can't wipe it */
+export function validateMap(input: unknown): {title: string | null | undefined, nodes: WireNode[], links: WireLink[]} {
+    const body = input as {title?: unknown, nodes?: unknown, links?: unknown};
     if (!Array.isArray(body?.nodes) || !Array.isArray(body?.links)) {
         fail("A map needs nodes and links.");
     }
+    if (!optional(body.title, (v): v is string => typeof v === "string" && v.length <= 200)) {
+        fail("A map's title is text of at most 200 characters.");
+    }
+    const title = body.title === undefined ? undefined
+        : typeof body.title === "string" && body.title.trim() ? body.title.trim() : null;
     const rawNodes = body.nodes as Record<string, unknown>[];
     const rawLinks = body.links as Record<string, unknown>[];
     if (rawNodes.length > 5000 || rawLinks.length > 20000) {
@@ -130,7 +136,7 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
     }
     assertNoLoop(links.filter(l => l.type === "BLOCKED_BY"), "Two places block each other.");
 
-    return {nodes, links};
+    return {title, nodes, links};
 }
 
 function assertNoLoop(links: WireLink[], message: string) {
