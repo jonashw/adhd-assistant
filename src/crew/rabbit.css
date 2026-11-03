@@ -1,0 +1,37 @@
+/* The robot rabbit and its burrow (Rabbit.tsx) */
+.crew-rabbit .burrow-band-1 { fill: #b48c61; }
+.crew-rabbit .burrow-band-2 { fill: #977049; }
+.crew-rabbit .burrow-band-3 { fill: #775636; }
+.crew-rabbit .burrow-grass { fill: #7aa35a; }
+.crew-rabbit .burrow-tunnel { fill: #4a3322; }
+.crew-rabbit .burrow-hole { fill: #2b1d12; }
+.crew-rabbit .burrow-home { fill: none; stroke: #222; stroke-width: 1.6; stroke-dasharray: 22 4; }
+.crew-rabbit .burrow-string { stroke: #e2574c; stroke-width: 1.2; stroke-dasharray: 2.6 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.crew-rabbit .rabbit-metal { fill: #dfe3e8; stroke: #8a929c; stroke-width: 0.45; }
+.crew-rabbit .rabbit-metal-dark { fill: #9aa3ad; }
+.crew-rabbit .rabbit-ear-inner { fill: #f2b8c6; }
+.crew-rabbit .rabbit-visor { fill: #2e3440; }
+.crew-rabbit .rabbit-nose { fill: #e57a93; }
+.crew-rabbit .rabbit-tail { fill: #fff; stroke: #c9ced4; stroke-width: 0.4; }
+.crew-rabbit .rabbit-box { fill: #c99a5b; stroke: #8a6435; stroke-width: 0.5; }
+.crew-rabbit .rabbit-box-tape { stroke: #8a6435; stroke-width: 0.6; }
+
+.crew-rabbit .part { transform-box: fill-box; }
+.crew-rabbit .rabbit-eye-shut { display: none; }
+.crew-rabbit.is-blink .rabbit-eye-open { display: none; }
+.crew-rabbit.is-blink .rabbit-eye-shut { display: inline; }
+.crew-rabbit .rabbit-ears { transform-origin: 50% 100%; }
+.crew-rabbit.is-ear .rabbit-ear-near { transform-origin: 50% 100%; animation: rabbit-ear 0.7s ease-in-out; }
+.crew-rabbit.is-nose .rabbit-nose { transform-origin: center; animation: rabbit-nose 0.3s ease-in-out 3; }
+.crew-rabbit.is-thump .rabbit-foot { transform-origin: 0% 50%; animation: rabbit-thump 0.25s ease-in-out 2; }
+/* moving: ears laid back */
+.crew-rabbit.is-moving .rabbit-ears { transform: rotate(-28deg); transform-origin: 0% 100%; }
+
+@keyframes rabbit-ear { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(-22deg); } 70% { transform: rotate(8deg); } }
+@keyframes rabbit-nose { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
+@keyframes rabbit-thump { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .crew-rabbit * { animation: none !important; }
+}

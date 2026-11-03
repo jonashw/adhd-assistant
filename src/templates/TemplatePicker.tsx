@@ -9,7 +9,7 @@ import { visuallyHidden } from "@mui/utils";
 import { ArrowBack, CheckCircleOutline, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
 import { ClaudeMapIcon } from "../ClaudeMapIcon";
-import { RabbitHoles } from "./RabbitHoles";
+import { RabbitBurrowLoop } from "../crew/Rabbit";
 import { GraphRepositoryContext } from "../GraphRepositoryContext";
 import { MindMap } from "../MindMap";
 import { CrewLead, StarterTemplate, graphAtStep, instantiate, placeCount, starterTemplates } from "./templates";
@@ -24,7 +24,7 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
         case "dog": return <Dog size={size * 0.8}/>;
         case "spider": return <Spider size={size * 0.6}/>;
         case "squirrel": return <Squirrel size={size * 0.7}/>;
-        case "rabbit": return <RabbitHoles size={size}/>;
+        case "rabbit": return <RabbitBurrowLoop size={size}/>;
         case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
         case "none": return <img src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
