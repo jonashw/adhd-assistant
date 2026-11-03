@@ -58,3 +58,5 @@
 @media (prefers-reduced-motion: reduce) {
     .crew-rabbit * { animation: none !important; }
 }
+
+.crew-rabbit .burrow-chamber.is-selected .burrow-tunnel { stroke: #4dd0e1; stroke-width: 1.2; }

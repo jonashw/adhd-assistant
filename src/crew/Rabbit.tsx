@@ -230,11 +230,15 @@ const fidgets: Fidget[] = [
 
 const short = (s: string, n: number) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
 
-export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = true, onPick}: {
+export function RabbitBurrow({size = 120, fit, graph, at, selected, carrying = false, labels = true, onPick}: {
     size?: number,
+    /* fill this box instead of using size, but never shrink below a readable scale (the box scrolls then) */
+    fit?: {width: number, height: number, minScale?: number},
     graph: MindMapGraphData,
     /* the place the rabbit is at; HOME when unset */
     at?: string,
+    /* the place picked out in the app, ringed */
+    selected?: string,
     carrying?: boolean,
     labels?: boolean,
     /* tap a chamber to send the rabbit there */
@@ -250,10 +254,15 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
     const here = b.chambers.get(at ?? b.rootId);
     const label = `Robot rabbit ${here && here.depth > 0 ? `at ${here.node.label}, ${here.depth} hole${here.depth === 1 ? "" : "s"} down` : "at the surface by HOME"}${carrying ? ", carrying a piece of work" : ""}`;
     const chambers = [...b.chambers.values()].filter(c => c.depth > 0);
+    const scale = fit
+        ? Math.max(Math.min(fit.width / b.width, fit.height / b.height), fit.minScale ?? 0)
+        : size / b.height;
     return (
         <svg className={["crew", "crew-rabbit", pose.moving && "is-moving", carrying && "is-carrying", fidget].filter(Boolean).join(" ")}
-            viewBox={`0 0 ${b.width} ${b.height}`} width={size * b.width / b.height} height={size} role="img" aria-label={label}
-            style={{display: "block", margin: "0 auto", maxWidth: "100%", height: "auto"}}>
+            viewBox={`0 0 ${b.width} ${b.height}`} width={b.width * scale} height={b.height * scale} role="img" aria-label={label}
+            style={fit
+                ? {display: "block", margin: "0 auto", flexShrink: 0}
+                : {display: "block", margin: "0 auto", maxWidth: "100%", height: "auto"}}>
             <title>{label}</title>
             <rect x={0} y={0} width={b.width} height={sky} className="burrow-sky"/>
             {Array.from({length: Math.max(1, b.depth)}, (_, i) =>
@@ -269,7 +278,7 @@ export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = 
             {chambers.map(c => {
                 const tucked = !visible.has(c.node.id);
                 const status = c.node.status;
-                return <g key={c.node.id} className={["burrow-chamber", tucked && "is-filled", status === "someday" && "is-someday", onPick && "is-pickable"].filter(Boolean).join(" ")}
+                return <g key={c.node.id} data-place={c.node.id} className={["burrow-chamber", selected === c.node.id && "is-selected", tucked && "is-filled", status === "someday" && "is-someday", onPick && "is-pickable"].filter(Boolean).join(" ")}
                     onClick={onPick ? () => onPick(c.node.id) : undefined}>
                     <title>{c.node.label}{status ? ` (${status})` : ""}</title>
                     <path d={chamberPath(c)} className="burrow-tunnel"/>

@@ -13,6 +13,12 @@ import { loadImgElement } from "./loadImgElement";
 import { useNavigator } from "./NavigatorContext";
 import { standingAt } from "./Navigator";
 import { YouStrip } from "./YouStrip";
+import { RabbitBurrow } from "./Crew";
+import { useLocalStorage } from "./useLocalStorage";
+import { AccountTree, Landscape } from "@mui/icons-material";
+import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+
+type MainView = "graph" | "burrow";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -51,6 +57,38 @@ export default function MindMapGraph({
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
 
     const nav = useNavigator();
+    //the main view: the force graph, or the rabbit's burrow drawn from the same map
+    const [mainView, setMainView] = useLocalStorage<MainView>("graph", "adhd.mainView", v => v, v => v === "burrow" ? "burrow" : "graph");
+    //on a narrow screen the burrow scrolls sideways: keep where the rabbit stands in view
+    const burrowView = React.useRef<HTMLDivElement>(null);
+    const bedrock = 88;
+    const rabbitAt = standingAt(nav.tether);
+    React.useEffect(() => {
+        const view = burrowView.current;
+        const chamber = view?.querySelector(`[data-place="${CSS.escape(rabbitAt)}"]`);
+        if (!view || !chamber || view.scrollWidth <= view.clientWidth) {
+            return;
+        }
+        const box = chamber.getBoundingClientRect();
+        const frame = view.getBoundingClientRect();
+        view.scrollTo({left: view.scrollLeft + box.left + box.width / 2 - frame.left - frame.width / 2, behavior: "smooth"});
+    }, [rabbitAt, mainView]);
+    const placeClicked = (id: string) => {
+        const node = graph.nodes.find(n => n.id === id);
+        if (!node || (selectedNode?.type === 'HOME' && node.type === 'HOME')) {
+            return;
+        }
+        if (nodeClickMode === "re-parent") {
+            if (!selectedNodeId) {
+                alert('cannot perform re-parenting without a selected node');
+            } else {
+                change(MindMap.reparent(graph, selectedNodeId, node.id));
+                setNodeClickMode('select');
+            }
+            return;
+        }
+        selectNodeId(node.id);
+    };
     //once the trail has loaded, open the map where Jon stands; after that, every place he opens is a visit
     const syncedWithTrail = React.useRef(false);
     React.useEffect(() => {
@@ -253,7 +291,7 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}/>
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} sceneShownBelow={mainView === "burrow"}/>
             </div>
 
             <div
@@ -312,36 +350,35 @@ export default function MindMapGraph({
                 }}
             />}
 
-            <Paper elevation={0}>
+            <Paper elevation={0} sx={{position: 'relative'}}>
+                <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={mainView}
+                    onChange={(_, v: MainView | null) => v && setMainView(v)}
+                    aria-label="Show the map as"
+                    sx={{position: 'absolute', top: 8, right: 8, zIndex: 2, bgcolor: 'background.paper'}}
+                >
+                    <ToggleButton value="graph" aria-label="Graph" title="Show the map as a graph"><AccountTree fontSize="small"/></ToggleButton>
+                    <ToggleButton value="burrow" aria-label="Burrow" title="Show the map as the rabbit's burrow"><Landscape fontSize="small"/></ToggleButton>
+                </ToggleButtonGroup>
                 <div>
-                    {homeImage && <ForceGraph2D
-                        onNodeClick={node => {
-                            if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
-                                //homeImages.next();
-                            } else {
-                                switch(nodeClickMode){
-                                    case "select": {
-                                        selectNodeId(node.id);
-                                        break;
-                                    }
-                                    case "re-parent": {
-                                        if(!selectedNodeId){
-                                            alert('cannot perform re-parenting without a selected node');
-                                        } else {
-
-                                            console.log('reparented node',selectedNodeId);
-                                            change(MindMap.reparent(graph,selectedNodeId,node.id));
-                                            setNodeClickMode('select');
-                                        }
-                                        break;
-                                    }
-                                    default: {
-                                        alert(`unexpected click mode: ${nodeClickMode}`)
-                                    }
-
-                                }
-                            }
+                    {mainView === "burrow" && <div
+                        style={{
+                            height, width, overflow: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'safe center',
+                            //sky above, and bedrock below where the buttons float so they don't cover the deepest chambers
+                            boxSizing: 'border-box', paddingBottom: bedrock,
+                            background: `linear-gradient(to bottom, #dcefff calc(100% - ${bedrock}px), #523a22 calc(100% - ${bedrock}px))`
                         }}
+                        data-testid="burrow-view"
+                        ref={burrowView}
+                        onClick={e => { if (e.target === e.currentTarget) selectNodeId(undefined); }}
+                    >
+                        <RabbitBurrow fit={{width: width - 4, height: height - bedrock - 4, minScale: 2.4}} graph={graph} at={rabbitAt} selected={selectedNodeId}
+                            carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
+                    </div>}
+                    {mainView === "graph" && homeImage && <ForceGraph2D
+                        onNodeClick={node => placeClicked(node.id)}
                         onBackgroundClick={() => {
                             selectNodeId(undefined);
                         }}
@@ -492,7 +529,7 @@ export default function MindMapGraph({
                             disabled={!selectedNode}
                             onClick={guideUserDeeper}
                         >
-                            {home?.scene === "burrow" ? "Down a hole" : "Deeper"}
+                            {home?.scene === "burrow" || mainView === "burrow" ? "Down a hole" : "Deeper"}
                         </Fab>
 
                         <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />

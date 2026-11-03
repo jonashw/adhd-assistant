@@ -1,6 +1,7 @@
 import React from "react";
-import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Stack, Typography } from "@mui/material";
-import { MindMapGraphData } from "./MindMap";
+import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListItemText, Menu, MenuItem, Snackbar, Stack, Typography } from "@mui/material";
+import { Wallpaper } from "@mui/icons-material";
+import { MapScene, MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
 import { Dog, Jon, RabbitBurrow, YouScene } from "./Crew";
@@ -8,9 +9,17 @@ import { WhatsNextDialog } from "./WhatsNextDialog";
 
 export const youStripHeight = 64;
 
+/* The scenes a map's stage can draw; each tells the same story in its own picture and words */
+const sceneChoices: {scene: MapScene, name: string, about: string}[] = [
+    {scene: "crew", name: "Scout and crew", about: "Your balloon head on its string, with the robot crew"},
+    {scene: "burrow", name: "Rabbit's burrow", about: "The map as tunnels, the rabbit's string as your breadcrumbs"}
+];
+
 /* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
-export function YouStrip({graph, onChange, selectNodeId}: {
+export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false}: {
     graph: MindMapGraphData,
+    /* the main view already draws the burrow, so the strip leaves its picture out */
+    sceneShownBelow?: boolean,
     onChange?: (graph: MindMapGraphData) => void,
     selectNodeId: (id: string) => void
 }) {
@@ -40,7 +49,13 @@ export function YouStrip({graph, onChange, selectNodeId}: {
     const askWeather = nav.loaded && shouldAskWeather(tether, nav.weatherAnswer, now) && now.getTime() >= weatherSnoozedUntil;
     const homeId = graph.nodes.find(n => n.type === "HOME")?.id;
     //rabbit-hole maps draw the rabbit's burrow: the map as tunnels, the rabbit where you stand, holding the work when tied off
-    const burrow = graph.nodes.find(n => n.type === "HOME")?.scene === "burrow";
+    const scene: MapScene = graph.nodes.find(n => n.type === "HOME")?.scene ?? "crew";
+    const burrow = scene === "burrow";
+    const [sceneMenu, setSceneMenu] = React.useState<HTMLElement | null>(null);
+    const pickScene = (next: MapScene) => {
+        setSceneMenu(null);
+        onChange?.({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene: next === "crew" ? undefined : next} : n), links: graph.links});
+    };
     //the same actions, in each scene's own words
     const words = burrow
         ? {untie: "Put it down", reelIn: "Back up a hole", tieOff: "Pick it up here", tiedAt: "Digging in at", setDown: "Left the work at",
@@ -60,13 +75,25 @@ export function YouStrip({graph, onChange, selectNodeId}: {
                 alignItems="center"
                 gap={0.5}
                 sx={{
-                    height: burrow ? "auto" : youStripHeight, py: burrow ? 0.5 : 0, px: 1, flexShrink: 0, overflow: "hidden",
+                    height: burrow && !sceneShownBelow ? "auto" : youStripHeight, py: burrow && !sceneShownBelow ? 0.5 : 0, px: 1, flexShrink: 0, overflow: "hidden",
                     borderBottom: 1, borderColor: "divider", bgcolor: "background.paper",
                     "& .MuiButton-root": {flexShrink: 0, minWidth: 0, px: 1}
                 }}
                 data-testid="you-strip"
             >
-                {burrow
+                {onChange && <IconButton size="small" title="Change the scene" aria-label="Change the scene"
+                    onClick={e => setSceneMenu(e.currentTarget)} sx={{flexShrink: 0}}>
+                    <Wallpaper fontSize="small"/>
+                </IconButton>}
+                <Menu anchorEl={sceneMenu} open={sceneMenu !== null} onClose={() => setSceneMenu(null)}>
+                    {sceneChoices.map(c =>
+                        <MenuItem key={c.scene} selected={c.scene === scene} onClick={() => pickScene(c.scene)}>
+                            <ListItemText primary={c.name} secondary={c.about}/>
+                        </MenuItem>)}
+                </Menu>
+                {sceneShownBelow
+                    ? null
+                    : burrow
                     ? <Box sx={{flex: "0 1 auto", maxWidth: "60%", minWidth: 0}} data-testid="burrow-stage">
                         <RabbitBurrow size={150} graph={graph} at={here} carrying={tether.state === "tied"} labels={false}
                             onPick={selectNodeId}/>
