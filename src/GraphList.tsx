@@ -30,7 +30,6 @@ import { CameraAlt, Delete, Download, UploadFile } from '@mui/icons-material';
 import { MindMap, MindMapGraphData } from './MindMap';
 import { exportGraph, readGraphFile } from './GraphFile';
 import { ServerApi } from './ServerApi';
-import { sampleGraphs } from './sampleGraphs';
 import { ConnectedAppsDialog } from './ConnectedAppsDialog';
 import { ClaudeMapEntry } from './ClaudeMapEntry';
 
@@ -225,12 +224,11 @@ export function GraphList() {
                         />
                         <SpeedDialAction
                             icon={<GraphIcon size={24} />}
-                            tooltipTitle={"Sample"}
+                            tooltipTitle={"Starter maps"}
                             tooltipOpen
                             onClick={() => {
-                                handleNewGraph({
-                                    ...sampleGraphs[0]
-                                });
+                                setSpeedDialOpen(false);
+                                navigate('/templates');
                             }}
                         />
                 </SpeedDial>
