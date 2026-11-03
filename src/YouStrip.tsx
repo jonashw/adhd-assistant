@@ -1,6 +1,5 @@
 import React from "react";
-import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListItemText, Menu, MenuItem, Snackbar, Stack, Typography } from "@mui/material";
-import { Wallpaper } from "@mui/icons-material";
+import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Stack, Typography } from "@mui/material";
 import { MapScene, MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
@@ -8,12 +7,6 @@ import { Dog, Jon, RabbitBurrow, YouScene } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
 export const youStripHeight = 64;
-
-/* The scenes a map's stage can draw; each tells the same story in its own picture and words */
-const sceneChoices: {scene: MapScene, name: string, about: string}[] = [
-    {scene: "crew", name: "Balloon-head and crew", about: "Your balloon head on its string, with the robot crew"},
-    {scene: "burrow", name: "Rabbit's burrow", about: "The map as tunnels, the rabbit's string as your breadcrumbs"}
-];
 
 /* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
 export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false}: {
@@ -51,11 +44,6 @@ export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false
     //rabbit-hole maps draw the rabbit's burrow: the map as tunnels, the rabbit where you stand, holding the work when tied off
     const scene: MapScene = graph.nodes.find(n => n.type === "HOME")?.scene ?? "crew";
     const burrow = scene === "burrow";
-    const [sceneMenu, setSceneMenu] = React.useState<HTMLElement | null>(null);
-    const pickScene = (next: MapScene) => {
-        setSceneMenu(null);
-        onChange?.({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene: next === "crew" ? undefined : next} : n), links: graph.links});
-    };
     //the same actions, in each scene's own words
     const words = burrow
         ? {untie: "Put it down", reelIn: "Back up a hole", tieOff: "Pick it up here", tiedAt: "Digging in at", setDown: "Left the work at",
@@ -81,16 +69,6 @@ export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false
                 }}
                 data-testid="you-strip"
             >
-                {onChange && <IconButton size="small" title="Change the scene" aria-label="Change the scene"
-                    onClick={e => setSceneMenu(e.currentTarget)} sx={{flexShrink: 0}}>
-                    <Wallpaper fontSize="small"/>
-                </IconButton>}
-                <Menu anchorEl={sceneMenu} open={sceneMenu !== null} onClose={() => setSceneMenu(null)}>
-                    {sceneChoices.map(c =>
-                        <MenuItem key={c.scene} selected={c.scene === scene} onClick={() => pickScene(c.scene)}>
-                            <ListItemText primary={c.name} secondary={c.about}/>
-                        </MenuItem>)}
-                </Menu>
                 {sceneShownBelow
                     ? null
                     : burrow

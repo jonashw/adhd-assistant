@@ -14,11 +14,18 @@ import { useNavigator } from "./NavigatorContext";
 import { standingAt } from "./Navigator";
 import { YouStrip } from "./YouStrip";
 import { RabbitBurrow } from "./Crew";
+import { BalloonTrail } from "./crew/BalloonTrail";
+import { MapScene } from "./MindMap";
 import { useLocalStorage } from "./useLocalStorage";
 import { AccountTree, Landscape } from "@mui/icons-material";
-import { ToggleButton, ToggleButtonGroup } from "@mui/material";
+import { SvgIcon, SvgIconProps, ToggleButton, ToggleButtonGroup } from "@mui/material";
 
-type MainView = "graph" | "burrow";
+type MainView = "graph" | "scene";
+
+const BalloonIcon = (props: SvgIconProps) =>
+    <SvgIcon {...props}><ellipse cx={12} cy={9} rx={6} ry={7}/><path d="M12 16 L10.6 18 h2.8 Z M12 18 q-2 2 0 4" fill="none" stroke="currentColor" strokeWidth={1.4}/></SvgIcon>;
+const RabbitIcon = (props: SvgIconProps) =>
+    <SvgIcon {...props}><path d="M8.5 2.5c1.4 0 2 3 2.2 6.2.4-.1.8-.2 1.3-.2s.9.1 1.3.2c.2-3.2.8-6.2 2.2-6.2 1.6 0 1.2 4.4.2 7.4 1.3 1 2.3 2.6 2.3 4.6 0 3.6-2.7 6.5-6 6.5s-6-2.9-6-6.5c0-2 1-3.6 2.3-4.6-1-3-1.4-7.4.2-7.4z"/></SvgIcon>;
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -58,7 +65,12 @@ export default function MindMapGraph({
 
     const nav = useNavigator();
     //the main view: the force graph, or the rabbit's burrow drawn from the same map
-    const [mainView, setMainView] = useLocalStorage<MainView>("graph", "adhd.mainView", v => v, v => v === "burrow" ? "burrow" : "graph");
+    //what fills the main area: the force graph, or the map's scene drawn big (the stage then leaves its picture out)
+    const [mainView, setMainView] = useLocalStorage<MainView>("graph", "adhd.mainView", v => v, v => v === "scene" || v === "burrow" ? "scene" : "graph");
+    //which scene the map is drawn in, saved with the map
+    const scene: MapScene = home?.scene ?? "crew";
+    const pickScene = (next: MapScene) =>
+        change({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene: next === "crew" ? undefined : next} : n), links: graph.links});
     //on a narrow screen the burrow scrolls sideways: keep where the rabbit stands in view
     const burrowView = React.useRef<HTMLDivElement>(null);
     const bedrock = 88;
@@ -291,7 +303,7 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} sceneShownBelow={mainView === "burrow"}/>
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} sceneShownBelow={mainView === "scene"}/>
             </div>
 
             <div
@@ -351,19 +363,21 @@ export default function MindMapGraph({
             />}
 
             <Paper elevation={0} sx={{position: 'relative'}}>
-                <ToggleButtonGroup
-                    size="small"
-                    exclusive
-                    value={mainView}
-                    onChange={(_, v: MainView | null) => v && setMainView(v)}
-                    aria-label="Show the map as"
-                    sx={{position: 'absolute', top: 8, right: 8, zIndex: 2, bgcolor: 'background.paper'}}
-                >
-                    <ToggleButton value="graph" aria-label="Graph" title="Show the map as a graph"><AccountTree fontSize="small"/></ToggleButton>
-                    <ToggleButton value="burrow" aria-label="Burrow" title="Show the map as the rabbit's burrow"><Landscape fontSize="small"/></ToggleButton>
-                </ToggleButtonGroup>
+                <Stack direction="row" gap={1} aria-label="Map layout" role="group"
+                    sx={{position: 'absolute', top: 8, left: 8, zIndex: 2, '& .MuiToggleButtonGroup-root': {bgcolor: 'background.paper'}}}>
+                    <ToggleButtonGroup size="small" exclusive value={mainView} onChange={(_, v: MainView | null) => v && setMainView(v)}
+                        aria-label="Show the map as">
+                        <ToggleButton value="graph" aria-label="Graph" title="Show the map as a graph"><AccountTree fontSize="small"/></ToggleButton>
+                        <ToggleButton value="scene" aria-label="Scene" title="Show the map as its scene, filling the screen"><Landscape fontSize="small"/></ToggleButton>
+                    </ToggleButtonGroup>
+                    <ToggleButtonGroup size="small" exclusive value={scene} onChange={(_, v: MapScene | null) => v && pickScene(v)}
+                        aria-label="Scene">
+                        <ToggleButton value="crew" aria-label="Balloon-head and crew" title="Balloon-head and crew: walk the waypoints, your head floats up to focus"><BalloonIcon fontSize="small"/></ToggleButton>
+                        <ToggleButton value="burrow" aria-label="Rabbit's burrow" title="Rabbit's burrow: the map as tunnels, the string as breadcrumbs"><RabbitIcon fontSize="small"/></ToggleButton>
+                    </ToggleButtonGroup>
+                </Stack>
                 <div>
-                    {mainView === "burrow" && <div
+                    {mainView === "scene" && scene === "burrow" && <div
                         style={{
                             height, width, overflow: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'safe center',
                             //sky above, and bedrock below where the buttons float so they don't cover the deepest chambers
@@ -375,6 +389,14 @@ export default function MindMapGraph({
                         onClick={e => { if (e.target === e.currentTarget) selectNodeId(undefined); }}
                     >
                         <RabbitBurrow fit={{width: width - 4, height: height - bedrock - 4, minScale: 2.4}} graph={graph} at={rabbitAt} selected={selectedNodeId}
+                            carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
+                    </div>}
+                    {mainView === "scene" && scene === "crew" && <div
+                        style={{height, width, overflow: 'hidden'}}
+                        data-testid="balloon-view"
+                        onClick={() => selectNodeId(undefined)}
+                    >
+                        <BalloonTrail width={width} height={height} floor={bedrock - 34} graph={graph} at={rabbitAt} selected={selectedNodeId}
                             carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
                     </div>}
                     {mainView === "graph" && homeImage && <ForceGraph2D
@@ -529,7 +551,7 @@ export default function MindMapGraph({
                             disabled={!selectedNode}
                             onClick={guideUserDeeper}
                         >
-                            {home?.scene === "burrow" || mainView === "burrow" ? "Down a hole" : "Deeper"}
+                            {scene === "burrow" ? "Down a hole" : "Deeper"}
                         </Fab>
 
                         <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />

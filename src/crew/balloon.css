@@ -1,0 +1,38 @@
+/* Balloon-head's day (BalloonTrail.tsx) */
+.balloon-trail .trail-sky-high { stop-color: #9cc6ec; }
+.balloon-trail .trail-sky-low { stop-color: #e6f3ff; }
+.balloon-trail .trail-ground { fill: #9fbf7a; }
+.balloon-trail .trail-grass { fill: #7aa35a; }
+.balloon-trail .trail-path { fill: none; stroke: #e8dcc0; stroke-width: 7; stroke-linecap: round; opacity: 0.8; }
+.balloon-trail .trail-level line { stroke: #ffffff; stroke-width: 1; stroke-dasharray: 2 6; opacity: 0.8; }
+.balloon-trail .trail-level text { font: 500 10px system-ui, sans-serif; fill: #5b7fa3; }
+.balloon-trail .trail-stake { stroke: #8a6435; stroke-width: 4; stroke-linecap: round; }
+.balloon-trail .trail-sign { fill: #fff8ea; stroke: #8a6435; stroke-width: 1.5; }
+.balloon-trail .trail-sign-text { font: 600 12px system-ui, sans-serif; fill: #3b2a1c; }
+.balloon-trail .trail-home-text { font: 700 10px system-ui, sans-serif; fill: #37474f; letter-spacing: 0.08em; }
+.balloon-trail .trail-active { fill: #1976d2; }
+.balloon-trail .trail-waypoint.is-here .trail-sign { stroke: #1976d2; stroke-width: 2.2; }
+.balloon-trail .trail-waypoint.is-selected .trail-sign { stroke: #4dd0e1; stroke-width: 2.6; }
+.balloon-trail .trail-waypoint.is-someday { filter: saturate(0.3); }
+.balloon-trail .trail-waypoint.is-someday .trail-sign-text { font-style: italic; fill: #7a6a5a; }
+.balloon-trail .trail-waypoint.is-tucked .trail-sign { fill: #e8e2d6; stroke-dasharray: 4 3; }
+.balloon-trail .trail-waypoint.is-tucked .trail-sign-text { text-decoration: line-through; fill: #8a7a6a; }
+.balloon-trail .is-pickable { cursor: pointer; }
+.balloon-trail .trail-waypoint.is-pickable:hover .trail-sign { fill: #fffdf6; stroke: #ffb300; }
+.balloon-trail .trail-edge-button { fill: #ffffff; opacity: 0.85; stroke: #8a6435; stroke-width: 1.2; }
+.balloon-trail .trail-edge-arrow { fill: none; stroke: #5d4037; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.balloon-trail .trail-more { font: 500 10px system-ui, sans-serif; fill: #4e6b3a; }
+.balloon-trail .trail-ribbon-flag { fill: #ffb300; stroke: #c67c00; stroke-width: 0.8; }
+.balloon-trail .trail-ribbon-text { font: 600 11px system-ui, sans-serif; fill: #37474f; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; }
+.balloon-trail .trail-ribbon.is-selected .trail-ribbon-flag { stroke: #4dd0e1; stroke-width: 2; }
+.balloon-trail .trail-here-tag { fill: #ffffff; stroke: #1976d2; stroke-width: 1.5; }
+.balloon-trail .trail-here.is-selected .trail-here-tag { stroke: #4dd0e1; stroke-width: 2.4; }
+.balloon-trail .trail-here-text { font: 600 12px system-ui, sans-serif; fill: #0d47a1; }
+.balloon-trail .trail-cloud { fill: #ffffff; stroke: #b0c8e0; stroke-width: 1.2; }
+.balloon-trail .trail-sighting.is-pickable:hover .trail-cloud { stroke: #ffb300; }
+.balloon-trail .trail-sighting.is-selected .trail-cloud { stroke: #4dd0e1; stroke-width: 2.2; }
+.balloon-trail .trail-cloud-text { font: 500 10px system-ui, sans-serif; fill: #37474f; }
+.balloon-trail .trail-dim { fill: #0d1b2a; }
+.balloon-trail .trail-head { animation: trail-bob 3.4s ease-in-out infinite; }
+@keyframes trail-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .balloon-trail .trail-head { animation: none; } }
