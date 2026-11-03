@@ -22,7 +22,8 @@ export function YouStrip({graph, onChange, selectNodeId, deeper}: {
     graph: MindMapGraphData,
     onChange?: (graph: MindMapGraphData) => void,
     selectNodeId: (id: string) => void,
-    /* the Deeper button: go down a rabbit hole from the selected place */
+    /* go deeper from the selected place: aloft that's "Float higher" (let out string toward a new sighting),
+       tied off it's "Dig in" (a new place under the one you're working) */
     deeper?: {disabled: boolean, onClick: () => void}
 }) {
     const nav = useNavigator();
@@ -103,7 +104,7 @@ export function YouStrip({graph, onChange, selectNodeId, deeper}: {
                         </Button>
                     </Badge>
                     {deeper && <Button size="small" variant="contained" color="info" disabled={deeper.disabled} onClick={deeper.onClick}>
-                        Deeper
+                        {tether.state === "aloft" ? "Float higher" : "Dig in"}
                     </Button>}
                 </Stack>
             </Stack>

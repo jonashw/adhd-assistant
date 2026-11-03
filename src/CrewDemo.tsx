@@ -1,14 +1,13 @@
 import React from "react";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
 import { Pause, PlayArrow, SkipNext, SkipPrevious } from "@mui/icons-material";
-import { MindfulScene, StringSpider, YouStage } from "./Crew";
+import { MindfulScene, YouStage } from "./Crew";
 
 /* A typical stretch of a day with the app, played as a loop. Each step is either a state you can be in
    (captioned with its name and the values you'd see) or a move between states (captioned "…ing…", since more
    is coming). A beat before each step ends, the next one is called out, so a change never arrives unannounced. */
-type Scene =
-    | {kind: "mindful"}
-    | {kind: "stage", aloft: boolean, stringOut: number, inClouds?: boolean, spider?: StringSpider};
+type StageProps = Omit<React.ComponentProps<typeof YouStage>, "height">;
+type Scene = {kind: "mindful"} | ({kind: "stage"} & StageProps);
 
 type Step = {
     scene: Scene,
@@ -16,30 +15,40 @@ type Step = {
     title: string,
     /* the values you'd read in the app, for a state */
     detail?: string,
+    /* a move between states: animated, captioned in italics */
     move?: boolean,
     ms: number
 };
 
+const at = "Fix back gate";
+const stage = (props: StageProps): Scene => ({kind: "stage", ...props});
+const reel = (out: number): Step => ({
+    scene: stage({aloft: true, stringOut: out, motion: "reel"}), title: "Reeling in…", move: true, ms: 900
+});
+
 const steps: Step[] = [
-    {scene: {kind: "mindful"}, title: "Mindful", detail: "At HOME, nothing set down", ms: 4000},
-    {scene: {kind: "stage", aloft: false, stringOut: 0}, title: "Walking to Fix back gate…", move: true, ms: 1800},
-    {scene: {kind: "stage", aloft: false, stringOut: 0}, title: "Tied off", detail: "Tied off at Fix back gate · both hands on the work", ms: 4000},
-    {scene: {kind: "stage", aloft: true, stringOut: 1}, title: "Untying…", move: true, ms: 1600},
-    {scene: {kind: "stage", aloft: true, stringOut: 1}, title: "Aloft", detail: "Aloft 2 min · string out 1 · set down: Fix back gate", ms: 4000},
-    {scene: {kind: "stage", aloft: true, stringOut: 2}, title: "Floating higher…", move: true, ms: 900},
-    {scene: {kind: "stage", aloft: true, stringOut: 3}, title: "Floating higher…", move: true, ms: 900},
-    {scene: {kind: "stage", aloft: true, stringOut: 3}, title: "Scouting", detail: "Aloft 20 min · string out 3 · set down: Fix back gate", ms: 4000},
-    {scene: {kind: "stage", aloft: true, stringOut: 4, inClouds: true}, title: "Drifting into the clouds…", move: true, ms: 1400},
-    {scene: {kind: "stage", aloft: true, stringOut: 5, inClouds: true}, title: "Head in the clouds", detail: "Aloft 50 min · string out 5 · set down: Fix back gate", ms: 4000},
-    {scene: {kind: "stage", aloft: true, stringOut: 5, inClouds: true, spider: "climb"}, title: "The spider is climbing your string…", move: true, ms: 2000},
-    {scene: {kind: "stage", aloft: true, stringOut: 5, inClouds: true, spider: "tug"}, title: "The tug", detail: "Set down at your feet: Fix back gate", ms: 4000},
-    {scene: {kind: "stage", aloft: true, stringOut: 4}, title: "Reeling in…", move: true, ms: 700},
-    {scene: {kind: "stage", aloft: true, stringOut: 3}, title: "Reeling in…", move: true, ms: 700},
-    {scene: {kind: "stage", aloft: true, stringOut: 2}, title: "Reeling in…", move: true, ms: 700},
-    {scene: {kind: "stage", aloft: true, stringOut: 1}, title: "Reeling in…", move: true, ms: 700},
-    {scene: {kind: "stage", aloft: false, stringOut: 0}, title: "Tying off…", move: true, ms: 1600},
-    {scene: {kind: "stage", aloft: false, stringOut: 0}, title: "Tied off", detail: "Tied off at Fix back gate · back to work", ms: 4000},
-    {scene: {kind: "stage", aloft: false, stringOut: 0}, title: "Walking home…", move: true, ms: 1800}
+    {scene: {kind: "mindful"}, title: "Mindful", detail: "At HOME, nothing set down (tap them)", ms: 4500},
+    {scene: stage({aloft: false, doing: "walk", crew: "walk", walking: "to"}), title: `Walking to ${at}…`, move: true, ms: 2800},
+    {scene: stage({aloft: false, doing: "pickup"}), title: "Picking up your work…", move: true, ms: 1800},
+    {scene: stage({aloft: false}), title: "Tied off", detail: `Tied off at ${at} · both hands on the work`, ms: 4000},
+    {scene: stage({aloft: false, doing: "setdown"}), title: "Setting your work down…", move: true, ms: 1800},
+    {scene: stage({aloft: false, doing: "untying"}), title: "Untying…", move: true, ms: 2200},
+    {scene: stage({aloft: true, stringOut: 1}), title: "Aloft", detail: `Aloft 2 min · string out 1 · set down: ${at}`, ms: 4000},
+    {scene: stage({aloft: true, stringOut: 2, motion: "float"}), title: "Floating higher…", move: true, ms: 1300},
+    {scene: stage({aloft: true, stringOut: 3, motion: "float"}), title: "Floating higher…", move: true, ms: 1300},
+    {scene: stage({aloft: true, stringOut: 3, motion: "scout"}), title: "Scouting…", detail: `Aloft 20 min · string out 3 · set down: ${at}`, ms: 6400},
+    {scene: stage({aloft: true, stringOut: 5, motion: "drift", inClouds: true, cloud: "rolling"}), title: "Drifting into the clouds…", move: true, ms: 2600},
+    {scene: stage({aloft: true, stringOut: 5, inClouds: true}), title: "Head in the clouds", detail: `Aloft 50 min · string out 5 · set down: ${at}`, ms: 4000},
+    {scene: stage({aloft: true, stringOut: 5, inClouds: true, spider: "climb"}), title: "The spider is climbing your string…", move: true, ms: 4200},
+    {scene: stage({aloft: true, stringOut: 5, inClouds: true, spider: "tug", crew: "tug"}), title: "The crew is tugging…", detail: `Set down at your feet: ${at}`, move: true, ms: 4800},
+    reel(4), reel(3), reel(2), reel(1),
+    {scene: stage({aloft: false, doing: "tying"}), title: "Tying off…", move: true, ms: 2400},
+    {scene: stage({aloft: false, doing: "pickup"}), title: "Picking up your work…", move: true, ms: 1800},
+    {scene: stage({aloft: false}), title: "Tied off", detail: `Tied off at ${at} · back to work`, ms: 4000},
+    {scene: stage({aloft: false, doing: "setdown"}), title: "Setting your work down…", move: true, ms: 1800},
+    {scene: stage({aloft: false, doing: "standing", crew: "rouse"}), title: "The crew is getting up…", move: true, ms: 1800},
+    {scene: stage({aloft: false, doing: "standing", crew: "rouse", facing: "left"}), title: "Turning for home…", move: true, ms: 1200},
+    {scene: stage({aloft: false, doing: "walk", crew: "walk", facing: "left", walking: "home"}), title: "Walking home…", move: true, ms: 3000}
 ];
 
 /* how long before a step ends that the next one is called out */
@@ -52,6 +61,11 @@ function nextTitle(i: number) {
         j = (j + 1) % steps.length;
     }
     return steps[j].title;
+}
+
+function stageProps({kind, ...props}: Scene & {kind: "stage"}): StageProps {
+    void kind;
+    return props;
 }
 
 export function CrewDemo() {
@@ -84,8 +98,7 @@ export function CrewDemo() {
             <Box sx={{height: 130, display: "flex", alignItems: "flex-end", justifyContent: "center"}}>
                 {step.scene.kind === "mindful"
                     ? <MindfulScene size={110}/>
-                    : <YouStage height={120} aloft={step.scene.aloft} stringOut={step.scene.stringOut}
-                        inClouds={step.scene.inClouds} spider={step.scene.spider}/>}
+                    : <YouStage height={120} {...stageProps(step.scene)}/>}
             </Box>
             <Box sx={{mt: 1.5, minHeight: 64, textAlign: "center"}} aria-live="polite">
                 <Typography variant="h6" sx={{fontStyle: step.move ? "italic" : undefined}} data-testid="crew-demo-title">

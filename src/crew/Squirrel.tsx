@@ -2,7 +2,11 @@ import { CrewSvg, Eye, ShutEye } from "./CrewSvg";
 import { Fidget, useFidget } from "./useFidget";
 
 /* The robot flying squirrel: bushy tail with a centre stripe, pointed ears. It charts, gliding down to plant a stake. */
-export type SquirrelDoing = "idle" | "glide" | "curled";
+export type SquirrelDoing = "idle" | "glide" | "curled"
+    /* jumping up and down by your arm, in time with the spider's tug */
+    | "jump"
+    /* hopping along behind you */
+    | "hop";
 
 const fidgets: Fidget[] = [
     {name: "is-blink", ms: 200, weight: 3},
@@ -14,8 +18,10 @@ const fidgets: Fidget[] = [
 const glideFidgets: Fidget[] = [{name: "is-blink", ms: 200}];
 
 export function Squirrel({size = 24, doing = "idle"}: {size?: number, doing?: SquirrelDoing}) {
-    const fidget = useFidget(doing === "glide" ? glideFidgets : fidgets, [1200, 4000], doing !== "curled");
+    const fidget = useFidget(doing === "glide" ? glideFidgets : fidgets, [1200, 4000], doing === "idle" || doing === "glide");
     const label = doing === "glide" ? "Robot flying squirrel, gliding"
+        : doing === "jump" ? "Robot flying squirrel, jumping"
+        : doing === "hop" ? "Robot flying squirrel, hopping along"
         : doing === "curled" ? "Robot flying squirrel, curled up"
         : "Robot flying squirrel";
     return (
