@@ -3,16 +3,14 @@ import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, Dialog
 import { MapScene, MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
-import { Dog, Jon, RabbitBurrow, YouScene } from "./Crew";
+import { Dog, Jon, RabbitBurrow } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
 export const youStripHeight = 64;
 
 /* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
-export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false}: {
+export function YouStrip({graph, onChange, selectNodeId}: {
     graph: MindMapGraphData,
-    /* the main view already draws the burrow, so the strip leaves its picture out */
-    sceneShownBelow?: boolean,
     onChange?: (graph: MindMapGraphData) => void,
     selectNodeId: (id: string) => void
 }) {
@@ -63,20 +61,12 @@ export function YouStrip({graph, onChange, selectNodeId, sceneShownBelow = false
                 alignItems="center"
                 gap={0.5}
                 sx={{
-                    height: burrow && !sceneShownBelow ? "auto" : youStripHeight, py: burrow && !sceneShownBelow ? 0.5 : 0, px: 1, flexShrink: 0, overflow: "hidden",
+                    height: youStripHeight, py: 0, px: 1, flexShrink: 0, overflow: "hidden",
                     borderBottom: 1, borderColor: "divider", bgcolor: "background.paper",
                     "& .MuiButton-root": {flexShrink: 0, minWidth: 0, px: 1}
                 }}
                 data-testid="you-strip"
             >
-                {sceneShownBelow
-                    ? null
-                    : burrow
-                    ? <Box sx={{flex: "0 1 auto", maxWidth: "60%", minWidth: 0}} data-testid="burrow-stage">
-                        <RabbitBurrow size={150} graph={graph} at={here} carrying={tether.state === "tied"} labels={false}
-                            onPick={selectNodeId}/>
-                    </Box>
-                    : <YouScene size={56} aloft={tether.state === "aloft"} stringOut={stringOut(tether)}/>}
                 <Box sx={{flex: "1 1 auto", minWidth: 0, lineHeight: 1.3, ml: 0.5}}>
                     {tether.state === "tied"
                         ? <Typography variant="body2" noWrap>{words.tiedAt} <b>{labelOf(tether.at)}</b></Typography>
