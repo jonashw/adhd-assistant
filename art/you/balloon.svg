@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Your head: a balloon. Drawn once, used at every size and height in the app.
+     Origin (0,0) is the balloon's centre; 10 units = the balloon's radius at r=10.
+     anchors layer: hidden marks the app reads, not drawn. Move them if you reshape the balloon. -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     viewBox="-10 -11.5 20 24" width="200" height="240">
+  <g id="art" inkscape:groupmode="layer" inkscape:label="art">
+    <path id="knot" d="M-1.4 11.6 L0 9.6 L1.4 11.6 Z" fill="#b71c1c"/>
+    <ellipse id="balloon" cx="0" cy="0" rx="8.6" ry="10" fill="#d32f2f" stroke="#b71c1c" stroke-width="0.6"/>
+    <ellipse id="shine" cx="-3.6" cy="-4.5" rx="1.7" ry="3.2" transform="rotate(25 -3.6 -4.5)" fill="#ffffff" opacity="0.45"/>
+  </g>
+  <g id="anchors" inkscape:groupmode="layer" inkscape:label="anchors" style="display:none">
+    <!-- the face (art/you/face.svg) is fitted into this box -->
+    <rect id="anchor-face" x="-6" y="-5" width="12" height="12" fill="none" stroke="#00bcd4" stroke-width="0.2"/>
+    <!-- where the string ties on -->
+    <circle id="anchor-string" cx="0" cy="11.6" r="0.5" fill="#00bcd4"/>
+  </g>
+</svg>

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "tsc && tsc -p worker && vite build",
+    "art:check": "node scripts/check-art.mjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "mkcert": "mkdir .cert && mkcert -key-file .cert/key.pem -cert-file .cert/cert.pem \"localhost\"",
