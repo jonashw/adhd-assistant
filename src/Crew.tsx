@@ -35,13 +35,19 @@ export function CrewAtRest({size = 48}: {size?: number}) {
 
 /* You and the crew on the ground, travel reading left to right: spider, squirrel, dog, then you.
    Tied off, the dog has settled at your feet; aloft, the spider rides your wrist. */
-export function YouScene({size = 56, aloft, stringOut = 0}: {size?: number, aloft: boolean, stringOut?: number}) {
+export function YouScene({size = 56, aloft, stringOut = 0, spider}: {
+    size?: number,
+    aloft: boolean,
+    stringOut?: number,
+    /* aloft, where the spider is on your string (it rides your wrist unless told otherwise) */
+    spider?: StringSpider
+}) {
     return (
         <span style={{display: "inline-flex", alignItems: "flex-end", gap: size * 0.02, lineHeight: 0}} data-testid="you-scene">
             {!aloft && <Spider size={size * 0.2}/>}
             <Squirrel size={size * 0.3}/>
             <Dog size={size * 0.4} doing={aloft ? "idle" : "curled"}/>
-            <Jon size={size} doing={aloft ? "aloft" : "tied"} stringOut={stringOut} spider={aloft ? "wrist" : undefined}/>
+            <Jon size={size} doing={aloft ? "aloft" : "tied"} stringOut={stringOut} spider={aloft ? spider ?? "wrist" : undefined}/>
         </span>
     );
 }
@@ -64,7 +70,8 @@ const levels = [0, 1, 2, 3, 4, 5];
 /* The stage: the ground the crew walks on, you at the head of the line, the graduations beside you that read
    how far up your head is, and a cloud round your head when it has gone up into one (the rabbit hole).
    It is as wide as the crew in line; give it a width ("100%") to stretch the ground further left. */
-export function YouStage({height = 96, width, aloft, stringOut = 0, inClouds = false}: {
+export function YouStage({height = 96, width, aloft, stringOut = 0, inClouds = false, spider}: {
+    spider?: StringSpider,
     height?: number,
     width?: number | string,
     aloft: boolean,
@@ -100,7 +107,7 @@ export function YouStage({height = 96, width, aloft, stringOut = 0, inClouds = f
             <span style={width
                 ? {position: "absolute", right: gaugeWidth + gap, top}
                 : {display: "inline-block", marginTop: top}}>
-                <YouScene size={jonSize} aloft={aloft} stringOut={stringOut}/>
+                <YouScene size={jonSize} aloft={aloft} stringOut={stringOut} spider={spider}/>
             </span>
             {/* head in the clouds */}
             {inClouds && <svg

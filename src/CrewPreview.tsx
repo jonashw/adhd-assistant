@@ -1,6 +1,7 @@
 import { Box, Stack, Typography } from "@mui/material";
 import { CrewAtRest, Dog, Jon, MindfulScene, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
 import { Mindful } from "./WhatsNextDialog";
+import { CrewDemo } from "./CrewDemo";
 
 /* /crew: every crew member in every move, to review the art without hunting for the screen it lives on */
 function Tile({title, children}: {title: string, children: React.ReactNode}) {
@@ -20,6 +21,9 @@ export function CrewPreview() {
             <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
                 Each one fidgets on its own clock. With reduced motion on, they all hold still.
             </Typography>
+            <Typography variant="h6" gutterBottom>A typical stretch of your day</Typography>
+            <Box sx={{mb: 3}}><CrewDemo/></Box>
+            <Typography variant="h6" gutterBottom>Every illustration</Typography>
             <Stack direction="row" flexWrap="wrap" gap={2}>
                 <Tile title="You, tied off"><Jon size={110} doing="tied"/></Tile>
                 <Tile title="You, aloft, 1 step out"><Jon size={110} doing="aloft" stringOut={1} spider="wrist"/></Tile>
