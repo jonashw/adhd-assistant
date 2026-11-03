@@ -80,8 +80,13 @@ export type MindMapGraphNode = {
     /* Jon's own interest, 1 to 5; unset is neutral */
     interest?: number,
     /* the place's note: markdown text, checklist items and photos (see NoteBody) */
-    body?: string
+    body?: string,
+    /* HOME only: the scene the map's stage draws; unset is the scout and robot crew */
+    scene?: MapScene
 }
+
+export const mapScenes = ['crew', 'burrow'] as const;
+export type MapScene = typeof mapScenes[number];
 
 export type MindMapGraphLink = {type: MindMapGraphLinkType, label?: string};
 /* PART_OF points from a node to its one parent; the others are ties across the tree */

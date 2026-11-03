@@ -1,4 +1,4 @@
-import { MindMap, MindMapGraphData, MindMapGraphLinkType, MindMapGraphNode, NodeStatus } from "../MindMap";
+import { MapScene, MindMap, MindMapGraphData, MindMapGraphLinkType, MindMapGraphNode, NodeStatus } from "../MindMap";
 
 /* Starter maps for the "Help me pick" page. Each template is a small tree of places with notes,
    plus a walkthrough: a few typical edits played on a preview, so you see how the map is meant to be used. */
@@ -56,6 +56,12 @@ function build(homeNote: string | undefined, places: PlaceSpec[], ties: {source:
     places.forEach(p => walk(p, "HOME"));
     return {nodes, links: [...links, ...ties]};
 }
+
+/* The map's stage draws this scene instead of the scout and crew */
+const withScene = (graph: MindMapGraphData, scene: MapScene): MindMapGraphData => ({
+    nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene} : n),
+    links: graph.links
+});
 
 /* A step that adds a place under another one */
 const add = (id: string, label: string, under: string) => (graph: MindMapGraphData): MindMapGraphData => ({
@@ -129,7 +135,7 @@ export const starterTemplates: StarterTemplate[] = [
             "Mostly one deep branch, so it doesn't show regions or What's next",
             "It's a story, not a map you'd keep"
         ],
-        graph: build(
+        graph: withScene(build(
             "This map is one afternoon of tangents. Start at \"Donate old bikes\" and look at the breadcrumbs.",
             [
                 {id: "sink", label: "Fix the sink", status: "active", children: [
@@ -146,7 +152,7 @@ export const starterTemplates: StarterTemplate[] = [
                 {id: "sam", label: "Reply to Sam"}
             ],
             [{source: "sink", target: "wrench", type: "BLOCKED_BY"}]
-        ),
+        ), "burrow"),
         walkthrough: [
             {caption: "You're at \"Donate old bikes\". Breadcrumbs: HOME › Fix the sink › Need a wrench › Garage is a mess › Reorganize garage.", focus: "bikes"},
             {caption: "Park the bikes for later: mark them someday.", focus: "bikes", apply: status("bikes", "someday")},

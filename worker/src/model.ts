@@ -4,6 +4,7 @@ import { HttpError } from "./http";
 
 export const statuses = ["captured", "active", "waiting", "someday", "done", "dropped"] as const;
 export const linkTypes = ["PART_OF", "BLOCKED_BY", "ALSO_IN", "LABELLED"] as const;
+export const scenes = ["crew", "burrow"] as const;
 
 export type WireNode = {
     id: string,
@@ -17,7 +18,9 @@ export type WireNode = {
     /* its next step fits in 5 minutes */
     small?: boolean,
     /* Jon's own interest, 1 to 5 */
-    interest?: number
+    interest?: number,
+    /* HOME only: the scene the map's stage draws */
+    scene?: typeof scenes[number]
 };
 export type WireLink = {source: string, target: string, type: typeof linkTypes[number], label?: string};
 export type WireMap = {id: string, revision: number, nodes: WireNode[], links: WireLink[]};
@@ -54,7 +57,8 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             || !optional(n.origin, (v): v is string => isText(v, 100))
             || !optional(n.body, (v): v is string => typeof v === "string" && v.length <= 100_000)
             || !optional(n.small, (v): v is boolean => typeof v === "boolean")
-            || !optional(n.interest, (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5)) {
+            || !optional(n.interest, (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5)
+            || !optional(n.scene, (v): v is string => scenes.includes(v as typeof scenes[number]))) {
             fail(`Place "${n.label}" has a field the map can't store.`);
         }
         return {
@@ -67,7 +71,8 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             origin: (n.origin ?? undefined) as string | undefined,
             body: (n.body ?? undefined) as string | undefined,
             small: n.small === true,
-            interest: (n.interest ?? undefined) as number | undefined
+            interest: (n.interest ?? undefined) as number | undefined,
+            scene: (n.scene ?? undefined) as WireNode["scene"]
         };
     });
 

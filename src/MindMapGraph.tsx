@@ -492,7 +492,7 @@ export default function MindMapGraph({
                             disabled={!selectedNode}
                             onClick={guideUserDeeper}
                         >
-                            Deeper
+                            {home?.scene === "burrow" ? "Down a hole" : "Deeper"}
                         </Fab>
 
                         <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />
