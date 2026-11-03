@@ -223,18 +223,61 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
     />;
 }
 
+/* One named tab for every jump, so repeated opens reuse it instead of piling up new ones */
 const open = (url?: string) => {
     if (url) {
-        window.open(url, "_blank", "noopener");
+        const tab = window.open(url, "adhd-assist-claude");
+        if (tab) {
+            tab.opener = null;
+        }
     }
 };
+
+type GraphData = {nodes: NodeObject<MapNode>[], links: {source: string, target: string}[]};
+
+const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: string}[]}) =>
+    JSON.stringify([g.nodes.map(n => n.id), g.links.map(l => `${l.source}>${l.target}`)]);
+
+/* Keeps the same node objects (and so their positions) across refreshes. A refresh that only changes
+   states or titles updates the nodes in place and leaves the layout alone; new nodes start next to
+   their parent, so only they and their neighbours move. */
+function useStableGraph(projects: ClaudeProject[]): GraphData {
+    const current = React.useRef<{data: GraphData, structure: string}>();
+    return React.useMemo(() => {
+        const fresh = graphOf(projects);
+        const structure = structureOf(fresh);
+        const previous = current.current;
+        const byId = new Map((previous?.data.nodes ?? []).map(n => [n.id, n]));
+        if (previous && previous.structure === structure) {
+            for (const node of fresh.nodes) {
+                Object.assign(byId.get(node.id)!, node);
+            }
+            return previous.data;
+        }
+        const parentOf = new Map(fresh.links.map(l => [l.target, l.source]));
+        const nodes = fresh.nodes.map(node => {
+            const kept = byId.get(node.id);
+            if (kept) {
+                return Object.assign(kept, node);
+            }
+            const parent = byId.get(parentOf.get(node.id) ?? "");
+            return parent?.x !== undefined
+                ? {...node, x: parent.x + (Math.random() - 0.5) * 10, y: (parent.y ?? 0) + (Math.random() - 0.5) * 10}
+                : node;
+        });
+        const data = {nodes, links: fresh.links.map(l => ({...l}))};
+        current.current = {data, structure};
+        return data;
+    }, [projects]);
+}
 
 function useClaudeMap(demo: boolean) {
     const [projects, setProjects] = React.useState<ClaudeProject[]>();
     const [error, setError] = React.useState<string>();
+    const tick = React.useRef(0);
     const load = React.useCallback(() => {
         if (demo) {
-            setProjects(demoClaudeMap());
+            setProjects(demoClaudeMap(tick.current++));
             return;
         }
         ServerApi.claudeMap()
@@ -246,13 +289,14 @@ function useClaudeMap(demo: boolean) {
     }, [demo]);
     React.useEffect(() => {
         load();
-        const timer = window.setInterval(load, refreshMs);
+        // the demo refreshes faster, so changes are easy to watch
+        const timer = window.setInterval(load, demo ? 8000 : refreshMs);
         window.addEventListener("focus", load);
         return () => {
             window.clearInterval(timer);
             window.removeEventListener("focus", load);
         };
-    }, [load]);
+    }, [load, demo]);
     return {projects, error, reload: load, setProjects};
 }
 
@@ -269,19 +313,21 @@ export function ClaudeMap() {
     const lastClick = React.useRef<{id: string, at: number}>();
 
     const visible = React.useMemo(() => (projects ?? []).filter(p => showHidden || !p.hidden), [projects, showHidden]);
-    // same structure and states keep the same graph, so a refresh doesn't shake the map
-    const signature = JSON.stringify(visible.map(p => [p.id, projectLabel(p), p.lastSyncedAt, p.threads.map(t => [t.id, t.title, t.state, t.inLatest])]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    const graphData = React.useMemo(() => graphOf(visible), [signature]);
+    const graphData = useStableGraph(visible);
+    // forces are set once per mounted graph; a data refresh never restarts the whole layout
+    const fitted = React.useRef(false);
+    const mountedGraph = React.useRef<unknown>();
     React.useEffect(() => {
         const graph = graphRef.current;
-        if (!graph) {
+        if (!graph || mountedGraph.current === graph) {
             return;
         }
+        mountedGraph.current = graph;
+        fitted.current = false;
         graph.d3Force("collide", collide(26));
         graph.d3Force("charge")?.strength(-160);
         graph.d3ReheatSimulation();
-    }, [graphData, view, rect.width]);
+    });
     const selected = graphData.nodes.find(n => n.id === selectedId);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
 
@@ -348,7 +394,13 @@ export function ClaudeMap() {
                 }}
                 autoPauseRedraw={false}
                 cooldownTime={2500}
-                onEngineStop={() => graphRef.current?.zoomToFit(400, 40)}
+                onEngineStop={() => {
+                    // fit once; after that, leave the view where Jon put it
+                    if (!fitted.current) {
+                        fitted.current = true;
+                        graphRef.current?.zoomToFit(400, 40);
+                    }
+                }}
                 onNodeClick={n => {
                     const now = Date.now();
                     const doubled = lastClick.current?.id === n.id && now - lastClick.current.at < 400;
