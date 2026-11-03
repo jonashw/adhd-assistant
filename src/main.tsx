@@ -11,6 +11,7 @@ import { createTheme, ThemeProvider } from "@mui/material/styles";
 import { GraphList } from './GraphList';
 import { SignInGate } from './SignInGate';
 import { CrewPreview } from './CrewPreview';
+import { ClaudeMap } from './ClaudeMap';
 
 const defaultTheme = createTheme();
 
@@ -36,6 +37,10 @@ const router = createBrowserRouter([
       {
         path: "/graph/:graphId",
         element: <GraphEditor />
+      },
+      {
+        path: "/claude",
+        element: <ClaudeMap />
       }
     ]
   },

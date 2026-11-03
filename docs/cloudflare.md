@@ -66,11 +66,32 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`.
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`.
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
 instructions can repeat that if threads forget.
+
+## The Claude map
+
+A separate map, kept by Claude, at `/claude`: one region per opted-in Claude project, one node per thread,
+each with a badge (Needs you, Ready to review, Working, Stuck, Stopped, Done). Double-click a node, or tap it
+and press **Open in Claude**, to jump to that thread. Jon only reads it, and can hide a project from the list
+view. Try it without a server at `/claude?demo`.
+
+**Opting a project in.** Paste this into the project's instructions (set the short name or leave that sentence out):
+
+> ADHD Assist Claude map: this project is opted in. Its short name is "Multitask". Whenever you call
+> check_in or report_state, and at the end of every turn as this project's coordinator, call sync_project
+> with this project's id and name and every one of its threads as list_threads gives them (id, title,
+> state, created and last-activity times).
+
+Delete the line to opt out. The project then stops syncing and fades to "Not heard lately" after 4 hours.
+
+**How it stays right.** Every snapshot carries the whole project, so any one Claude remembering brings every
+thread up to date. Snapshots land in the `claude_snapshots` inbox before they are applied, and an older
+snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
+deleted. Decision record: "AA: Mirror Claude threads on the map".
 
 ## Local development
 

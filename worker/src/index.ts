@@ -6,6 +6,7 @@ import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
+import { listClaudeMap, setProjectHidden } from "./claude";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
     const email = await requireUser(request, env);
@@ -19,6 +20,14 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
     if (url.pathname === "/api/maps" && request.method === "GET") {
         return json(await listMaps(env));
+    }
+    if (url.pathname === "/api/claude-map" && request.method === "GET") {
+        return json(await listClaudeMap(env));
+    }
+    const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);
+    if (hideMatch && request.method === "POST") {
+        await setProjectHidden(env, decodeURIComponent(hideMatch[1]), hideMatch[2] === "hide");
+        return new Response(null, {status: 204});
     }
     const mediaMatch = /^\/api\/media\/([^/]+)$/.exec(url.pathname);
     if (mediaMatch && request.method === "GET") {

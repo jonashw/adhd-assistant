@@ -7,6 +7,8 @@ import { HttpError } from "./http";
 import { checkIn, reportState, suggestPlace } from "./items";
 import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places";
 import { LinkedItem, threadStates } from "../../src/TrailTypes";
+import { claudeThreadStates } from "../../src/ClaudeMapTypes";
+import { syncProject } from "./claude";
 
 /* The Claude connector: a stateless MCP server at /mcp. Claude can check a thread in, report its state,
    and read Jon's map. It can't change places, statuses or links. */
@@ -20,7 +22,8 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Name the place this thread serves: call find_places with a few words, and pass the best match as place. Regions right under HOME can't be targets; pick a place inside one.
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
-- Never report on Jon's behalf, and never report "waiting" just to get attention.`;
+- Never report on Jon's behalf, and never report "waiting" just to get attention.
+- Claude map: if this thread is in a Claude project whose instructions opt it into the Claude map, call sync_project with the project's whole thread list, as you can list it, whenever you call check_in or report_state, and once at the end of every coordinator turn. Send every thread, not just your own: any one sync brings the whole project up to date.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
 
@@ -79,6 +82,24 @@ function buildServer(env: Env): McpServer {
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(async () => describeThread(await reportState(env, args.thread_id, args.state, args.note))));
+
+    server.registerTool("sync_project", {
+        title: "Sync a project",
+        description: "Mirror this Claude project and all of its threads onto Jon's Claude map, exactly as the platform lists them (for example from list_threads). Send the whole list each time; a thread left out is marked \"not seen lately\", never deleted. Safe to repeat.",
+        inputSchema: {
+            project_id: z.string().min(1).max(100).describe("The project's id, like \"chan_...\""),
+            project_name: z.string().min(1).max(200).describe("The project's name as Jon sees it"),
+            short_name: z.string().min(1).max(40).optional().describe("A short label for the map, if the project instructions give one"),
+            threads: z.array(z.object({
+                thread_id: z.string().min(1).max(100).describe("The thread's id, like \"cmsg_...\""),
+                title: z.string().min(1).max(300),
+                state: z.enum(claudeThreadStates).describe("The platform's state for it: working, blocked (needs Jon), review_ready, done, failed or stopped"),
+                created_at: z.string().max(40).optional(),
+                last_activity_at: z.string().max(40).optional()
+            })).max(500)
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(() => syncProject(env, args)));
 
     server.registerTool("suggest_place", {
         title: "Suggest a place",

@@ -32,6 +32,7 @@ import { exportGraph, readGraphFile } from './GraphFile';
 import { ServerApi } from './ServerApi';
 import { sampleGraphs } from './sampleGraphs';
 import { ConnectedAppsDialog } from './ConnectedAppsDialog';
+import { ClaudeMapEntry } from './ClaudeMapEntry';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
 
@@ -102,6 +103,8 @@ export function GraphList() {
             }}
         />}
 
+
+        {GraphContext.status?.mode === "server" && <ClaudeMapEntry/>}
 
         <Paper elevation={0}>
             {GraphContext.graphs.length 
