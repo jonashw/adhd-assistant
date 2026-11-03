@@ -11,7 +11,7 @@ export const youStripHeight = 64;
 
 /* The scenes a map's stage can draw; each tells the same story in its own picture and words */
 const sceneChoices: {scene: MapScene, name: string, about: string}[] = [
-    {scene: "crew", name: "Scout and crew", about: "Your balloon head on its string, with the robot crew"},
+    {scene: "crew", name: "Balloon-head and crew", about: "Your balloon head on its string, with the robot crew"},
     {scene: "burrow", name: "Rabbit's burrow", about: "The map as tunnels, the rabbit's string as your breadcrumbs"}
 ];
 
