@@ -47,8 +47,8 @@ export function CrewPreview() {
                     </Stack>
                 </Tile>
             </Stack>
-            <Typography variant="h6" sx={{mt: 3}}>The stage, as wide as the toolbar lets it be</Typography>
-            <Stack gap={1} sx={{maxWidth: 300}}>
+            <Typography variant="h6" sx={{mt: 3}}>The stage: you and the crew in the corner</Typography>
+            <Stack gap={1} sx={{maxWidth: 360}}>
                 {([
                     ["Tied off", false, 0, false],
                     ["Aloft, 1 step out", true, 1, false],

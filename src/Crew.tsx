@@ -63,9 +63,10 @@ const levels = [0, 1, 2, 3, 4, 5];
 
 /* The stage: the ground the crew walks on, you at the head of the line, the graduations beside you that read
    how far up your head is, and a cloud round your head when it has gone up into one (the rabbit hole).
-   It stretches to the width it is given; you stand near the right, the crew trailing from the left. */
-export function YouStage({height = 96, aloft, stringOut = 0, inClouds = false}: {
+   It is as wide as the crew in line; give it a width ("100%") to stretch the ground further left. */
+export function YouStage({height = 96, width, aloft, stringOut = 0, inClouds = false}: {
     height?: number,
+    width?: number | string,
     aloft: boolean,
     stringOut?: number,
     /* head in the clouds: long enough or far enough up that the spider would tug */
@@ -88,7 +89,7 @@ export function YouStage({height = 96, aloft, stringOut = 0, inClouds = false}: 
         : "Tied off: your head is held close";
     return (
         <span
-            style={{position: "relative", display: "block", width: "100%", height, lineHeight: 0}}
+            style={{position: "relative", display: "inline-block", width, height, lineHeight: 0, paddingRight: gaugeWidth + gap, paddingLeft: 4, boxSizing: "border-box"}}
             data-testid="you-stage"
             data-level={level}
             data-in-clouds={inClouds || undefined}
@@ -96,7 +97,9 @@ export function YouStage({height = 96, aloft, stringOut = 0, inClouds = false}: 
             {/* the ground */}
             <span style={{position: "absolute", left: 0, right: 0, bottom: ground - 2, height: 2, background: "#a9b4bf", borderRadius: 1}}/>
             {/* you and the crew, travel reading left to right */}
-            <span style={{position: "absolute", right: gaugeWidth + gap, bottom: ground}}>
+            <span style={width
+                ? {position: "absolute", right: gaugeWidth + gap, top}
+                : {display: "inline-block", marginTop: top}}>
                 <YouScene size={jonSize} aloft={aloft} stringOut={stringOut}/>
             </span>
             {/* head in the clouds */}

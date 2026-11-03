@@ -1,18 +1,16 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useElementSize } from "./useContainerWidth";
-import { Fab, Breadcrumbs, Button, Paper, Snackbar, Stack} from "@mui/material";
+import { Breadcrumbs, Button, Paper, Snackbar } from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
 import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
-import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
-import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 import { loadImgElement } from "./loadImgElement";
 import { useNavigator } from "./NavigatorContext";
 import { standingAt } from "./Navigator";
-import { YouLabel, YouStrip } from "./YouStrip";
+import { YouStrip } from "./YouStrip";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -28,12 +26,13 @@ export default function MindMapGraph({
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
+    const [footerSize,footerRef] = useElementSize();
     const breadCrumbsRef = React.useRef<HTMLDivElement>(null);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
     //the breadcrumb bar keeps a fixed height (it scrolls sideways) so the canvas never resizes when the path grows
     const breadCrumbsHeight = 40;
-    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight), [
-        headerSize
+    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight + footerSize.height), [
+        headerSize, footerSize
     ]);
     const [revealHidden, setRevealHidden] = React.useState(false);
     const [removedNode, setRemovedNode] = React.useState<MindMapGraphNode>();
@@ -119,62 +118,6 @@ export default function MindMapGraph({
         setRabbitHoleModalVisible(false);
     }
 
-    const onSpeech = React.useCallback((result: Transcript) => {
-        if(!result.isFinal){
-            return;
-        }
-        if(result.value === "remove"){
-            if(selectedNode){
-                if(selectedNode.type === "HOME"){
-                    alert('sorry, you may not remove HOME');
-                } else {
-                    console.log('removed node',selectedNode);
-                    change(MindMap.remove(value, selectedNode));
-                    setRemovedNode(selectedNode);
-                    const home = value.nodes.find(n => n.type === "HOME");
-                    selectNodeId(home?.id);
-                }
-            } else {
-                alert ('no node selected');
-            }
-        }
-        if(result.value === "undo"){
-            undoController.undo();
-        }
-        if(result.value === "redo"){
-            undoController.redo();
-        }
-        if(result.value.indexOf('deeper') === 0){
-            const label = result.value.replace(/^deeper/,'').trim();
-            if(!selectedNodeId){
-                alert('cannot go deeper without a selected node');
-                return;
-            }
-            if(label.length === 0){
-                alert('label not long enough');
-                return;
-            }
-            const [updatedValue, newNode] = MindMap.rabbitHole(graph, selectedNodeId, label);
-            console.log('deeper by voice',newNode);
-            change(updatedValue);
-            selectNodeId(newNode.id);
-        }
-    }, [ graph, selectedNode]);
-
-    const { listeningStatus, startListening, stopListening, transcript} =
-        useSpeechRecognition({
-            onRecognize: onSpeech,
-            interimResults: false,
-            maxAlternatives: 1,
-            continuous: true
-        });
-
-    React.useEffect(() => {
-        if(!transcript){
-            return;
-        }
-    },[transcript]);
-
     React.useEffect(() => {
         if(!value || !selectedNodeId || !home){
             setPathHome(undefined);
@@ -253,7 +196,6 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}/>
             </div>
 
             <div
@@ -313,8 +255,7 @@ export default function MindMapGraph({
             />}
 
             <Paper elevation={0}>
-                <div style={{position: 'relative'}}>
-                    <YouLabel graph={value}/>
+                <div>
                     {homeImage && <ForceGraph2D
                         onNodeClick={node => {
                             if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
@@ -483,23 +424,12 @@ export default function MindMapGraph({
                         dagLevelDistance={25}
                         dagMode={"radialin"}
                     /> }
-                    <Stack direction={"row-reverse"} gap={2} alignItems={"center"}
-
-                            sx={{ position: 'fixed', right: '1em', bottom: '1em'}}
-                    >
-                        <Fab
-                            variant="extended"
-                            color={"info"}
-                            disabled={!selectedNode}
-                            onClick={guideUserDeeper}
-                        >
-                            Deeper
-                        </Fab>
-
-                        <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />
-                    </Stack>
                 </div>
             </Paper>
+            <div ref={footerRef} style={{marginTop: 'auto'}}>
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}
+                    deeper={{disabled: !selectedNode, onClick: guideUserDeeper}}/>
+            </div>
         </div>
     );
 }
