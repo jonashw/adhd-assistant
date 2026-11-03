@@ -55,3 +55,80 @@ export function MindfulScene({size = 80}: {size?: number}) {
         </span>
     );
 }
+
+/* Where your head floats for each level of string out, in your drawing's own units (it is 96 tall):
+   level 0 is tied off, head held close; levels 1..5 are string out, matching Jon's headY */
+const levelHeadY = (level: number) => level === 0 ? 42.5 : 32.5 - Math.min(5, level) * 5;
+const levels = [0, 1, 2, 3, 4, 5];
+
+/* The stage: the ground the crew walks on, you at the head of the line, the graduations beside you that read
+   how far up your head is, and a cloud round your head when it has gone up into one (the rabbit hole).
+   It stretches to the width it is given; you stand near the right, the crew trailing from the left. */
+export function YouStage({height = 96, aloft, stringOut = 0, inClouds = false}: {
+    height?: number,
+    aloft: boolean,
+    stringOut?: number,
+    /* head in the clouds: long enough or far enough up that the spider would tug */
+    inClouds?: boolean
+}) {
+    const ground = 4;
+    const jonSize = height - ground - 2;
+    const u = jonSize / 96;
+    const gaugeWidth = 18;
+    const gap = 6;
+    const level = aloft ? Math.max(1, Math.min(5, stringOut)) : 0;
+    const top = height - ground - jonSize;
+    const yOf = (l: number) => top + levelHeadY(l) * u;
+    //your head, in px from the stage's right edge and top: aloft it rides at x 32 of your 40-wide drawing, tied at 18
+    const headRight = gaugeWidth + gap + (40 - (aloft ? 32 : 18)) * u;
+    const headTop = yOf(level);
+    const cloudW = 34 * u * 1.6;
+    const label = aloft
+        ? `Your head is ${level} of 5 levels up${inClouds ? ", in the clouds" : ""}`
+        : "Tied off: your head is held close";
+    return (
+        <span
+            style={{position: "relative", display: "block", width: "100%", height, lineHeight: 0}}
+            data-testid="you-stage"
+            data-level={level}
+            data-in-clouds={inClouds || undefined}
+        >
+            {/* the ground */}
+            <span style={{position: "absolute", left: 0, right: 0, bottom: ground - 2, height: 2, background: "#a9b4bf", borderRadius: 1}}/>
+            {/* you and the crew, travel reading left to right */}
+            <span style={{position: "absolute", right: gaugeWidth + gap, bottom: ground}}>
+                <YouScene size={jonSize} aloft={aloft} stringOut={stringOut}/>
+            </span>
+            {/* head in the clouds */}
+            {inClouds && <svg
+                aria-hidden="true"
+                viewBox="0 0 40 18"
+                width={cloudW}
+                height={cloudW * 18 / 40}
+                style={{position: "absolute", right: headRight - cloudW / 2, top: headTop - cloudW * 18 / 40 * 0.45, pointerEvents: "none"}}
+                data-testid="you-cloud"
+            >
+                <g fill="#e3e7ec" opacity={0.95}>
+                    <ellipse cx={20} cy={8} rx={14} ry={7}/>
+                    <ellipse cx={10} cy={12} rx={9} ry={5}/>
+                    <ellipse cx={30} cy={12} rx={9} ry={5}/>
+                </g>
+            </svg>}
+            {/* the graduations: one mark per level, the one your head is at drawn bold */}
+            <svg
+                role="img"
+                aria-label={label}
+                width={gaugeWidth}
+                height={height}
+                style={{position: "absolute", right: 0, top: 0}}
+                data-testid="you-gauge"
+            >
+                <title>{label}</title>
+                <line x1={gaugeWidth - 4} y1={yOf(5) - 3} x2={gaugeWidth - 4} y2={yOf(0) + 3} stroke="#d9d4c7" strokeWidth={1}/>
+                {levels.map(l => l === level
+                    ? <line key={l} x1={2} y1={yOf(l)} x2={gaugeWidth} y2={yOf(l)} stroke="#2b5e94" strokeWidth={2.5} strokeLinecap="round"/>
+                    : <line key={l} x1={gaugeWidth - 9} y1={yOf(l)} x2={gaugeWidth} y2={yOf(l)} stroke="#a9b4bf" strokeWidth={1.2}/>)}
+            </svg>
+        </span>
+    );
+}

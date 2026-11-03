@@ -1,5 +1,5 @@
 import { Box, Stack, Typography } from "@mui/material";
-import { CrewAtRest, Dog, Jon, MindfulScene, Sloth, Spider, Squirrel, YouScene } from "./Crew";
+import { CrewAtRest, Dog, Jon, MindfulScene, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
 import { Mindful } from "./WhatsNextDialog";
 
 /* /crew: every crew member in every move, to review the art without hunting for the screen it lives on */
@@ -46,6 +46,20 @@ export function CrewPreview() {
                         <Spider size={18}/><Squirrel size={20}/><Dog size={24}/>
                     </Stack>
                 </Tile>
+            </Stack>
+            <Typography variant="h6" sx={{mt: 3}}>The stage, as wide as the toolbar lets it be</Typography>
+            <Stack gap={1} sx={{maxWidth: 300}}>
+                {([
+                    ["Tied off", false, 0, false],
+                    ["Aloft, 1 step out", true, 1, false],
+                    ["Aloft, 3 steps out, head in the clouds", true, 3, true],
+                    ["Aloft, 5 steps out, head in the clouds", true, 5, true]
+                ] as const).map(([title, aloft, out, clouds]) => (
+                    <Box key={title} sx={{borderBottom: 1, borderColor: "divider", pb: 1}}>
+                        <YouStage height={96} aloft={aloft} stringOut={out} inClouds={clouds}/>
+                        <Typography variant="caption" color="text.secondary">{title}</Typography>
+                    </Box>
+                ))}
             </Stack>
             <Typography variant="h6" sx={{mt: 3}}>The Mindful screen in What's next</Typography>
             <Mindful/>

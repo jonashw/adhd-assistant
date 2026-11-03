@@ -12,7 +12,7 @@ import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar
 import { loadImgElement } from "./loadImgElement";
 import { useNavigator } from "./NavigatorContext";
 import { standingAt } from "./Navigator";
-import { YouStrip } from "./YouStrip";
+import { YouLabel, YouStrip } from "./YouStrip";
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -313,7 +313,8 @@ export default function MindMapGraph({
             />}
 
             <Paper elevation={0}>
-                <div>
+                <div style={{position: 'relative'}}>
+                    <YouLabel graph={value}/>
                     {homeImage && <ForceGraph2D
                         onNodeClick={node => {
                             if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
