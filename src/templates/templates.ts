@@ -118,7 +118,7 @@ export const starterTemplates: StarterTemplate[] = [
         pickWhen: "\"I keep losing my way.\"",
         teaches: "Finding your way home, where a place came from, and Blocked by",
         keep: "A demo for showing people",
-        summary: "A chain of tangents you'll recognize: you set out to fix the sink and ended up donating bikes. You start five steps out, and the breadcrumbs show the way back.",
+        summary: "A chain of tangents you'll recognize: you set out to fix the sink and ended up donating bikes. The map is drawn as the rabbit's burrow: each place a chamber, each tangent a hole further down. You start five holes deep, and the string shows the way back.",
         why: "It shows the app's original promise in five seconds: however far you wander, you can always get home.",
         pros: [
             "Small, funny and relatable",
@@ -126,21 +126,24 @@ export const starterTemplates: StarterTemplate[] = [
             "Shows Blocked by: the sink waits on the wrench"
         ],
         cons: [
-            "One long branch, so it doesn't show regions or What's next",
+            "Mostly one deep branch, so it doesn't show regions or What's next",
             "It's a story, not a map you'd keep"
         ],
         graph: build(
             "This map is one afternoon of tangents. Start at \"Donate old bikes\" and look at the breadcrumbs.",
             [
                 {id: "sink", label: "Fix the sink", status: "active", children: [
-                    {id: "wrench", label: "Need a wrench", children: [
+                    {id: "plumber", label: "Call a plumber?", status: "someday"},
+                    {id: "wrench", label: "Need a wrench", note: "- [ ] Check the garage\n- [ ] Ask the neighbour", children: [
                         {id: "garage", label: "Garage is a mess", children: [
+                            {id: "photos", label: "Box of old photos", note: "Found behind the bikes. Worth an evening, not this afternoon."},
                             {id: "reorg", label: "Reorganize garage", children: [
                                 {id: "bikes", label: "Donate old bikes", note: "Five steps out from HOME. This is where the spider climbs your string and tugs: you set down \"Fix the sink\" a while ago."}
                             ]}
                         ]}
                     ]}
-                ]}
+                ]},
+                {id: "sam", label: "Reply to Sam"}
             ],
             [{source: "sink", target: "wrench", type: "BLOCKED_BY"}]
         ),

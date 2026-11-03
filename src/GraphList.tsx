@@ -1,7 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { GraphRepositoryContext } from './GraphRepositoryContext';
 import {
     AppBar,
+    Box,
+    Link,
     Button,
     CircularProgress,
     Container,
@@ -236,6 +238,12 @@ export function GraphList() {
  
             </Stack>
         </Paper>
+
+        <Box component="footer" sx={{px: 2, pt: 2, pb: 12, color: 'text.secondary', typography: 'body2'}}>
+            <Link component={RouterLink} to="/crew" underline="hover" color="inherit">Meet the crew</Link>
+            {' · '}
+            <Link component={RouterLink} to="/templates" underline="hover" color="inherit">Starter maps</Link>
+        </Box>
 
         <input
             ref={importInputRef}

@@ -9,7 +9,7 @@ import { visuallyHidden } from "@mui/utils";
 import { ArrowBack, CheckCircleOutline, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
 import { ClaudeMapIcon } from "../ClaudeMapIcon";
-import { RabbitBurrowLoop } from "../crew/Rabbit";
+import { RabbitBurrow, RabbitBurrowLoop } from "../crew/Rabbit";
 import { GraphRepositoryContext } from "../GraphRepositoryContext";
 import { MindMap } from "../MindMap";
 import { CrewLead, StarterTemplate, graphAtStep, instantiate, placeCount, starterTemplates } from "./templates";
@@ -86,7 +86,9 @@ function Walkthrough({template}: {template: StarterTemplate}) {
     return (
         <Stack gap={1}>
             <Paper variant="outlined" sx={{p: 1, overflowX: "auto"}}>
-                <TemplatePreview graph={graph} focus={steps[step].focus} title={template.name}/>
+                {template.crew === "rabbit"
+                    ? <RabbitBurrow size={260} graph={graph} at={steps[step].focus}/>
+                    : <TemplatePreview graph={graph} focus={steps[step].focus} title={template.name}/>}
             </Paper>
             <Typography variant="overline" color="text.secondary" sx={{lineHeight: 1.5}}>
                 Try it · step {step + 1} of {steps.length}
@@ -101,7 +103,12 @@ function Walkthrough({template}: {template: StarterTemplate}) {
                     ? <Button size="small" onClick={() => setStep(0)} startIcon={<Replay/>}>Again</Button>
                     : <Button size="small" onClick={() => setStep(s => s + 1)} endIcon={<KeyboardArrowRight/>}>Next</Button>}
             />
-            <PreviewLegend/>
+            {template.crew === "rabbit"
+                ? <Typography variant="caption" color="text.secondary">
+                    Each place is a chamber under its parent. A lit lantern means active, faded means someday,
+                    and backfilled means done. What a note holds lies on the chamber floor.
+                </Typography>
+                : <PreviewLegend/>}
         </Stack>
     );
 }

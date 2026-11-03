@@ -1,100 +1,207 @@
 import React from "react";
 import { Eye, ShutEye } from "./CrewSvg";
 import { Fidget, useFidget, usePrefersReducedMotion } from "./useFidget";
+import { MindMap, MindMapGraphData, MindMapGraphNode } from "../MindMap";
+import { parseNote } from "../NoteBody";
+import { burrowDemoGraph } from "./burrowDemo";
 import "./rabbit.css";
 
-/* The robot rabbit of the rabbit-hole map. It lives in a burrow: the surface with HOME on it, and three
-   tunnels below, each one a tangent deeper. Its string is tied at HOME and runs behind it through every
-   hole it has gone down, like breadcrumbs, so the way back is always marked. When it climbs back up,
-   the string comes up with it.
-   depth: 0 is the surface beside HOME; 1 to 3 are the tunnels. Changing depth plays the jump down or the climb up.
+/* The robot rabbit of the rabbit-hole map, and its burrow, drawn from the map itself.
+   The surface, with the sky above it, is HOME. Every place is a chamber one layer below its parent,
+   and every child is its own hole in the floor of its parent's chamber, so a wide map makes a wide burrow
+   and a deep tangent makes a deep one.
+   The rabbit's string is tied at HOME and runs down through each chamber on the way to wherever the rabbit
+   is: the same path as the app's breadcrumbs. Sending it somewhere else takes it up to the place both share,
+   then down another hole; the string reels in and pays out as it goes.
+   Done chambers are backfilled, someday ones fade, an active one has a lantern lit.
    carrying: it has picked up a piece of work here and holds it in both front paws (its "tied off"). */
 
-export const burrowDepths = 3;
-
-const W = 124, H = 116;
-const surface = 24;
+const colW = 36;
 const bandH = 30;
-const floorOf = (d: number) => d === 0 ? surface : surface + d * bandH - 3;
-const shaftX = [0, 36, 66, 96];
-const restX = [27, 50, 80, 108];
+const sky = 22;
+const pad = 8;
+const chamberW = 26;
+const chamberH = 17;
 
-//the string's whole route from HOME, through every hole, to the deepest tunnel
-const route: [number, number][] = [
-    [9, surface],
-    [shaftX[1], surface], [shaftX[1], floorOf(1)],
-    [shaftX[2], floorOf(1)], [shaftX[2], floorOf(2)],
-    [shaftX[3], floorOf(2)], [shaftX[3], floorOf(3)],
-    [118, floorOf(3)]
-];
-const segLen = route.slice(1).map((p, i) => Math.hypot(p[0] - route[i][0], p[1] - route[i][1]));
+type Chamber = {node: MindMapGraphNode, x: number, depth: number, floor: number, parent?: string};
+type Burrow = {chambers: Map<string, Chamber>, rootId: string, width: number, height: number, depth: number, signature: string};
 
-//how far along the route the rabbit rests at each depth
-const restAt = (d: number) => {
-    let s = 0;
-    for (let i = 0; i < segLen.length; i++) {
-        const [a, b] = [route[i], route[i + 1]];
-        const onThisFloor = a[1] === floorOf(d) && b[1] === floorOf(d) && restX[d] >= Math.min(a[0], b[0]) && restX[d] <= Math.max(a[0], b[0]);
-        if (onThisFloor) {
-            return s + Math.abs(restX[d] - a[0]);
+const floorOf = (depth: number) => depth === 0 ? sky : sky + depth * bandH - 4;
+
+function dig(graph: MindMapGraphData): Burrow {
+    const root = graph.nodes.find(n => n.type === "HOME") ?? graph.nodes[0];
+    const byId = new Map(graph.nodes.map(n => [n.id, n]));
+    const chambers = new Map<string, Chamber>();
+    let leaf = 0;
+    let deepest = 0;
+    const visit = (id: string, depth: number, parent: string | undefined, seen: Set<string>): number => {
+        deepest = Math.max(deepest, depth);
+        const kids = MindMap.childrenOf(graph, id).filter(k => !seen.has(k) && byId.has(k));
+        let x: number;
+        if (kids.length === 0) {
+            x = pad + colW / 2 + 14 + leaf++ * colW;
+        } else {
+            const xs = kids.map(k => visit(k, depth + 1, id, new Set([...seen, k])));
+            x = (xs[0] + xs[xs.length - 1]) / 2;
         }
-        s += segLen[i];
+        chambers.set(id, {node: byId.get(id)!, x, depth, floor: floorOf(depth), parent});
+        return x;
+    };
+    if (root) {
+        visit(root.id, 0, undefined, new Set([root.id]));
+        //HOME sits at the left of the surface, where the string is tied
+        chambers.get(root.id)!.x = pad + 4;
     }
-    return s;
-};
-
-/* The point at distance s along the route, whether that stretch is level ground, and the route walked so far */
-function along(s: number): {x: number, y: number, level: boolean, walked: [number, number][]} {
-    const walked: [number, number][] = [route[0]];
-    let left = s;
-    for (let i = 0; i < segLen.length; i++) {
-        const [a, b] = [route[i], route[i + 1]];
-        if (left <= segLen[i] || i === segLen.length - 1) {
-            const t = segLen[i] === 0 ? 0 : Math.min(1, left / segLen[i]);
-            const x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t;
-            walked.push([x, y]);
-            return {x, y, level: a[1] === b[1], walked};
-        }
-        left -= segLen[i];
-        walked.push(b);
-    }
-    const last = route[route.length - 1];
-    return {x: last[0], y: last[1], level: true, walked};
+    const width = pad * 2 + 14 + Math.max(leaf, 1) * colW;
+    const height = floorOf(deepest) + 10 + pad;
+    const signature = [...chambers.values()].map(c => `${c.node.id}@${c.x},${c.depth}`).join("|");
+    return {chambers, rootId: root?.id ?? "", width, height, depth: deepest, signature};
 }
 
-const msPerUnit = 14;
+type Pt = [number, number];
 
-/* Moves the rabbit's place along the route toward the target depth, one frame at a time */
-function useTravel(depth: number): {s: number, moving: boolean, facing: 1 | -1} {
+/* Where a child's hole opens in its parent's floor: under the child, but inside the parent's chamber */
+function holeX(b: Burrow, child: Chamber): number {
+    const parent = child.parent ? b.chambers.get(child.parent) : undefined;
+    if (!parent || parent.depth === 0) {
+        return child.x;
+    }
+    return parent.x + Math.max(-chamberW / 2 + 4, Math.min(chamberW / 2 - 4, child.x - parent.x));
+}
+
+/* The chamber ids from HOME down to a place */
+function lineage(b: Burrow, id: string): string[] {
+    const line: string[] = [];
+    let at: string | undefined = id;
+    while (at !== undefined && b.chambers.has(at) && !line.includes(at)) {
+        line.unshift(at);
+        at = b.chambers.get(at)!.parent;
+    }
+    return line;
+}
+
+const restPoint = (c: Chamber): Pt => [c.depth === 0 ? c.x + 12 : c.x, c.floor];
+
+/* The points walked going down from a parent's rest spot into a child's */
+function downStep(b: Burrow, child: Chamber): Pt[] {
+    const parent = b.chambers.get(child.parent!)!;
+    const hx = holeX(b, child);
+    return [[hx, parent.floor], [child.x, child.floor]];
+}
+
+/* The whole string from HOME to a place's rest spot */
+function stringTo(b: Burrow, id: string): Pt[] {
+    const line = lineage(b, id);
+    const pts: Pt[] = [[b.chambers.get(line[0])!.x, sky]];
+    line.slice(1).forEach(cid => pts.push(...downStep(b, b.chambers.get(cid)!)));
+    return pts;
+}
+
+/* The way from one place to another: up to the place they share, then down. Returns the shared
+   ancestor's string and the walk, with how far along the walk the turn at the shared ancestor comes. */
+function routeBetween(b: Burrow, from: string, to: string): {shared: Pt[], walk: Pt[], turn: number} {
+    const a = lineage(b, from), z = lineage(b, to);
+    let i = 0;
+    while (i < a.length && i < z.length && a[i] === z[i]) i++;
+    const lca = a[i - 1] ?? b.rootId;
+    const shared = stringTo(b, lca);
+    const up: Pt[] = [restPoint(b.chambers.get(from)!)];
+    for (let k = a.length - 1; k >= i; k--) {
+        const step = downStep(b, b.chambers.get(a[k])!);
+        up.push(step[0]);
+    }
+    up.push(restPoint(b.chambers.get(lca)!));
+    const down: Pt[] = [];
+    for (let k = i; k < z.length; k++) {
+        down.push(...downStep(b, b.chambers.get(z[k])!));
+    }
+    down.push(restPoint(b.chambers.get(to)!));
+    const walk = [...up, ...down];
+    return {shared, walk, turn: lengthOf(up)};
+}
+
+const dist = (a: Pt, b: Pt) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+const lengthOf = (pts: Pt[]) => pts.slice(1).reduce((s, p, i) => s + dist(pts[i], p), 0);
+
+/* The part of a polyline from its start to distance s, ending at the exact point there */
+function cut(pts: Pt[], s: number): Pt[] {
+    const out: Pt[] = [pts[0]];
+    let left = s;
+    for (let i = 1; i < pts.length; i++) {
+        const d = dist(pts[i - 1], pts[i]);
+        if (left <= d) {
+            const t = d === 0 ? 0 : left / d;
+            out.push([pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t]);
+            return out;
+        }
+        left -= d;
+        out.push(pts[i]);
+    }
+    return out;
+}
+
+/* The part of a polyline between distances a and b */
+function sub(pts: Pt[], a: number, b: number): Pt[] {
+    const upToB = cut(pts, b);
+    const upToA = cut(pts, a);
+    return [upToA[upToA.length - 1], ...upToB.slice(upToA.length)];
+}
+
+const msPerUnit = 12;
+
+type Pose = {x: number, y: number, string: Pt[], moving: boolean, facing: 1 | -1, level: boolean};
+
+/* Walks the rabbit to the place `at`, a frame at a time; when the burrow itself changes shape, it just appears there */
+function useWalk(b: Burrow, at: string): Pose {
     const reduced = usePrefersReducedMotion();
-    const target = restAt(Math.max(0, Math.min(burrowDepths, depth)));
-    const [s, setS] = React.useState(target);
-    const [facing, setFacing] = React.useState<1 | -1>(1);
-    const sRef = React.useRef(target);
+    const target = b.chambers.has(at) ? at : b.rootId;
+    const [state, setState] = React.useState<{from: string, to: string, s: number, signature: string}>(
+        {from: target, to: target, s: 0, signature: b.signature});
+    const current = React.useRef(state);
+    current.current = state;
     React.useEffect(() => {
-        const from = sRef.current;
-        if (reduced || from === target) {
-            sRef.current = target;
-            setS(target);
+        const was = current.current;
+        if (reduced || was.signature !== b.signature || !b.chambers.has(was.to)) {
+            setState({from: target, to: target, s: 0, signature: b.signature});
             return;
         }
-        setFacing(target > from ? 1 : -1);
-        const duration = Math.abs(target - from) * msPerUnit;
+        if (was.to === target && was.from === target) {
+            return;
+        }
+        //start from wherever it last arrived
+        const from = was.to;
+        const {walk} = routeBetween(b, from, target);
+        const total = lengthOf(walk);
         const start = performance.now();
         let frame = 0;
         const tick = (now: number) => {
-            const t = Math.min(1, (now - start) / duration);
+            const t = Math.min(1, (now - start) / Math.max(1, total * msPerUnit));
             const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-            sRef.current = from + (target - from) * eased;
-            setS(sRef.current);
+            setState({from, to: target, s: eased * total, signature: b.signature});
             if (t < 1) {
                 frame = requestAnimationFrame(tick);
+            } else {
+                setState({from: target, to: target, s: 0, signature: b.signature});
             }
         };
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [target, reduced]);
-    return {s, moving: Math.abs(s - target) > 0.01, facing};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [target, b.signature, reduced]);
+
+    const {shared, walk, turn} = routeBetween(b, state.from, state.to);
+    const walked = cut(walk, state.s);
+    const [x, y] = walked[walked.length - 1];
+    const prev = walked.length > 1 ? walked[walked.length - 2] : walked[0];
+    //going up, the string runs from the shared place back down to the rabbit; going down, it follows the walk
+    const tail = state.s < turn ? sub(walk, state.s, turn).reverse() : sub(walk, turn, state.s);
+    const string = [...shared, ...tail];
+    const moving = state.from !== state.to;
+    const total = lengthOf(walk);
+    const ahead = cut(walk, Math.min(total, state.s + 0.5));
+    const next = ahead[ahead.length - 1];
+    const dx = next[0] - x || x - prev[0];
+    return {x, y, string, moving, facing: dx < 0 ? -1 : 1, level: Math.abs(next[1] - y) < 0.01 && Math.abs(prev[1] - y) < 0.01};
 }
 
 const fidgets: Fidget[] = [
@@ -104,42 +211,145 @@ const fidgets: Fidget[] = [
     {name: "is-thump", ms: 500, weight: 1}
 ];
 
-export function RabbitBurrow({size = 100, depth = 0, carrying = false}: {size?: number, depth?: number, carrying?: boolean}) {
-    const {s, moving, facing} = useTravel(depth);
-    const here = along(s);
-    const fidget = useFidget(fidgets, [1600, 4500], !moving);
-    //on level ground it hops; in a shaft it slides straight down or scrabbles up
-    const hop = moving && here.level ? -Math.abs(Math.sin(s / 4)) * 5 : 0;
-    const string = here.walked.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
-    const label = `Robot rabbit, ${depth === 0 ? "at the surface by HOME" : `${depth} hole${depth === 1 ? "" : "s"} down`}${carrying ? ", carrying a piece of work" : ""}`;
+const short = (s: string, n: number) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
+
+export function RabbitBurrow({size = 120, graph, at, carrying = false, labels = true, onPick}: {
+    size?: number,
+    graph: MindMapGraphData,
+    /* the place the rabbit is at; HOME when unset */
+    at?: string,
+    carrying?: boolean,
+    labels?: boolean,
+    /* tap a chamber to send the rabbit there */
+    onPick?: (id: string) => void
+}) {
+    const b = React.useMemo(() => dig(graph), [graph]);
+    const uid = React.useId().replace(/:/g, "");
+    const pose = useWalk(b, at ?? b.rootId);
+    const fidget = useFidget(fidgets, [1600, 4500], !pose.moving);
+    const visible = new Set(MindMap.visibleGraph(graph, false).nodes.map(n => n.id));
+    const hop = pose.moving && pose.level ? -Math.abs(Math.sin(pose.x / 3)) * 4 : 0;
+    const d = (pts: Pt[]) => pts.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
+    const here = b.chambers.get(at ?? b.rootId);
+    const label = `Robot rabbit ${here && here.depth > 0 ? `at ${here.node.label}, ${here.depth} hole${here.depth === 1 ? "" : "s"} down` : "at the surface by HOME"}${carrying ? ", carrying a piece of work" : ""}`;
+    const chambers = [...b.chambers.values()].filter(c => c.depth > 0);
     return (
-        <svg className={["crew", "crew-rabbit", moving && "is-moving", carrying && "is-carrying", fidget].filter(Boolean).join(" ")}
-            viewBox={`0 0 ${W} ${H}`} width={size * W / H} height={size} role="img" aria-label={label}>
+        <svg className={["crew", "crew-rabbit", pose.moving && "is-moving", carrying && "is-carrying", fidget].filter(Boolean).join(" ")}
+            viewBox={`0 0 ${b.width} ${b.height}`} width={size * b.width / b.height} height={size} role="img" aria-label={label}
+            style={{display: "block", margin: "0 auto", maxWidth: "100%", height: "auto"}}>
             <title>{label}</title>
-            {/* ground: the surface and three bands below it, each with its tunnel and the shaft down into it */}
-            {[1, 2, 3].map(d =>
-                <rect key={d} x={0} y={surface + (d - 1) * bandH} width={W} height={d === 3 ? H - surface - 2 * bandH : bandH} className={`burrow-band burrow-band-${d}`}/>)}
-            <rect x={0} y={surface - 1.2} width={W} height={2.4} className="burrow-grass"/>
-            {[1, 2, 3].map(d => {
-                const top = surface + (d - 1) * bandH;
-                const left = shaftX[d] - 7;
-                const right = d === 3 ? W - 2 : shaftX[d + 1] + 7;
-                return <g key={d}>
-                    <rect x={left} y={top + 2} width={right - left} height={floorOf(d) - top} rx={7} className="burrow-tunnel"/>
-                    <rect x={shaftX[d] - 4} y={floorOf(d - 1) - 1} width={8} height={top + 4 - floorOf(d - 1) + 1} rx={3} className="burrow-tunnel"/>
+            <rect x={0} y={0} width={b.width} height={sky} className="burrow-sky"/>
+            {Array.from({length: Math.max(1, b.depth)}, (_, i) =>
+                <rect key={i} x={0} y={sky + i * bandH} width={b.width} height={i === b.depth - 1 ? b.height - sky - i * bandH : bandH}
+                    className={`burrow-band burrow-band-${Math.min(i, 4) + 1}`}/>)}
+            <rect x={0} y={sky - 1.2} width={b.width} height={2.4} className="burrow-grass"/>
+            {/* shafts first, so the chambers sit over their ends */}
+            {chambers.map(c => {
+                const parent = b.chambers.get(c.parent!)!;
+                const hx = holeX(b, c);
+                const tucked = !visible.has(c.node.id);
+                return <path key={`shaft-${c.node.id}`} d={`M${hx} ${parent.floor - 1} L${c.x} ${c.floor - chamberH / 2}`}
+                    className={tucked ? "burrow-shaft is-filled" : "burrow-shaft"} fill="none"/>;
+            })}
+            {chambers.map(c => {
+                const tucked = !visible.has(c.node.id);
+                const status = c.node.status;
+                return <g key={c.node.id} className={["burrow-chamber", tucked && "is-filled", status === "someday" && "is-someday", onPick && "is-pickable"].filter(Boolean).join(" ")}
+                    onClick={onPick ? () => onPick(c.node.id) : undefined}>
+                    <title>{c.node.label}{status ? ` (${status})` : ""}</title>
+                    <rect x={c.x - chamberW / 2} y={c.floor - chamberH + 2} width={chamberW} height={chamberH} rx={7} className="burrow-tunnel"/>
+                    {!tucked && <FloorThings x={c.x} floor={c.floor} body={c.node.body}/>}
+                    {status === "active" && !tucked && <g className="burrow-lantern">
+                        <line x1={c.x + 8} y1={c.floor - chamberH + 2} x2={c.x + 8} y2={c.floor - chamberH + 6} className="burrow-lantern-cord"/>
+                        <rect x={c.x + 6.6} y={c.floor - chamberH + 5.6} width={2.8} height={3.8} rx={0.8} className="burrow-lantern-case"/>
+                        <circle cx={c.x + 8} cy={c.floor - chamberH + 7.5} r={1.1} className="burrow-lantern-light"/>
+                    </g>}
+                    {labels && <text x={c.x} y={c.floor + 7} textAnchor="middle" className="burrow-label">{short(c.node.label, 11)}</text>}
                 </g>;
             })}
-            <ellipse cx={shaftX[1]} cy={surface} rx={6} ry={2} className="burrow-hole"/>
-            {/* HOME on the surface, where the string is tied */}
-            <circle cx={9} cy={surface - 5} r={4.2} className="burrow-home"/>
-            <path d={string} className="burrow-string" fill="none"/>
-            <g transform={`translate(${here.x} ${here.y + hop})`}>
-                <g transform={`scale(${facing * 1.2} 1.2)`}>
+            {/* light: lit lanterns glow warm, and the rabbit's eyes throw a little cool light, only inside the tunnels */}
+            <defs>
+                <radialGradient id={`${uid}-warm`}>
+                    <stop offset="0%" stopColor="#ffd27a" stopOpacity={0.85}/>
+                    <stop offset="60%" stopColor="#ffb347" stopOpacity={0.25}/>
+                    <stop offset="100%" stopColor="#ffb347" stopOpacity={0}/>
+                </radialGradient>
+                <radialGradient id={`${uid}-cool`}>
+                    <stop offset="0%" stopColor="#9ff3ff" stopOpacity={0.5}/>
+                    <stop offset="100%" stopColor="#9ff3ff" stopOpacity={0}/>
+                </radialGradient>
+                <mask id={`${uid}-tunnels`} maskUnits="userSpaceOnUse" x={0} y={0} width={b.width} height={b.height}>
+                    {chambers.map(c => <rect key={c.node.id} x={c.x - chamberW / 2} y={c.floor - chamberH + 2} width={chamberW} height={chamberH} rx={7} fill="#fff"/>)}
+                    {chambers.map(c => {
+                        const parent = b.chambers.get(c.parent!)!;
+                        return <path key={`m-${c.node.id}`} d={`M${holeX(b, c)} ${parent.floor - 1} L${c.x} ${c.floor - chamberH / 2}`} stroke="#fff" strokeWidth={7} strokeLinecap="round"/>;
+                    })}
+                </mask>
+            </defs>
+            <g mask={`url(#${uid}-tunnels)`} style={{pointerEvents: "none"}}>
+                {chambers.filter(c => c.node.status === "active" && visible.has(c.node.id)).map(c =>
+                    <circle key={`glow-${c.node.id}`} cx={c.x + 8} cy={c.floor - chamberH + 7.5} r={22} fill={`url(#${uid}-warm)`} className="burrow-glow"/>)}
+                {pose.y > sky + 1 && <circle cx={pose.x + pose.facing * 6} cy={pose.y - 11} r={12} fill={`url(#${uid}-cool)`}/>}
+            </g>
+            {/* surface holes for the places right under HOME */}
+            {chambers.filter(c => c.depth === 1).map(c => <ellipse key={`hole-${c.node.id}`} cx={c.x} cy={sky} rx={5} ry={1.8} className="burrow-hole"/>)}
+            <circle cx={b.chambers.get(b.rootId)?.x ?? pad} cy={sky - 5} r={4.2} className="burrow-home"/>
+            <path d={d(pose.string)} className="burrow-string" fill="none"/>
+            <g transform={`translate(${pose.x} ${pose.y + hop})`} style={{pointerEvents: "none"}}>
+                <g transform={`scale(${pose.facing} 1)`}>
                     <RabbitBody carrying={carrying}/>
                 </g>
             </g>
         </svg>
     );
+}
+
+const loop = ["sink", "wrench", "garage", "photos", "bikes", "HOME", "sam", "HOME"];
+
+/* The demo burrow on a loop: down a tangent, across, all the way home, and off to another place */
+export function RabbitBurrowLoop({size = 100, labels = false}: {size?: number, labels?: boolean}) {
+    const reduced = usePrefersReducedMotion();
+    const [i, setI] = React.useState(reduced ? 4 : 0);
+    React.useEffect(() => {
+        if (reduced) {
+            return;
+        }
+        const timer = window.setTimeout(() => setI(n => (n + 1) % loop.length), loop[i] === "HOME" ? 3200 : 2600);
+        return () => window.clearTimeout(timer);
+    }, [i, reduced]);
+    return <RabbitBurrow size={size} graph={burrowDemoGraph} at={loop[i]} labels={labels}/>;
+}
+
+/* What a place's note holds, set out on its chamber floor: a photo in a frame, a checklist on a clipboard,
+   a page of writing. One of each kind, left of the middle so the rabbit has room. */
+function FloorThings({x, floor, body}: {x: number, floor: number, body?: string}) {
+    const kinds = new Set(parseNote(body).map(b => b.kind));
+    const things: React.ReactNode[] = [];
+    let at = x - 10;
+    if (kinds.has("image")) {
+        things.push(<g key="image" transform={`translate(${at} ${floor})`} className="burrow-thing">
+            <title>Photo</title>
+            <rect x={-2.4} y={-4.6} width={4.8} height={4} rx={0.4} className="thing-frame"/>
+            <path d="M-1.8 -1.1 L-0.6 -2.6 L0.4 -1.6 L1.1 -2.2 L1.8 -1.1 Z" className="thing-picture"/>
+        </g>);
+        at += 5.6;
+    }
+    if (kinds.has("check")) {
+        things.push(<g key="check" transform={`translate(${at} ${floor})`} className="burrow-thing">
+            <title>Checklist</title>
+            <rect x={-2} y={-5.2} width={4} height={5} rx={0.4} className="thing-board"/>
+            <path d="M-1.3 -3.8 l0.5 0.5 l0.9 -0.9 M-1.3 -1.9 l0.5 0.5 l0.9 -0.9" className="thing-tick"/>
+        </g>);
+        at += 5;
+    }
+    if (kinds.has("text")) {
+        things.push(<g key="text" transform={`translate(${at} ${floor})`} className="burrow-thing">
+            <title>Notes</title>
+            <path d="M-2.2 -0.2 L-1.6 -4.4 L2 -4 L1.6 0.2 Z" className="thing-page"/>
+            <path d="M-1.2 -3.3 L1.2 -3 M-1.3 -2.3 L1.1 -2 M-1.4 -1.3 L0.6 -1.1" className="thing-lines"/>
+        </g>);
+    }
+    return <>{things}</>;
 }
 
 /* A sitting robot rabbit, facing right, its feet at 0,0 */
@@ -172,25 +382,4 @@ function RabbitBody({carrying}: {carrying: boolean}) {
             <rect x={-0.5} y={-1.4} width={7} height={1.6} rx={0.8} className="part rabbit-foot rabbit-metal-dark"/>
         </g>
     );
-}
-
-/* The burrow on a loop: down one hole at a time to the bottom, then all the way back up to HOME */
-export function RabbitBurrowLoop({size = 100}: {size?: number}) {
-    const reduced = usePrefersReducedMotion();
-    const [depth, setDepth] = React.useState(reduced ? burrowDepths : 0);
-    const down = React.useRef(true);
-    React.useEffect(() => {
-        if (reduced) {
-            setDepth(burrowDepths);
-            return;
-        }
-        //rest a beat at each depth, longer after the long climb home
-        const timer = window.setTimeout(() => {
-            if (depth === burrowDepths) down.current = false;
-            if (depth === 0) down.current = true;
-            setDepth(down.current ? depth + 1 : 0);
-        }, depth === 0 ? 2600 : 1800 + (restAt(depth) - restAt(depth - 1)) * msPerUnit);
-        return () => window.clearTimeout(timer);
-    }, [reduced, depth]);
-    return <RabbitBurrow size={size} depth={depth}/>;
 }
