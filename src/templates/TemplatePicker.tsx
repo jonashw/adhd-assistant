@@ -1,18 +1,21 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    AppBar, Box, Button, Card, CardActionArea, CardActions, CardContent, CardHeader, Chip, Container, Divider, Grid, IconButton,
+    AppBar, Box, Button, Card, CardActionArea, CardActions, Dialog, CardContent, CardHeader, Chip, Container, Divider, Grid, IconButton,
     List, ListItem, ListItemIcon, ListItemText, MobileStepper, Paper, Stack, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, ToggleButton, ToggleButtonGroup, Toolbar, Typography
 } from "@mui/material";
 import { visuallyHidden } from "@mui/utils";
 import { alpha } from "@mui/material/styles";
-import { ArrowBack, CheckCircleOutline, PlaceOutlined, TableRows, ViewColumn, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
+import { ArrowBack, CheckCircleOutline, Visibility, TableRows, ViewColumn, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
 import { ClaudeMapIcon } from "../ClaudeMapIcon";
 import { RabbitBurrow, RabbitBurrowLoop } from "../crew/Rabbit";
 import { Speaker } from "../crew/Speaker";
 import { useLocalStorage } from "../useLocalStorage";
+import MindMapGraph from "../MindMapGraph";
+import { NavigatorProvider } from "../NavigatorContext";
+import { memoryTrailStore } from "../Trail";
 import { GraphRepositoryContext } from "../GraphRepositoryContext";
 import { MindMap } from "../MindMap";
 import { CrewLead, StarterTemplate, graphAtStep, instantiate, placeCount, starterTemplates } from "./templates";
@@ -108,13 +111,10 @@ function SpeechBubble({text, lean}: {text: string, lean: number}) {
     );
 }
 
-function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
+function ComparisonColumns({onPick, onUse, onPreview}: {
+    onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void, onPreview: (t: StarterTemplate) => void
+}) {
     const n = starterTemplates.length;
-    const fact = (label: string, text: React.ReactNode) =>
-        <Box>
-            <Typography variant="overline" color="text.secondary" sx={{lineHeight: 1.4, display: "block"}}>{label}</Typography>
-            <Typography variant="body2">{text}</Typography>
-        </Box>;
     return (
         <Box>
             {/* you, asking; kept outside the sideways scroll so you stay in the middle of the screen */}
@@ -128,30 +128,21 @@ function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => voi
                     {starterTemplates.map(t =>
                         <Card key={t.id} variant="outlined" aria-label={t.name}
                             sx={{display: "flex", flexDirection: "column", bgcolor: theme => alpha(theme.palette.primary.main, 0.06)}}>
-                            <CardActionArea onClick={() => onPick(t)} sx={{flexGrow: 1, display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start"}}>
-                                <Box sx={{display: "flex", justifyContent: "center", alignItems: "center", height: 76, pt: 1.5}}>
-                                    <CrewFace crew={t.crew} size={56}/>
-                                </Box>
-                                <Box sx={{px: 1.5, pt: 1, pb: 1, textAlign: "center"}}>
-                                    <Typography variant="subtitle2" component="h3" sx={{lineHeight: 1.3}}>{t.name}</Typography>
-                                    <Stack direction="row" gap={0.5} justifyContent="center" flexWrap="wrap" sx={{mt: 0.75, minHeight: 22}}>
-                                        {t.badge && <Chip label={t.badge} size="small" color="primary" sx={{height: 20}}/>}
-                                        <Chip label={leadName[t.crew]} size="small" variant="outlined" sx={{height: 20, bgcolor: "background.paper"}}/>
-                                    </Stack>
-                                </Box>
-                                <Paper variant="outlined" sx={{mx: 1, mb: 1, p: 1.25, borderRadius: 2, flexGrow: 1}}>
-                                    <Stack gap={1}>
-                                        {fact("Teaches", t.teaches)}
-                                        {fact("Afterwards", t.keep)}
-                                    </Stack>
-                                </Paper>
+                            {/* the picture opens the map itself, as a preview */}
+                            <CardActionArea onClick={() => onPreview(t)} title={`Preview ${t.name}`} aria-label={`Preview ${t.name}`}
+                                sx={{display: "flex", justifyContent: "center", alignItems: "center", height: 88, pt: 1}}>
+                                <CrewFace crew={t.crew} size={56}/>
+                            </CardActionArea>
+                            <CardActionArea onClick={() => onPick(t)} sx={{flexGrow: 1, display: "block", px: 1.5, pt: 0.5, pb: 1.5, textAlign: "center"}}>
+                                <Typography variant="subtitle2" component="h3" fontWeight={700} sx={{lineHeight: 1.3}}>{t.name}</Typography>
+                                {t.badge && <Chip label={t.badge} size="small" color="primary" sx={{height: 20, mt: 0.5}}/>}
+                                <Typography variant="body2" color="text.secondary" sx={{mt: 0.75}}>{t.teaches}</Typography>
                             </CardActionArea>
                             <Divider/>
-                            <CardActions sx={{bgcolor: "background.paper", justifyContent: "space-between", px: 1.25, gap: 0.5}}>
-                                <Stack direction="row" alignItems="center" gap={0.25} sx={{color: "text.secondary"}} title={`${placeCount(t)} places`} aria-label={`${placeCount(t)} places`}>
-                                    <PlaceOutlined sx={{fontSize: 16}}/>
-                                    <Typography variant="caption">{placeCount(t)}</Typography>
-                                </Stack>
+                            <CardActions sx={{bgcolor: "background.paper", justifyContent: "space-between", px: 1, gap: 0.5}}>
+                                <IconButton size="small" color="primary" onClick={() => onPreview(t)} title={`Preview ${t.name}`} aria-label={`Preview ${t.name} full screen`}>
+                                    <Visibility fontSize="small"/>
+                                </IconButton>
                                 <Button size="small" variant="contained" aria-label={`Start with ${t.name}`} onClick={() => onUse(t)}>Start</Button>
                             </CardActions>
                         </Card>)}
@@ -199,7 +190,7 @@ function Walkthrough({template}: {template: StarterTemplate}) {
     );
 }
 
-function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (t: StarterTemplate) => void}) {
+function TemplateSection({template, onUse, onPreview}: {template: StarterTemplate, onUse: (t: StarterTemplate) => void, onPreview: (t: StarterTemplate) => void}) {
     return (
         <Card id={sectionId(template)} variant="outlined"
             sx={{scrollMarginTop: 72, bgcolor: theme => alpha(theme.palette.primary.main, 0.06)}}>
@@ -208,6 +199,7 @@ function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (
                 title={<Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
                     <Typography variant="h6" component="h2">{template.name}</Typography>
                     {template.badge && <Chip label={template.badge} size="small" color="primary"/>}
+                    <Chip label={`Led by: ${leadName[template.crew]}`} size="small" variant="outlined" sx={{bgcolor: "background.paper"}}/>
                 </Stack>}
                 subheader={`Pick it when you're thinking ${template.pickWhen}`}
             />
@@ -252,6 +244,7 @@ function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (
                 <Typography variant="body2" color="text.secondary" sx={{mr: "auto"}}>
                     {placeCount(template)} places · {template.keep}
                 </Typography>
+                <Button onClick={() => onPreview(template)}>Preview</Button>
                 <Button variant="contained" onClick={() => onUse(template)}>Start with this map</Button>
             </CardActions>
         </Card>
@@ -259,6 +252,27 @@ function TemplateSection({template, onUse}: {template: StarterTemplate, onUse: (
 }
 
 type Compare = "columns" | "rows";
+
+/* The map itself, full screen, to try out before you start it: nothing is saved, and closing throws it away */
+function TemplatePreviewDialog({template, onClose, onUse}: {template: StarterTemplate, onClose: () => void, onUse: (t: StarterTemplate) => void}) {
+    const [graph, setGraph] = React.useState(() => MindMap.normalize({...instantiate(template), id: `preview-${template.id}`}));
+    const trailStore = React.useMemo(() => memoryTrailStore(), []);
+    return (
+        <Dialog fullScreen open onClose={onClose} aria-label={`Preview of ${template.name}`}>
+            <NavigatorProvider graph={graph} trailStore={trailStore}>
+                <MindMapGraph value={graph} onChange={g => setGraph(current => ({...g, id: current.id}))} onBack={onClose}
+                    banner={<Stack direction="row" alignItems="center" gap={1}
+                        sx={{px: 2, py: 0.75, bgcolor: "warning.light", color: "warning.contrastText"}} data-testid="preview-banner">
+                        <Typography variant="body2" sx={{flexGrow: 1}}>
+                            <b>Preview: {template.name}.</b> Try anything; nothing is saved.
+                        </Typography>
+                        <Button size="small" color="inherit" onClick={onClose}>Close</Button>
+                        <Button size="small" variant="contained" color="primary" onClick={() => onUse(template)}>Start with this map</Button>
+                    </Stack>}/>
+            </NavigatorProvider>
+        </Dialog>
+    );
+}
 
 export function TemplatePicker() {
     const navigate = useNavigate();
@@ -269,6 +283,7 @@ export function TemplatePicker() {
         GraphContext.saveGraph(graph);
         navigate(`/graph/${graph.id}`);
     };
+    const [previewing, setPreviewing] = React.useState<StarterTemplate>();
     const jump = (template: StarterTemplate) =>
         document.getElementById(sectionId(template))?.scrollIntoView({behavior: "smooth", block: "start"});
     return (
@@ -281,6 +296,8 @@ export function TemplatePicker() {
                     <Typography variant="h6" component="h1">Help me pick a map</Typography>
                 </Toolbar>
             </AppBar>
+            {previewing && <TemplatePreviewDialog template={previewing} onClose={() => setPreviewing(undefined)}
+                onUse={t => { setPreviewing(undefined); use(t); }}/>}
             <Container maxWidth="md" sx={{py: 3}}>
                 <Stack gap={3}>
                     <Stack direction={{xs: "column", sm: "row"}} gap={2} alignItems={{xs: "flex-start", sm: "center"}}>
@@ -291,7 +308,7 @@ export function TemplatePicker() {
                                 balloon head, the dog, the squirrel, the spider and the sloth at HOME. Each map puts one of them forward.
                             </Typography>
                             <Typography variant="body2" color="text.secondary" sx={{mt: 1}}>
-                                Tap a map to read more and try it out before you start it.
+                                Tap a picture to try that map full screen without saving anything, or a name to read more.
                             </Typography>
                         </Box>
                     </Stack>
@@ -302,10 +319,10 @@ export function TemplatePicker() {
                             <ToggleButton value="rows" aria-label="One per row" title="One map per row"><TableRows fontSize="small"/></ToggleButton>
                         </ToggleButtonGroup>
                         {compare === "columns"
-                            ? <ComparisonColumns onPick={jump} onUse={use}/>
+                            ? <ComparisonColumns onPick={jump} onUse={use} onPreview={setPreviewing}/>
                             : <ComparisonTable onPick={jump} onUse={use}/>}
                     </Stack>
-                    {starterTemplates.map(t => <TemplateSection key={t.id} template={t} onUse={use}/>)}
+                    {starterTemplates.map(t => <TemplateSection key={t.id} template={t} onUse={use} onPreview={setPreviewing}/>)}
                 </Stack>
             </Container>
         </Box>

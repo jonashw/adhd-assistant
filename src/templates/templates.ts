@@ -74,12 +74,12 @@ const then = (...fs: ((g: MindMapGraphData) => MindMapGraphData)[]) => (graph: M
 export const starterTemplates: StarterTemplate[] = [
     {
         id: "first-day-out",
-        name: "First day out",
+        name: "Guided tour",
         badge: "Start here",
         crew: "tour",
         pickWhen: "\"How does this app work?\"",
-        teaches: "Charting, walking, waiting, signals, the crew and Mindful",
-        keep: "Read it, then clear it",
+        teaches: "The basics: places, walking, tying off and signals",
+        keep: "Clear it once you've had the tour",
         summary: "A guided tour. HOME has three regions, Work, Home and Self, and every place's note teaches one thing you can do and introduces the crew member who helps with it.",
         why: "It's the only template that explains the scout picture, so you learn the app by using it instead of reading about it.",
         pros: [
@@ -119,11 +119,11 @@ export const starterTemplates: StarterTemplate[] = [
     },
     {
         id: "rabbit-hole",
-        name: "Rabbit hole, round trip",
+        name: "Rabbit hole and back",
         crew: "rabbit",
         pickWhen: "\"I keep losing my way.\"",
-        teaches: "Finding your way home, where a place came from, and Blocked by",
-        keep: "A demo for showing people",
+        teaches: "Diving into a tangent and finding your way home",
+        keep: "Dig your own holes in it, or keep it to show people",
         summary: "A chain of tangents you'll recognize: you set out to fix the sink and ended up donating bikes. The map is drawn as the rabbit's burrow: each place a chamber, each tangent a hole further down. You start five holes deep, and the string shows the way back.",
         why: "It shows the app's original promise in five seconds: however far you wander, you can always get home.",
         pros: [
@@ -166,8 +166,8 @@ export const starterTemplates: StarterTemplate[] = [
         name: "Base camp",
         crew: "dog",
         pickWhen: "\"Am I OK right now?\"",
-        teaches: "Looking after yourself counts as work",
-        keep: "Keep it and come back often",
+        teaches: "Checking in on yourself: water, food, rest, people",
+        keep: "Keep it and check in often",
         summary: "Water, food, movement, sleep, people and rest, each with one small way to check in with yourself. Nothing here is a chore list, and nothing here judges you.",
         why: "It puts your own needs on the map next to your work, which is the spirit of the whole app.",
         pros: [
@@ -199,11 +199,11 @@ export const starterTemplates: StarterTemplate[] = [
     },
     {
         id: "gtd-review",
-        name: "GTD-style weekly review",
+        name: "Weekly review",
         crew: "squirrel",
         pickWhen: "\"I need to sort my pile.\"",
-        teaches: "Statuses, the 5-minute flag and What's next",
-        keep: "Keep it and swap in your own items",
+        teaches: "Sorting a pile into next steps, someday and done",
+        keep: "Swap in your own pile and review it weekly",
         summary: "An inbox of captured items, two projects already moving, and a someday pile. The items already have statuses and a few are small, so What's next has something to rank on day one.",
         why: "You see What's next do its job right away instead of facing an empty screen.",
         pros: [
@@ -251,7 +251,7 @@ export const starterTemplates: StarterTemplate[] = [
         name: "My Claude projects",
         crew: "claude",
         pickWhen: "\"Where are all my Claude threads?\"",
-        teaches: "Regions, places Claude threads check into, signals at a stake",
+        teaches: "Seeing which Claude threads need you, and where",
         keep: "Keep it as your Claude map",
         summary: "Regions for your Claude work with a few places in each. When the connector is on, Claude threads check into places here, and their state shows up as signals at that stake.",
         why: "It sets up the navigator: one map that tells you which Claude thread needs you, without opening every one.",
@@ -290,11 +290,11 @@ export const starterTemplates: StarterTemplate[] = [
     },
     {
         id: "blank-regions",
-        name: "Blank regions",
+        name: "Blank map",
         crew: "none",
         pickWhen: "\"I know what I'm doing.\"",
-        teaches: "Nothing, on purpose",
-        keep: "Keep it",
+        teaches: "Nothing, on purpose: HOME and a few empty regions",
+        keep: "Make it yours",
         summary: "Four empty regions under HOME: Work, Home, Body and People. No notes, no examples.",
         why: "You want a little structure without a tour.",
         pros: [

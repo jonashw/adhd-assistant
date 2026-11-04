@@ -1,7 +1,7 @@
 import React from "react";
 import { MindMapGraphDataRecord } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
-import { emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, Visit, VisitKind } from "./Trail";
+import { emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, TrailStore, Visit, VisitKind } from "./Trail";
 import { readTether, standingAt, Tether, WeatherAnswer } from "./Navigator";
 
 export type Navigator = {
@@ -43,9 +43,14 @@ export function useNavigator(): Navigator {
 
 const weatherKey = (mapId: string) => `weather:${mapId}`;
 
-export function NavigatorProvider({graph, children}: {graph: MindMapGraphDataRecord, children: React.ReactNode}) {
+export function NavigatorProvider({graph, children, trailStore}: {
+    graph: MindMapGraphDataRecord,
+    children: React.ReactNode,
+    /* where the trail is kept; the server or this browser unless given (a preview keeps it in memory) */
+    trailStore?: TrailStore
+}) {
     const {status} = React.useContext(GraphRepositoryContext);
-    const store = status?.mode === "server" ? serverTrailStore : localTrailStore;
+    const store = trailStore ?? (status?.mode === "server" ? serverTrailStore : localTrailStore);
     const mapId = graph.id;
     const homeId = graph.nodes.find(n => n.type === "HOME")?.id ?? "";
     const [trail, setTrail] = React.useState<TrailData>(emptyTrail);

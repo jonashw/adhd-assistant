@@ -42,9 +42,15 @@ type GraphRefType =
 export default function MindMapGraph({
     value,
     onChange,
+    onBack,
+    banner,
 }:{
     value: MindMapGraphData,
     onChange: (value: MindMapGraphData) => void,
+    /* where the back arrow goes; the map list unless given */
+    onBack?: () => void,
+    /* shown above the toolbar, e.g. while previewing a starter map */
+    banner?: React.ReactNode,
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
@@ -294,7 +300,9 @@ export default function MindMapGraph({
     return (
         <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
             <div ref={headerRef}>
+                {banner}
                 <MindMapEditorToolbar 
+                    onBack={onBack}
                     value={value}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}

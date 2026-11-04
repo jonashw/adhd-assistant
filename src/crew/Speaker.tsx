@@ -25,7 +25,8 @@ export function Speaker({size = 72}: {size?: number}) {
             <circle cx={39} cy={47} r={1.9} className="speaker-skin"/>
             <g className="part jon-bob">
                 {/* a neck where the knot was, then an ordinary head */}
-                <rect x={21.6} y={50} width={4.8} height={9.5} rx={1.6} className="speaker-skin"/>
+                <rect x={21.6} y={53} width={4.8} height={6.5} rx={1.6} className="speaker-skin"/>
+                <g transform="translate(0 4.5)">
                 <ellipse cx={13.6} cy={39} rx={1.9} ry={2.8} className="speaker-skin"/>
                 <ellipse cx={34.4} cy={39} rx={1.9} ry={2.8} className="speaker-skin"/>
                 <ellipse cx={24} cy={38} rx={10.4} ry={12.4} className="speaker-skin"/>
@@ -37,6 +38,7 @@ export function Speaker({size = 72}: {size?: number}) {
                 <path d="M18.6 33.6 q1.6 -1 3.2 0 M26.2 33.6 q1.6 -1 3.2 0" className="speaker-brow"/>
                 {/* the open mouth, mid-question */}
                 <ellipse cx={24} cy={44} rx={2.4} ry={2.8} className="part speaker-mouth"/>
+                </g>
             </g>
         </CrewSvg>
     );

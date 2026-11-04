@@ -23,6 +23,7 @@ export function MindMapEditorToolbar({
     revealHidden,
     setRevealHidden,
     onNodeRemoved,
+    onBack,
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
@@ -34,6 +35,8 @@ export function MindMapEditorToolbar({
     revealHidden: boolean;
     setRevealHidden: (value: boolean) => void;
     onNodeRemoved: (node: MindMapGraphNode) => void;
+    /* where the back arrow goes; the map list unless given */
+    onBack?: () => void;
 }) {
     const navigate = useNavigate();
     const home = value.nodes.find(n => n.type === "HOME");
@@ -122,7 +125,7 @@ export function MindMapEditorToolbar({
 
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
                 <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between', '& .MuiButton-root': { minWidth: 40, px: 1 } }}>
-                    <IconButton color="inherit" edge="start" title="Back to your maps" aria-label="Back to your maps" onClick={() => navigate("/")}>
+                    <IconButton color="inherit" edge="start" title="Back to your maps" aria-label="Back to your maps" onClick={() => onBack ? onBack() : navigate("/")}>
                         <ArrowBack/>
                     </IconButton>
                     <UndoRedoToolbar controller={undoController} />
