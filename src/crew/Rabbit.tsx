@@ -377,7 +377,7 @@ function FloorThings({x, floor, body}: {x: number, floor: number, body?: string}
 }
 
 /* A sitting robot rabbit, facing right, its feet at 0,0 */
-function RabbitBody({carrying}: {carrying: boolean}) {
+export function RabbitBody({carrying}: {carrying: boolean}) {
     return (
         <g className="part rabbit-all">
             <circle cx={-6.5} cy={-4.5} r={2.4} className="rabbit-tail"/>

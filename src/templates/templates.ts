@@ -57,7 +57,7 @@ function build(homeNote: string | undefined, places: PlaceSpec[], ties: {source:
     return {nodes, links: [...links, ...ties]};
 }
 
-/* The map's stage draws this scene instead of the scout and crew */
+/* The view a map opens in: each starter map opens in the picture its places were written for */
 const withScene = (graph: MindMapGraphData, scene: MapScene): MindMapGraphData => ({
     nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene} : n),
     links: graph.links
@@ -91,7 +91,7 @@ export const starterTemplates: StarterTemplate[] = [
             "The places are lessons, not your work, so you clear them afterwards",
             "It's the most to read of the six"
         ],
-        graph: build(
+        graph: withScene(build(
             "HOME is Mindful. When nothing needs you, your crew curls up at your feet and the sloth hangs here at HOME. That's the goal, not a gap.\n\nOpen each place to read its note.",
             [
                 {id: "work", label: "Work", children: [
@@ -108,7 +108,7 @@ export const starterTemplates: StarterTemplate[] = [
                     {id: "done-here", label: "Mark this done", note: "- [x] Read the tour\n- [ ] Mark this place done and watch it tuck away\n- [ ] Clear the tour and chart your own map"}
                 ]}
             ]
-        ),
+        ), "crew"),
         walkthrough: [
             {caption: "You open the map at HOME. Three regions, a few places, nothing started yet."},
             {caption: "Chart a place: add \"Call the dentist\" under Self. The squirrel plants a stake.", focus: "dentist", apply: add("dentist", "Call the dentist", "self")},
@@ -179,7 +179,7 @@ export const starterTemplates: StarterTemplate[] = [
             "It teaches feelings more than features",
             "Places don't repeat yet, so you bring them back by hand"
         ],
-        graph: build(
+        graph: withScene(build(
             "Base camp is for coming back to. The dog and the sloth live here: they're the crew's reminder to stop and notice.",
             [
                 {id: "water", label: "Water", children: [{id: "glass", label: "Glass of water", small: true}]},
@@ -189,7 +189,7 @@ export const starterTemplates: StarterTemplate[] = [
                 {id: "people", label: "People", children: [{id: "text", label: "Text a friend", small: true}]},
                 {id: "rest", label: "Rest", children: [{id: "scroll", label: "Scrolling, on purpose", small: true, note: "Scrolling counts as rest when you chose it. When it chose you, that's useful to know too, and nothing to feel bad about."}]}
             ]
-        ),
+        ), "crew"),
         walkthrough: [
             {caption: "It's 3pm and you haven't eaten. Look under Food.", focus: "protein"},
             {caption: "Mark \"Something with protein\" active while you eat.", focus: "protein", apply: status("protein", "active")},
@@ -250,7 +250,7 @@ export const starterTemplates: StarterTemplate[] = [
         id: "claude-projects",
         name: "My Claude projects",
         crew: "claude",
-        pickWhen: "\"Where are all my Claude threads?\"",
+        pickWhen: "\"What's up with Claude?\"",
         teaches: "Seeing which Claude threads need you, and where",
         keep: "Keep it as your Claude map",
         summary: "Regions for your Claude work with a few places in each. When the connector is on, Claude threads check into places here, and their state shows up as signals at that stake.",

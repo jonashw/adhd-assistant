@@ -247,7 +247,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const ariaLabel = here === home
         ? "Balloon-head at HOME, feet on the ground"
         : `Balloon-head on the ground at ${label(waypoint)}${levels > 0 ? `, head ${levels} level${levels === 1 ? "" : "s"} up at ${label(here)}` : ""}${carrying ? ", holding the work" : ""}`;
-    const enso = 130;
+    const enso = Math.min(130, Math.max(70, height * 0.24));
 
     return (
         <svg className="crew balloon-trail" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}
