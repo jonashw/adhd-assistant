@@ -36,19 +36,20 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
         case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
         case "none": return <img src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
+        case "review": return <img src="/review.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
     }
 }
 
 /* who leads each map, as a short tag on its card */
 const leadName: Record<CrewLead, string> = {
-    tour: "Whole crew", dog: "Dog", spider: "Spider", squirrel: "Squirrel", sloth: "Sloth",
+    tour: "Whole crew", dog: "Dog", spider: "Spider", squirrel: "Squirrel", sloth: "Sloth", review: "No crew",
     rabbit: "Rabbit", claude: "Claude", none: "No crew"
 };
 
 const sectionId = (t: StarterTemplate) => `template-${t.id}`;
 
 /* the maps that each answer a question in their own picture; the rest are smaller variations, listed after */
-const secondary = new Set(["base-camp", "gtd-review"]);
+const secondary = new Set(["base-camp"]);
 const featured = starterTemplates.filter(t => !secondary.has(t.id));
 const others = starterTemplates.filter(t => secondary.has(t.id));
 

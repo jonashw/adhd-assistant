@@ -54,5 +54,6 @@ export function MapEmblem({crew, size = 56}: {crew: CrewLead, size?: number}) {
         case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
         case "none": return <img src="/Enso.svg" width={size * 0.8} height={size * 0.8} alt="An enso"/>;
+        case "review": return <img src="/review.svg" width={size * 0.8} height={size * 0.8} alt="A week on a calendar inside a looping arrow"/>;
     }
 }

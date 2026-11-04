@@ -89,7 +89,7 @@ export type MindMapGraphNode = {
 
 export const mapScenes = ['crew', 'burrow'] as const;
 export type MapScene = typeof mapScenes[number];
-export const homeSymbols = ['enso', 'null', 'om', 'buddha', 'yin-yang'] as const;
+export const homeSymbols = ['enso', 'null', 'om', 'buddha', 'yin-yang', 'review'] as const;
 export type HomeSymbol = typeof homeSymbols[number];
 
 export type MindMapGraphLink = {type: MindMapGraphLinkType, label?: string};

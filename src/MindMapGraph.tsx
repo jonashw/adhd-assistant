@@ -19,10 +19,10 @@ import { HomeSymbol, MapScene, homeSymbols } from "./MindMap";
 
 /* the symbols HOME can wear in the graph, the old ones from the app's first days */
 const symbolImage: Record<HomeSymbol, string> = {
-    enso: '/Enso.svg', null: '/null.svg', om: '/om.png', buddha: '/buddha.png', 'yin-yang': '/yin-yang.png'
+    enso: '/Enso.svg', null: '/null.svg', om: '/om.png', buddha: '/buddha.png', 'yin-yang': '/yin-yang.png', review: '/review.svg'
 };
 const symbolName: Record<HomeSymbol, string> = {
-    enso: 'Enso', null: 'NULL', om: 'Om', buddha: 'Buddha', 'yin-yang': 'Yin and yang'
+    enso: 'Enso', null: 'NULL', om: 'Om', buddha: 'Buddha', 'yin-yang': 'Yin and yang', review: 'Weekly review'
 };
 import { AccountTree, ArrowDropDown } from "@mui/icons-material";
 import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps, Typography } from "@mui/material";

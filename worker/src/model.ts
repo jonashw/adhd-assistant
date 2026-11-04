@@ -5,7 +5,7 @@ import { HttpError } from "./http";
 export const statuses = ["captured", "active", "waiting", "someday", "done", "dropped"] as const;
 export const linkTypes = ["PART_OF", "BLOCKED_BY", "ALSO_IN", "LABELLED"] as const;
 export const scenes = ["crew", "burrow"] as const;
-export const symbols = ["enso", "null", "om", "buddha", "yin-yang"] as const;
+export const symbols = ["enso", "null", "om", "buddha", "yin-yang", "review"] as const;
 
 export type WireNode = {
     id: string,

@@ -1,9 +1,9 @@
-import { MapScene, MindMap, MindMapGraphData, MindMapGraphLinkType, MindMapGraphNode, NodeStatus } from "../MindMap";
+import { HomeSymbol, MapScene, MindMap, MindMapGraphData, MindMapGraphLinkType, MindMapGraphNode, NodeStatus } from "../MindMap";
 
 /* Starter maps for the "Help me pick" page. Each template is a small tree of places with notes,
    plus a walkthrough: a few typical edits played on a preview, so you see how the map is meant to be used. */
 
-export type CrewLead = "tour" | "dog" | "spider" | "squirrel" | "sloth" | "rabbit" | "claude" | "none";
+export type CrewLead = "tour" | "dog" | "spider" | "squirrel" | "sloth" | "rabbit" | "claude" | "review" | "none";
 
 type PlaceSpec = {
     id: string,
@@ -60,6 +60,12 @@ function build(homeNote: string | undefined, places: PlaceSpec[], ties: {source:
 /* The view a map opens in: each starter map opens in the picture its places were written for */
 const withScene = (graph: MindMapGraphData, scene: MapScene): MindMapGraphData => ({
     nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene} : n),
+    links: graph.links
+});
+
+/* The symbol a map's HOME wears in the graph view */
+const withSymbol = (graph: MindMapGraphData, symbol: HomeSymbol): MindMapGraphData => ({
+    nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, symbol} : n),
     links: graph.links
 });
 
@@ -207,7 +213,7 @@ export const starterTemplates: StarterTemplate[] = [
     {
         id: "gtd-review",
         name: "Weekly review",
-        crew: "squirrel",
+        crew: "review",
         pickWhen: "\"I need to sort my pile.\"",
         teaches: "Sorting a pile into next steps, someday and done",
         keep: "Swap in your own pile and review it weekly",
@@ -222,7 +228,7 @@ export const starterTemplates: StarterTemplate[] = [
             "The buckets can teach the wrong habit: here a status belongs to a place, it isn't a folder",
             "The example items are someone else's life until you swap them"
         ],
-        graph: build(
+        graph: withSymbol(build(
             "In this app a status lives on the place, not in a folder. Inbox is just a region to empty: as you sort, move each item to where it belongs and give it a status.",
             [
                 {id: "inbox", label: "Inbox", children: [
@@ -244,7 +250,7 @@ export const starterTemplates: StarterTemplate[] = [
                     {id: "shed", label: "Repaint the shed", status: "someday"}
                 ]}
             ]
-        ),
+        ), "review"),
         walkthrough: [
             {caption: "Weekly review starts at Inbox: three captured items.", focus: "inbox"},
             {caption: "\"Receipt from the vet\" takes two minutes. Do it and mark it done.", focus: "vet", apply: status("vet", "done")},
