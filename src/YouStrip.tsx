@@ -28,9 +28,11 @@ export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}:
 }) {
     const nav = useNavigator();
     const {tether, now} = nav;
+    //Balloon-head's picture calls HOME base camp
+    const homeName = graph.nodes.find(n => n.type === "HOME")?.scene === "crew" ? "Base camp" : "HOME";
     const labelOf = (id: string) => {
         const node = graph.nodes.find(n => n.id === id);
-        return node ? (node.type === "HOME" ? "HOME" : node.label) : "a place that's gone";
+        return node ? (node.type === "HOME" ? homeName : node.label) : "a place that's gone";
     };
     const here = standingAt(tether);
     const back = reelInStep(tether);
@@ -79,7 +81,7 @@ export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}:
     const offering = offerTieOff !== undefined && here === offerTieOff && tether.state === "aloft";
     const tugNote = tether.state === "aloft" && tether.setDown !== homeId
         ? `${burrow ? "The work you left" : "Set down at your feet"}: ${labelOf(tether.setDown)}`
-        : `Home is ${stringOut(tether)} ${burrow ? "hole(s) up" : "step(s) back"}.`;
+        : `${homeName === "HOME" ? "Home" : homeName} is ${stringOut(tether)} ${burrow ? "hole(s) up" : "step(s) back"}.`;
     const actions = (
         <>
             {tether.state === "tied"

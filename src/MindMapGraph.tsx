@@ -15,9 +15,17 @@ import { standingAt } from "./Navigator";
 import { YouStrip } from "./YouStrip";
 import { RabbitBurrow } from "./Crew";
 import { BalloonTrail } from "./crew/BalloonTrail";
-import { MapScene } from "./MindMap";
+import { HomeSymbol, MapScene, homeSymbols } from "./MindMap";
+
+/* the symbols HOME can wear in the graph, the old ones from the app's first days */
+const symbolImage: Record<HomeSymbol, string> = {
+    enso: '/Enso.svg', null: '/null.svg', om: '/om.png', buddha: '/buddha.png', 'yin-yang': '/yin-yang.png'
+};
+const symbolName: Record<HomeSymbol, string> = {
+    enso: 'Enso', null: 'NULL', om: 'Om', buddha: 'Buddha', 'yin-yang': 'Yin and yang'
+};
 import { AccountTree, ArrowDropDown } from "@mui/icons-material";
-import { ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps } from "@mui/material";
+import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps, Typography } from "@mui/material";
 
 /* One picture at a time: the map as a graph, as the rabbit's holes, or as Balloon-head's day. Saved with the map. */
 type MapView = "graph" | MapScene;
@@ -82,6 +90,10 @@ export default function MindMapGraph({
     //the main view: the force graph, or the rabbit's burrow drawn from the same map
     const view: MapView = home?.scene ?? "graph";
     const [viewMenu, setViewMenu] = React.useState<HTMLElement | null>(null);
+    const pickSymbol = (next: HomeSymbol) => {
+        setViewMenu(null);
+        change({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, symbol: next === "enso" ? undefined : next} : n), links: graph.links});
+    };
     const pickView = (next: MapView) => {
         setViewMenu(null);
         change({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene: next === "graph" ? undefined : next} : n), links: graph.links});
@@ -242,9 +254,11 @@ export default function MindMapGraph({
     },[transcript]);
 
 
+    //the symbol HOME wears in the graph, chosen per map
+    const symbol: HomeSymbol = home?.symbol ?? 'enso';
     React.useEffect(() => {
-        loadImgElement('/Enso.svg').then(setHomeImage);
-    },[]);
+        loadImgElement(symbolImage[symbol]).then(setHomeImage);
+    },[symbol]);
 
     React.useEffect(() => {
         graphRef.current?.d3ReheatSimulation();
@@ -355,6 +369,18 @@ export default function MindMapGraph({
                             <ListItemIcon>{viewIcon(v.view)}</ListItemIcon>
                             <ListItemText primary={v.name} secondary={v.about}/>
                         </MenuItem>)}
+                    {/* the graph's HOME can wear any of the old symbols */}
+                    {view === "graph" && <Box sx={{px: 2, pt: 1, pb: 0.5, borderTop: 1, borderColor: 'divider', mt: 0.5}}>
+                        <Typography variant="overline" color="text.secondary">HOME symbol</Typography>
+                        <Stack direction="row" gap={0.5} role="radiogroup" aria-label="HOME symbol">
+                            {homeSymbols.map(sym =>
+                                <IconButton key={sym} role="radio" aria-checked={sym === symbol} aria-label={symbolName[sym]} title={symbolName[sym]}
+                                    onClick={() => pickSymbol(sym)}
+                                    sx={{border: 2, borderColor: sym === symbol ? 'primary.main' : 'transparent', borderRadius: 2, p: 0.5}}>
+                                    <img src={symbolImage[sym]} alt="" width={32} height={32} style={{objectFit: 'contain'}}/>
+                                </IconButton>)}
+                        </Stack>
+                    </Box>}
                 </Menu>
                 <div>
                     {view === "burrow" && <div

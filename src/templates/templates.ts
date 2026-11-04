@@ -74,7 +74,7 @@ const then = (...fs: ((g: MindMapGraphData) => MindMapGraphData)[]) => (graph: M
 export const starterTemplates: StarterTemplate[] = [
     {
         id: "first-day-out",
-        name: "Guided tour",
+        name: "Base camp",
         badge: "Start here",
         crew: "tour",
         pickWhen: "\"How does this app work?\"",
@@ -151,7 +151,7 @@ export const starterTemplates: StarterTemplate[] = [
                         {id: "garage", label: "Garage is a mess", children: [
                             {id: "photos", label: "Box of old photos", note: "Found behind the bikes. Worth an evening, not this afternoon."},
                             {id: "reorg", label: "Reorganize garage", children: [
-                                {id: "bikes", label: "Donate old bikes", note: "Five steps out from HOME. This is where the spider climbs your string and tugs: you set down \"Fix the sink\" a while ago."}
+                                {id: "bikes", label: "Donate old bikes", note: "Five holes down from HOME. This is where your string starts to pull: you left \"Fix the sink\" up there a while ago."}
                             ]}
                         ]}
                     ]}
@@ -170,7 +170,7 @@ export const starterTemplates: StarterTemplate[] = [
     },
     {
         id: "base-camp",
-        name: "Base camp",
+        name: "Check-in",
         crew: "dog",
         pickWhen: "\"Am I OK right now?\"",
         teaches: "Checking in on yourself: water, food, rest, people",
@@ -187,7 +187,7 @@ export const starterTemplates: StarterTemplate[] = [
             "Places don't repeat yet, so you bring them back by hand"
         ],
         graph: withScene(build(
-            "Base camp is for coming back to. The dog and the sloth live here: they're the crew's reminder to stop and notice.",
+            "This map is for coming back to. The dog and the sloth live here: they're the crew's reminder to stop and notice.",
             [
                 {id: "water", label: "Water", children: [{id: "glass", label: "Glass of water", small: true}]},
                 {id: "food", label: "Food", children: [{id: "protein", label: "Something with protein", small: true}]},

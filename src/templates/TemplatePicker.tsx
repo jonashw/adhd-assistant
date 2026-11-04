@@ -47,6 +47,28 @@ const leadName: Record<CrewLead, string> = {
 
 const sectionId = (t: StarterTemplate) => `template-${t.id}`;
 
+/* the maps that each answer a question in their own picture; the rest are smaller variations, listed after */
+const secondary = new Set(["base-camp", "gtd-review"]);
+const featured = starterTemplates.filter(t => !secondary.has(t.id));
+const others = starterTemplates.filter(t => secondary.has(t.id));
+
+function MoreMaps({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
+    return (
+        <Stack gap={1}>
+            <Typography variant="overline" color="text.secondary">More starter maps</Typography>
+            <Box sx={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 1}}>
+                {others.map(t =>
+                    <Card key={t.id} variant="outlined" sx={{display: "flex", alignItems: "center", pl: 2, pr: 0.75, py: 0.5,
+                        bgcolor: theme => alpha(theme.palette.primary.main, 0.06)}}>
+                        <Typography variant="body2" sx={{flexGrow: 1}}>{t.name}</Typography>
+                        <Button size="small" sx={{minWidth: 0}} onClick={() => onPick(t)} aria-label={`Read more about ${t.name}`}>More</Button>
+                        <Button size="small" sx={{minWidth: 0, ml: 0.5}} variant="contained" onClick={() => onUse(t)} aria-label={`Start with ${t.name}`}>Start</Button>
+                    </Card>)}
+            </Box>
+        </Stack>
+    );
+}
+
 function ComparisonTable({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
     const wide = {display: {xs: "none", sm: "table-cell"}};
     return (
@@ -189,7 +211,7 @@ function AnswerCard({template, onPick, onUse}: {template: StarterTemplate, onPic
 
 /* Wide screens: you stand over a row of questions, each answered by the card under it */
 function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
-    const n = starterTemplates.length;
+    const n = featured.length;
     const mouth = React.useRef<HTMLDivElement>(null);
     return (
         <Box>
@@ -197,9 +219,9 @@ function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => voi
             <Box sx={{display: "flex", justifyContent: "center", mb: -0.5}}><Box ref={mouth} sx={{lineHeight: 0}}><Speaker size={96}/></Box></Box>
             <Box sx={{overflowX: "auto", pb: 1, mx: -1, px: 1}}>
                 <Box sx={{display: "grid", gridTemplateColumns: `repeat(${n}, minmax(120px, 1fr))`, columnGap: 1.25, rowGap: 1.5, minWidth: n * 130}}>
-                    {starterTemplates.map(t =>
+                    {featured.map(t =>
                         <SpeechBubble key={`${t.id}-ask`} text={t.pickWhen} mouth={mouth}/>)}
-                    {starterTemplates.map(t => <AnswerCard key={t.id} template={t} onPick={onPick} onUse={onUse}/>)}
+                    {featured.map(t => <AnswerCard key={t.id} template={t} onPick={onPick} onUse={onUse}/>)}
                 </Box>
             </Box>
         </Box>
@@ -215,7 +237,7 @@ function ComparisonStack({onPick, onUse}: {onPick: (t: StarterTemplate) => void,
             <Box ref={mouth} sx={{position: "sticky", top: 64, mt: "-24px", lineHeight: 0}}><Speaker size={88}/></Box>
             {/* one column of questions on a phone, two side by side when there's room */}
             <Box sx={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", columnGap: 2, rowGap: 2.5}}>
-                {starterTemplates.map(t =>
+                {featured.map(t =>
                     <Stack key={t.id} gap={1}>
                         <SpeechBubble text={t.pickWhen} side="left" mouth={mouth}/>
                         <Box sx={{ml: "18px"}}><AnswerCard template={t} onPick={onPick} onUse={onUse}/></Box>
@@ -422,9 +444,12 @@ export function TemplatePicker() {
                         </ToggleButtonGroup>
                         {compare === "rows"
                             ? <ComparisonTable onPick={jump} onUse={use}/>
-                            : wide
-                                ? <ComparisonColumns onPick={jump} onUse={use}/>
-                                : <ComparisonStack onPick={jump} onUse={use}/>}
+                            : <>
+                                {wide
+                                    ? <ComparisonColumns onPick={jump} onUse={use}/>
+                                    : <ComparisonStack onPick={jump} onUse={use}/>}
+                                <MoreMaps onPick={jump} onUse={use}/>
+                            </>}
                     </Stack>
                     {starterTemplates.map(t => <TemplateSection key={t.id} template={t} onUse={use} onPreview={setPreviewing}/>)}
                 </Stack>

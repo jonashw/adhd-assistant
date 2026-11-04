@@ -122,7 +122,8 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const pos = useRingPosition(ringIndex, ring.length);
     const visible = React.useMemo(() => new Set(MindMap.visibleGraph(graph, false).nodes.map(n => n.id)), [graph]);
     const node = (id: string) => graph.nodes.find(n => n.id === id);
-    const label = (id: string) => node(id)?.type === "HOME" ? "HOME" : node(id)?.label ?? "";
+    //in this picture HOME is base camp: where you rest in the hammock between trips out
+    const label = (id: string) => node(id)?.type === "HOME" ? "Base camp" : node(id)?.label ?? "";
 
     //the ground, and how far apart the waypoints stand
     const groundY = height - floor - 34;
@@ -254,7 +255,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const offsets = ring.map((id, i) => ({id, off: ringOffset(i, pos, ring.length)})).filter(w => Math.abs(w.off) <= reach);
     const hidden = ring.length - offsets.filter(w => Math.abs(w.off) <= reach - 0.4).length;
     const ariaLabel = here === home
-        ? "Balloon-head at HOME, feet on the ground"
+        ? "At base camp, resting in the hammock"
         : `Balloon-head on the ground at ${label(waypoint)}${levels > 0 ? `, head ${levels} level${levels === 1 ? "" : "s"} up at ${label(here)}` : ""}${carrying ? ", holding the work" : ""}`;
 
     return (
@@ -320,7 +321,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                                     {short(label(id), n?.status === "active" ? 15 : 17)}
                                 </text>
                             </g>}
-                        {isHome && <text x={0} y={-ringD - 10} textAnchor="middle" className="trail-home-text">HOME</text>}
+                        {isHome && <text x={0} y={-ringD - 10} textAnchor="middle" className="trail-home-text">BASE CAMP</text>}
                     </g>
                 );
             })}

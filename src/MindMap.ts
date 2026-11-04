@@ -82,11 +82,15 @@ export type MindMapGraphNode = {
     /* the place's note: markdown text, checklist items and photos (see NoteBody) */
     body?: string,
     /* HOME only: the scene the map's stage draws; unset is the scout and robot crew */
-    scene?: MapScene
+    scene?: MapScene,
+    /* HOME only: the symbol HOME wears in the graph view; unset is the enso */
+    symbol?: HomeSymbol
 }
 
 export const mapScenes = ['crew', 'burrow'] as const;
 export type MapScene = typeof mapScenes[number];
+export const homeSymbols = ['enso', 'null', 'om', 'buddha', 'yin-yang'] as const;
+export type HomeSymbol = typeof homeSymbols[number];
 
 export type MindMapGraphLink = {type: MindMapGraphLinkType, label?: string};
 /* PART_OF points from a node to its one parent; the others are ties across the tree */
