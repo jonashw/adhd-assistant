@@ -371,7 +371,11 @@
 }
 
 /* Balloon-head asking a question (Speaker.tsx) */
-.crew-speaker .speaker-mouth { fill: var(--crew-balloon-face); transform-box: fill-box; transform-origin: center; }
+.crew-speaker .speaker-skin { fill: #e0a77f; stroke: #b77b55; stroke-width: 0.5; }
+.crew-speaker .speaker-hair { fill: #4a3426; }
+.crew-speaker .speaker-ink { fill: #2b2b2b; }
+.crew-speaker .speaker-brow { fill: none; stroke: #4a3426; stroke-width: 0.8; stroke-linecap: round; }
+.crew-speaker .speaker-mouth { fill: #7a2e2a; transform-box: fill-box; transform-origin: center; }
 .crew-speaker.is-talk .speaker-mouth { animation: speaker-talk 1200ms ease-in-out; }
 @keyframes speaker-talk { 0%, 100% { transform: scaleY(1); } 20%, 60% { transform: scaleY(0.45); } 40%, 80% { transform: scaleY(1.1); } }
 @media (prefers-reduced-motion: reduce) { .crew-speaker.is-talk .speaker-mouth { animation: none; } }

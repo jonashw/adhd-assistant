@@ -1,13 +1,13 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    AppBar, Box, Button, Card, CardActions, CardContent, CardHeader, Chip, Container, Divider, Grid, IconButton,
+    AppBar, Box, Button, Card, CardActionArea, CardActions, CardContent, CardHeader, Chip, Container, Divider, Grid, IconButton,
     List, ListItem, ListItemIcon, ListItemText, MobileStepper, Paper, Stack, Table, TableBody, TableCell,
     TableContainer, TableHead, TableRow, ToggleButton, ToggleButtonGroup, Toolbar, Typography
 } from "@mui/material";
 import { visuallyHidden } from "@mui/utils";
 import { alpha } from "@mui/material/styles";
-import { ArrowBack, CheckCircleOutline, TableRows, ViewColumn, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
+import { ArrowBack, CheckCircleOutline, PlaceOutlined, TableRows, ViewColumn, KeyboardArrowLeft, KeyboardArrowRight, RemoveCircleOutline, Replay } from "@mui/icons-material";
 import { Dog, Spider, Squirrel, YouScene } from "../Crew";
 import { ClaudeMapIcon } from "../ClaudeMapIcon";
 import { RabbitBurrow, RabbitBurrowLoop } from "../crew/Rabbit";
@@ -33,6 +33,12 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
         case "none": return <img src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
     }
 }
+
+/* who leads each map, as a short tag on its card */
+const leadName: Record<CrewLead, string> = {
+    tour: "Whole crew", dog: "Dog", spider: "Spider", squirrel: "Squirrel", sloth: "Sloth",
+    rabbit: "Rabbit", claude: "Claude", none: "No crew"
+};
 
 const sectionId = (t: StarterTemplate) => `template-${t.id}`;
 
@@ -83,8 +89,6 @@ function ComparisonTable({onPick, onUse}: {onPick: (t: StarterTemplate) => void,
 
 /* The same comparison turned on its side: you ask yourself a question up top, each map's question floats in
    a speech bubble pointing back at you, and below it, framed apart, the map that answers it. No header row. */
-const colW = 122;
-const labelW = 104;
 
 function SpeechBubble({text, lean}: {text: string, lean: number}) {
     //the tail leans toward the speaker, who stands over the middle of the table
@@ -106,75 +110,53 @@ function SpeechBubble({text, lean}: {text: string, lean: number}) {
 
 function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
     const n = starterTemplates.length;
-    const fixed = {tableLayout: "fixed" as const, width: labelW + n * colW, borderCollapse: "separate" as const};
-    const cols = <colgroup><col style={{width: labelW}}/>{starterTemplates.map(t => <col key={t.id} style={{width: colW}}/>)}</colgroup>;
-    const label = (text: string) =>
-        <TableCell component="th" scope="row" sx={{verticalAlign: "top", color: "text.secondary", typography: "overline", lineHeight: 1.6, pr: 1}}>{text}</TableCell>;
-    const cell = {verticalAlign: "top", px: 1};
+    const fact = (label: string, text: React.ReactNode) =>
+        <Box>
+            <Typography variant="overline" color="text.secondary" sx={{lineHeight: 1.4, display: "block"}}>{label}</Typography>
+            <Typography variant="body2">{text}</Typography>
+        </Box>;
     return (
         <Box>
-        {/* you, asking; kept outside the sideways scroll so you stay in the middle of the screen */}
-        <Box sx={{display: "flex", justifyContent: "center", mb: -1}}><Speaker size={96}/></Box>
-        <Box sx={{overflowX: "auto", pb: 1}}>
-            {/* the question you ask yourself: outside the table's frame */}
-            <Table size="small" sx={fixed} aria-label="The question each map answers">
-                {cols}
-                <TableBody>
-                    <TableRow>
-                        <TableCell sx={{border: 0, verticalAlign: "bottom", color: "text.secondary", typography: "overline", lineHeight: 1.6}}>Pick it when you're thinking</TableCell>
-                        {starterTemplates.map((t, i) =>
-                            <TableCell key={t.id} sx={{border: 0, px: 0, pt: 0, verticalAlign: "top"}}>
-                                <SpeechBubble text={t.pickWhen} lean={((n - 1) / 2 - i) * 15}/>
-                            </TableCell>)}
-                    </TableRow>
-                </TableBody>
-            </Table>
-            {/* and the maps that answer it */}
-            <TableContainer component={Paper} variant="outlined" sx={{width: fixed.width, mt: 1.5, overflow: "visible"}}>
-                <Table size="small" sx={{...fixed, width: "100%"}} aria-label="Starter maps compared side by side">
-                    {cols}
-                    <TableBody>
-                        <TableRow>
-                            {label("Map")}
-                            {starterTemplates.map(t =>
-                                <TableCell key={t.id} sx={{...cell, cursor: "pointer"}} onClick={() => onPick(t)}>
-                                    <Typography variant="body2" fontWeight={600} sx={{lineHeight: 1.3}}>{t.name}</Typography>
-                                    {t.badge && <Chip label={t.badge} size="small" color="primary" sx={{height: 20, mt: 0.5}}/>}
-                                </TableCell>)}
-                        </TableRow>
-                        <TableRow>
-                            <TableCell sx={{p: 0}}/>
-                            {starterTemplates.map(t =>
-                                <TableCell key={t.id} align="center" sx={{...cell, cursor: "pointer", height: 72}} onClick={() => onPick(t)}>
-                                    <Box sx={{display: "flex", justifyContent: "center", alignItems: "center", height: 56}}><CrewFace crew={t.crew} size={52}/></Box>
-                                </TableCell>)}
-                        </TableRow>
-                        <TableRow>
-                            {label("Teaches")}
-                            {starterTemplates.map(t => <TableCell key={t.id} sx={cell}><Typography variant="body2">{t.teaches}</Typography></TableCell>)}
-                        </TableRow>
-                        <TableRow>
-                            {label("Places")}
-                            {starterTemplates.map(t => <TableCell key={t.id} sx={cell}><Typography variant="body2">{placeCount(t)}</Typography></TableCell>)}
-                        </TableRow>
-                        <TableRow>
-                            {label("Afterwards")}
-                            {starterTemplates.map(t => <TableCell key={t.id} sx={cell}><Typography variant="body2">{t.keep}</Typography></TableCell>)}
-                        </TableRow>
-                        <TableRow>
-                            <TableCell sx={{borderBottom: 0}}/>
-                            {starterTemplates.map(t =>
-                                <TableCell key={t.id} sx={{...cell, borderBottom: 0, py: 1.5}}>
-                                    <Stack gap={0.5}>
-                                        <Button size="small" variant="contained" aria-label={`Start with ${t.name}`} onClick={() => onUse(t)}>Start</Button>
-                                        <Button size="small" onClick={() => onPick(t)}>Read more</Button>
+            {/* you, asking; kept outside the sideways scroll so you stay in the middle of the screen */}
+            <Box sx={{display: "flex", justifyContent: "center", mb: -0.5}}><Speaker size={96}/></Box>
+            <Box sx={{overflowX: "auto", pb: 1, mx: -1, px: 1}}>
+                <Box sx={{display: "grid", gridTemplateColumns: `repeat(${n}, minmax(128px, 1fr))`, columnGap: 1.25, rowGap: 1.5, minWidth: n * 138}}>
+                    {/* the question you ask yourself, outside the cards */}
+                    {starterTemplates.map((t, i) =>
+                        <SpeechBubble key={`${t.id}-ask`} text={t.pickWhen} lean={((n - 1) / 2 - i) * 15}/>)}
+                    {/* and the map that answers it, one card each */}
+                    {starterTemplates.map(t =>
+                        <Card key={t.id} variant="outlined" aria-label={t.name}
+                            sx={{display: "flex", flexDirection: "column", bgcolor: theme => alpha(theme.palette.primary.main, 0.06)}}>
+                            <CardActionArea onClick={() => onPick(t)} sx={{flexGrow: 1, display: "flex", flexDirection: "column", alignItems: "stretch", justifyContent: "flex-start"}}>
+                                <Box sx={{display: "flex", justifyContent: "center", alignItems: "center", height: 76, pt: 1.5}}>
+                                    <CrewFace crew={t.crew} size={56}/>
+                                </Box>
+                                <Box sx={{px: 1.5, pt: 1, pb: 1, textAlign: "center"}}>
+                                    <Typography variant="subtitle2" component="h3" sx={{lineHeight: 1.3}}>{t.name}</Typography>
+                                    <Stack direction="row" gap={0.5} justifyContent="center" flexWrap="wrap" sx={{mt: 0.75, minHeight: 22}}>
+                                        {t.badge && <Chip label={t.badge} size="small" color="primary" sx={{height: 20}}/>}
+                                        <Chip label={leadName[t.crew]} size="small" variant="outlined" sx={{height: 20, bgcolor: "background.paper"}}/>
                                     </Stack>
-                                </TableCell>)}
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </TableContainer>
-        </Box>
+                                </Box>
+                                <Paper variant="outlined" sx={{mx: 1, mb: 1, p: 1.25, borderRadius: 2, flexGrow: 1}}>
+                                    <Stack gap={1}>
+                                        {fact("Teaches", t.teaches)}
+                                        {fact("Afterwards", t.keep)}
+                                    </Stack>
+                                </Paper>
+                            </CardActionArea>
+                            <Divider/>
+                            <CardActions sx={{bgcolor: "background.paper", justifyContent: "space-between", px: 1.25, gap: 0.5}}>
+                                <Stack direction="row" alignItems="center" gap={0.25} sx={{color: "text.secondary"}} title={`${placeCount(t)} places`} aria-label={`${placeCount(t)} places`}>
+                                    <PlaceOutlined sx={{fontSize: 16}}/>
+                                    <Typography variant="caption">{placeCount(t)}</Typography>
+                                </Stack>
+                                <Button size="small" variant="contained" aria-label={`Start with ${t.name}`} onClick={() => onUse(t)}>Start</Button>
+                            </CardActions>
+                        </Card>)}
+                </Box>
+            </Box>
         </Box>
     );
 }
