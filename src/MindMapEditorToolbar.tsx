@@ -86,6 +86,11 @@ export function MindMapEditorToolbar({
 
             <MindMapOutlineModal
                 graph={value}
+                selectedId={selectedNode?.id}
+                onSelect={id => {
+                    selectNodeId(id);
+                    setOutlineVisible(false);
+                }}
                 open={outlineVisible}
                 onClose={() => {
                     setOutlineVisible(false);

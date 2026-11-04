@@ -213,13 +213,14 @@ function ComparisonStack({onPick, onUse}: {onPick: (t: StarterTemplate) => void,
         <Box sx={{display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 1, alignItems: "start"}}>
             {/* raised so your mouth is level with the first question; it rides down the page as you scroll */}
             <Box ref={mouth} sx={{position: "sticky", top: 64, mt: "-24px", lineHeight: 0}}><Speaker size={88}/></Box>
-            <Stack gap={2.5} sx={{maxWidth: 360}}>
+            {/* one column of questions on a phone, two side by side when there's room */}
+            <Box sx={{display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", columnGap: 2, rowGap: 2.5}}>
                 {starterTemplates.map(t =>
                     <Stack key={t.id} gap={1}>
                         <SpeechBubble text={t.pickWhen} side="left" mouth={mouth}/>
                         <Box sx={{ml: "18px"}}><AnswerCard template={t} onPick={onPick} onUse={onUse}/></Box>
                     </Stack>)}
-            </Stack>
+            </Box>
         </Box>
     );
 }

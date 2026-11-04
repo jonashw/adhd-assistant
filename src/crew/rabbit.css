@@ -28,7 +28,11 @@
 .crew-rabbit .thing-lines { stroke: #8f8f8f; stroke-width: 0.3; }
 .crew-rabbit .burrow-hole { fill: #2b1d12; }
 .crew-rabbit .burrow-spoil { fill: #a07a52; }
-.crew-rabbit .burrow-home { fill: none; stroke: #222; stroke-width: 1.6; stroke-dasharray: 22 4; }
+.crew-rabbit .burrow-boulder { fill: #8d877d; stroke: #5f5a52; stroke-width: 0.5; }
+.crew-rabbit .burrow-boulder-shine { fill: none; stroke: #b9b3a8; stroke-width: 0.6; stroke-linecap: round; }
+.crew-rabbit .burrow-bolt { fill: #d5dade; stroke: #6b7177; stroke-width: 0.25; }
+.crew-rabbit .burrow-hanger { fill: none; stroke: #b9c0c6; stroke-width: 0.5; }
+.crew-rabbit .burrow-carabiner { fill: none; stroke: #e0a030; stroke-width: 0.55; }
 .crew-rabbit .burrow-string { stroke: #e2574c; stroke-width: 1.2; stroke-dasharray: 2.6 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .crew-rabbit .rabbit-metal { fill: #dfe3e8; stroke: #8a929c; stroke-width: 0.45; }

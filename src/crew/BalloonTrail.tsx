@@ -5,6 +5,7 @@ import { Dog } from "./Dog";
 import { Squirrel } from "./Squirrel";
 import { Spider } from "./Spider";
 import { Sloth } from "./Sloth";
+import { PersonHead } from "./PersonHead";
 import { usePrefersReducedMotion } from "./useFidget";
 import "./crew.css";
 import "./balloon.css";
@@ -382,14 +383,14 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
 
             {/* the string, hooked round the pin in every cloud on the way up, then your head */}
             <g className="crew-jon">
-                <path d={string} className="jon-string"/>
+                {!resting && <path d={string} className="jon-string"/>}
                 {pins.map(p => <g key={p.id} pointerEvents="none">
                     <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 6} className="trail-pin"/>
                     <circle cx={p.x} cy={p.y - 5} r={2.4} className="trail-pin-head"/>
                 </g>)}
-                <g className="trail-head">
+                {!resting && <g className="trail-head">
                     <Head x={headX} y={headY} r={headR}/>
-                </g>
+                </g>}
             </g>
             </g>
         </svg>
@@ -488,14 +489,15 @@ function StoneRing({d, resting, carrying, s}: {d: number, resting: boolean, carr
             <path d={`M${h.left[0] - t * 0.4} ${h.left[1] - t * 0.3} L${h.left[0]} ${h.left[1]} M${h.right[0] + t * 0.4} ${h.right[1] - t * 0.3} L${h.right[0]} ${h.right[1]}`} className="trail-rope"/>
             <path d={`M${h.left[0]} ${h.left[1]} Q0 ${h.sag + d * 0.06} ${h.right[0]} ${h.right[1]} Q0 ${h.sag - d * 0.08} ${h.left[0]} ${h.left[1]} Z`} className="trail-hammock"/>
             <path d={`M${h.left[0]} ${h.left[1]} Q0 ${h.sag} ${h.right[0]} ${h.right[1]}`} className="trail-hammock-stripe"/>
-            {/* you, lying in it, string in hand */}
-            {resting && <g className="crew-jon" transform={`translate(${-d * 0.08} ${h.sag - d * 0.1}) rotate(84) scale(${s * 0.9}) translate(-18 -75)`}>
+            {/* you, lying in it */}
+            {resting && <g className="crew-jon" transform={`translate(${-d * 0.02} ${h.sag - d * 0.1}) rotate(84) scale(${s * 0.66}) translate(-18 -62)`}>
                 <path d="M14.5 80v12M21.5 80v12" className="jon-leg"/>
                 <rect x={11.5} y={59} width={13} height={22} rx={3} className="jon-jacket"/>
                 <path d="M12 62 L10 72" className="jon-arm"/>
                 {carrying && <rect x={15} y={66} width={8} height={6} rx={1} className="jon-work"/>}
+                {/* at HOME head and body are one: no balloon, just your own head, eyes closed */}
+                <PersonHead cx={18} mood="rest"/>
             </g>}
-            {resting && <circle cx={h.hand[0]} cy={h.hand[1]} r={1.8 * s} className="trail-hand"/>}
         </g>
     );
 }

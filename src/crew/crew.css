@@ -371,6 +371,10 @@
 }
 
 /* Balloon-head asking a question (Speaker.tsx) */
+.crew .person-skin { fill: #e0a77f; stroke: #b77b55; stroke-width: 0.5; }
+.crew .person-hair { fill: #4a3426; }
+.crew .person-ink { fill: #2b2b2b; }
+.crew .person-line { fill: none; stroke: #4a2c22; stroke-width: 0.9; stroke-linecap: round; }
 .crew-speaker .speaker-skin { fill: #e0a77f; stroke: #b77b55; stroke-width: 0.5; }
 .crew-speaker .speaker-hair { fill: #4a3426; }
 .crew-speaker .speaker-ink { fill: #2b2b2b; }

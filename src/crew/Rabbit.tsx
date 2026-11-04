@@ -20,6 +20,8 @@ const colW = 36;
 const bandH = 30;
 const sky = 22;
 const pad = 8;
+//how far behind HOME's spot its boulder sits
+const anchorBack = 9;
 const chamberW = 30;
 const chamberH = 15;
 
@@ -109,7 +111,8 @@ function downStep(b: Burrow, child: Chamber): Pt[] {
 /* The whole string from HOME to a place's rest spot */
 function stringTo(b: Burrow, id: string): Pt[] {
     const line = lineage(b, id);
-    const pts: Pt[] = [[b.chambers.get(line[0])!.x, sky]];
+    //from the carabiner on HOME's boulder, just behind where the rabbit stands at the surface
+    const pts: Pt[] = [[b.chambers.get(line[0])!.x - anchorBack, sky - 1.6], [b.chambers.get(line[0])!.x, sky]];
     line.slice(1).forEach(cid => pts.push(...downStep(b, b.chambers.get(cid)!)));
     return pts;
 }
@@ -257,18 +260,23 @@ export function RabbitBurrow({size = 120, fit, graph, at, selected, carrying = f
     const scale = fit
         ? Math.max(Math.min(fit.width / b.width, fit.height / b.height), fit.minScale ?? 0)
         : size / b.height;
+    //filling a box: the earth (and the sky over it) runs the box's whole width, past the burrow's own edges
+    const extra = fit ? Math.max(16, fit.width / scale - b.width) : 16;
+    const vx = -extra / 2;
+    const vw = b.width + extra;
+    const rootX = (b.chambers.get(b.rootId)?.x ?? pad) - anchorBack;
     return (
         <svg className={["crew", "crew-rabbit", pose.moving && "is-moving", carrying && "is-carrying", fidget].filter(Boolean).join(" ")}
-            viewBox={`0 0 ${b.width} ${b.height}`} width={b.width * scale} height={b.height * scale} role="img" aria-label={label}
+            viewBox={`${vx} 0 ${vw} ${b.height}`} width={vw * scale} height={b.height * scale} role="img" aria-label={label}
             style={fit
                 ? {display: "block", margin: "0 auto", flexShrink: 0}
                 : {display: "block", margin: "0 auto", maxWidth: "100%", height: "auto"}}>
             <title>{label}</title>
-            <rect x={0} y={0} width={b.width} height={sky} className="burrow-sky"/>
+            <rect x={vx} y={0} width={vw} height={sky} className="burrow-sky"/>
             {Array.from({length: Math.max(1, b.depth)}, (_, i) =>
-                <rect key={i} x={0} y={sky + i * bandH} width={b.width} height={i === b.depth - 1 ? b.height - sky - i * bandH : bandH}
+                <rect key={i} x={vx} y={sky + i * bandH} width={vw} height={i === b.depth - 1 ? b.height - sky - i * bandH : bandH}
                     className={`burrow-band burrow-band-${Math.min(i, 4) + 1}`}/>)}
-            <rect x={0} y={sky - 1.2} width={b.width} height={2.4} className="burrow-grass"/>
+            <rect x={vx} y={sky - 1.2} width={vw} height={2.4} className="burrow-grass"/>
             {/* shafts first, so the chambers sit over their ends */}
             {chambers.map(c => {
                 const tucked = !visible.has(c.node.id);
@@ -317,7 +325,18 @@ export function RabbitBurrow({size = 120, fit, graph, at, selected, carrying = f
                 <path d={`M${c.x + 4} ${sky - 0.6} Q${c.x + 8} ${sky - 3.2} ${c.x + 12} ${sky - 0.6} Z`} className="burrow-spoil"/>
                 <path d={`M${c.x - 4} ${sky - 0.8} L${c.x + 4} ${sky - 0.8} L${c.x + 3} ${sky + 1.6} L${c.x - 3} ${sky + 1.6} Z`} className="burrow-hole"/>
             </g>)}
-            <circle cx={b.chambers.get(b.rootId)?.x ?? pad} cy={sky - 5} r={4.2} className="burrow-home"/>
+            {/* HOME: a boulder with climbing bolts in it, the anchor the string is clipped to */}
+            <g className="burrow-anchor">
+                <title>HOME</title>
+                <path d={`M${rootX - 7} ${sky} Q${rootX - 7.6} ${sky - 5.4} ${rootX - 3.4} ${sky - 7.4} Q${rootX + 1} ${sky - 9.2} ${rootX + 4.6} ${sky - 6.8} Q${rootX + 7.8} ${sky - 4.4} ${rootX + 7} ${sky} Z`} className="burrow-boulder"/>
+                <path d={`M${rootX - 4.4} ${sky - 5.6} Q${rootX - 1} ${sky - 7.4} ${rootX + 3} ${sky - 6.6}`} className="burrow-boulder-shine"/>
+                {[[rootX - 3.6, sky - 4], [rootX + 0.4, sky - 4.6]].map(([x, y]) => <g key={x}>
+                    <path d={`M${x - 0.9} ${y} a0.9 1.3 0 1 0 1.8 0`} className="burrow-hanger"/>
+                    <circle cx={x} cy={y} r={0.55} className="burrow-bolt"/>
+                </g>)}
+                {/* the carabiner on the near bolt, with the string clipped in */}
+                <rect x={rootX - 0.4} y={sky - 3.6} width={1.6} height={3} rx={0.8} className="burrow-carabiner"/>
+            </g>
             <path d={d(pose.string)} className="burrow-string" fill="none"/>
             <g transform={`translate(${pose.x} ${pose.y + hop})`} style={{pointerEvents: "none"}}>
                 <g transform={`scale(${pose.facing} 1)`}>

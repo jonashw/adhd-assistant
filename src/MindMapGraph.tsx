@@ -1,10 +1,10 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useElementSize } from "./useContainerWidth";
-import { Fab, Breadcrumbs, Button, Paper, Snackbar, Stack} from "@mui/material";
+import { Fab, Button, Paper, Snackbar, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
-import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
+import { MindMap, MindMapGraphData, MindMapGraphNode} from "./MindMap";
 import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
 import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
@@ -57,10 +57,10 @@ export default function MindMapGraph({
     const [headerSize,headerRef] = useElementSize();
     const [actionsSlot, setActionsSlot] = React.useState<HTMLDivElement | null>(null);
     const [nextSlot, setNextSlot] = React.useState<HTMLDivElement | null>(null);
-    const breadCrumbsRef = React.useRef<HTMLDivElement>(null);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
     //the breadcrumb bar keeps a fixed height (it scrolls sideways) so the canvas never resizes when the path grows
-    const breadCrumbsHeight = 40;
+    //the path home now lives in the outline, not in a bar over the map
+    const breadCrumbsHeight = 0;
     const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight), [
         headerSize
     ]);
@@ -68,7 +68,6 @@ export default function MindMapGraph({
     const [removedNode, setRemovedNode] = React.useState<MindMapGraphNode>();
     const width = window.innerWidth;
 
-    const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value,onChange);
     const change = React.useCallback((updatedGraph: MindMapGraphData) => {
         //the undo history passes the change on to onChange, so it is saved once
@@ -242,22 +241,6 @@ export default function MindMapGraph({
         }
     },[transcript]);
 
-    React.useEffect(() => {
-        if(!value || !selectedNodeId || !home){
-            setPathHome(undefined);
-            return;
-        }
-        const shortestPathHome = MindMap.shortestPathBetween(value, selectedNodeId, home.id);
-        setPathHome(shortestPathHome);
-    },[value, selectedNodeId, setPathHome]);
-
-    React.useEffect(() => {
-        //keep the selected node, at the end of the path, in view
-        const bar = breadCrumbsRef.current;
-        if(bar){
-            bar.scrollLeft = bar.scrollWidth;
-        }
-    },[pathHome]);
 
     React.useEffect(() => {
         loadImgElement('/Enso.svg').then(setHomeImage);
@@ -325,28 +308,6 @@ export default function MindMapGraph({
                 <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} actionsSlot={actionsSlot} nextSlot={nextSlot}/>
             </div>
 
-            <div
-                ref={breadCrumbsRef}
-                style={{height: breadCrumbsHeight, flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap'}}
-            >
-                {pathHome && pathHome.length > 1 && (
-                    <Breadcrumbs
-                        separator="&larr;"
-                        aria-label="breadcrumb"
-                        sx={{'& .MuiBreadcrumbs-ol': {flexWrap: 'nowrap', height: breadCrumbsHeight}, '& .MuiBreadcrumbs-li': {flexShrink: 0}}}
-                    >
-                        {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟 */}
-                        {[...pathHome].reverse().map((segment) => (
-                            <Button key={segment.node.id} variant="text" onClick={() => {
-                                selectNodeId(segment.node.id);
-                            }}>
-                                {segment.node.label}
-                            </Button>
-                        ))}
-                    </Breadcrumbs>
-                )}
-            </div>
-
             <Snackbar
                 sx={{bottom: {xs: 136, sm: 88}}}
                 open={removedNode !== undefined}
@@ -398,7 +359,7 @@ export default function MindMapGraph({
                 <div>
                     {view === "burrow" && <div
                         style={{
-                            height, width, overflow: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'safe center',
+                            height, width, overflow: 'auto', display: 'flex', alignItems: 'safe flex-end', justifyContent: 'safe center',
                             //sky above, and bedrock below where the buttons float so they don't cover the deepest chambers
                             boxSizing: 'border-box', paddingBottom: bedrock,
                             background: `linear-gradient(to bottom, #dcefff calc(100% - ${bedrock}px), #523a22 calc(100% - ${bedrock}px))`

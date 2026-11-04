@@ -104,7 +104,14 @@ export const starterTemplates: StarterTemplate[] = [
                 ]},
                 {id: "self", label: "Self", children: [
                     {id: "signals", label: "Signals", note: "Signals land at a place. A flag is a deadline, a flare is someone who needs you, smoke is trouble and fresh tracks are news. Your spider carries notes about them up your string."},
-                    {id: "float", label: "Floating away", note: "Following a tangent floats your head away from where your feet are. That's fine. After a few steps out, the spider climbs your string and gives it a tug, with a note about what you set down."},
+                    {id: "float", label: "Floating away", note: "Following a tangent floats your head away from where your feet are. That's fine. After a few steps out, the spider climbs your string and gives it a tug, with a note about what you set down.", children: [
+                        {id: "float-1", label: "One thought leads to another", note: "Pick this cloud and your head floats up to it. The cloud lights up, and the ones you passed stay hooked on your string.", children: [
+                            {id: "float-2", label: "And another", children: [
+                                {id: "float-3", label: "Where was I?", note: "Four clouds up. Look down your string: every cloud it hooks is a step of the way back. Reel in to come down one at a time."}
+                            ]},
+                            {id: "float-side", label: "A side thought"}
+                        ]}
+                    ]},
                     {id: "done-here", label: "Mark this done", note: "- [x] Read the tour\n- [ ] Mark this place done and watch it tuck away\n- [ ] Clear the tour and chart your own map"}
                 ]}
             ]

@@ -8,7 +8,7 @@ import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stri
 import { Jon, RabbitBurrow } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
-export const youStripHeight = 64;
+export const youStripHeight = 36;
 
 const pulse = {
     "@keyframes ctaPulse": {"0%, 100%": {transform: "scale(1)"}, "50%": {transform: "scale(1.06)"}},
@@ -38,6 +38,15 @@ export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}:
     const [offerTieOff, setOfferTieOff] = React.useState<string>();
     const [tugSnoozedUntil, setTugSnoozedUntil] = React.useState(0);
     const [weatherSnoozedUntil, setWeatherSnoozedUntil] = React.useState(0);
+
+    //the offer to tie off lasts a little while, then the button settles back
+    React.useEffect(() => {
+        if (offerTieOff === undefined) {
+            return;
+        }
+        const timer = window.setTimeout(() => setOfferTieOff(undefined), 12000);
+        return () => window.clearTimeout(timer);
+    }, [offerTieOff]);
 
     const reelIn = () => {
         if (back) {
@@ -85,12 +94,16 @@ export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}:
                     </Badge>}
                     {tugging && <Fab size="small" onClick={() => setTugSnoozedUntil(now.getTime() + 15 * 60_000)}
                         title="Not yet" aria-label="Not yet: snooze the tug for 15 minutes"><Close fontSize="small"/></Fab>}
+                    {offering && <Box role="status" sx={{bgcolor: "background.paper", borderRadius: 5, px: 1.5, py: 0.75, boxShadow: 2,
+                        typography: "body2", maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+                        You're at <b>{labelOf(here)}</b>
+                    </Box>}
                     <Fab variant="extended" size="medium" color={offering ? "success" : "default"} sx={offering ? pulse : undefined}
                         onClick={() => {
                             nav.tieOff(here);
                             setOfferTieOff(undefined);
                         }}>
-                        {offering ? `${words.tieOff} here` : words.tieOff}
+                        {words.tieOff}
                     </Fab>
                 </>}
         </>
@@ -125,12 +138,10 @@ export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}:
                 <Box sx={{flex: "1 1 auto", minWidth: 0, lineHeight: 1.3, ml: 0.5}}>
                     {tether.state === "tied"
                         ? <Typography variant="body2" noWrap>{words.tiedAt} <b>{labelOf(tether.at)}</b></Typography>
-                        : <>
-                            <Typography variant="body2" noWrap>{words.aloft}</Typography>
-                            <Typography variant="caption" color="text.secondary" noWrap component="div">
-                                {words.setDown}: {labelOf(tether.setDown)}
-                            </Typography>
-                        </>}
+                        : <Typography variant="body2" noWrap>
+                            {words.aloft}
+                            <Box component="span" sx={{color: "text.secondary"}}> · {words.setDown}: {labelOf(tether.setDown)}</Box>
+                        </Typography>}
                 </Box>
             </Stack>
 
