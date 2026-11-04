@@ -55,6 +55,8 @@ export default function MindMapGraph({
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
+    const [actionsSlot, setActionsSlot] = React.useState<HTMLDivElement | null>(null);
+    const [nextSlot, setNextSlot] = React.useState<HTMLDivElement | null>(null);
     const breadCrumbsRef = React.useRef<HTMLDivElement>(null);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
     //the breadcrumb bar keeps a fixed height (it scrolls sideways) so the canvas never resizes when the path grows
@@ -87,7 +89,8 @@ export default function MindMapGraph({
     };
     //on a narrow screen the burrow scrolls sideways: keep where the rabbit stands in view
     const burrowView = React.useRef<HTMLDivElement>(null);
-    const bedrock = 88;
+    //room kept at the foot of the map for the calls to action: one row of them, or two on a phone
+    const bedrock = width < 600 ? 140 : 88;
     const rabbitAt = standingAt(nav.tether);
     React.useEffect(() => {
         const view = burrowView.current;
@@ -319,7 +322,7 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}/>
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} actionsSlot={actionsSlot} nextSlot={nextSlot}/>
             </div>
 
             <div
@@ -345,6 +348,7 @@ export default function MindMapGraph({
             </div>
 
             <Snackbar
+                sx={{bottom: {xs: 136, sm: 88}}}
                 open={removedNode !== undefined}
                 autoHideDuration={8000}
                 onClose={(_, reason) => {
@@ -556,10 +560,13 @@ export default function MindMapGraph({
                         dagLevelDistance={25}
                         dagMode={"radialin"}
                     /> }
-                    <Stack direction={"row-reverse"} gap={2} alignItems={"center"}
-
-                            sx={{ position: 'fixed', right: '1em', bottom: '1em'}}
+                    {/* the calls to action, all along the foot of the map: yours on the left, finding your way on the right */}
+                    <Stack direction="row" flexWrap="wrap-reverse" gap={1} alignItems="flex-end"
+                        sx={{position: 'fixed', left: '1em', right: '1em', bottom: '1em', pointerEvents: 'none',
+                            '& .MuiFab-root, & .MuiBadge-root': {pointerEvents: 'auto'}}}
                     >
+                        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" ref={setActionsSlot} data-testid="you-actions"/>
+                    <Stack direction={"row-reverse"} gap={1} alignItems={"center"} sx={{ml: 'auto'}}>
                         <Fab
                             variant="extended"
                             color={"info"}
@@ -569,7 +576,9 @@ export default function MindMapGraph({
                             {view === "burrow" ? "Down a hole" : "Deeper"}
                         </Fab>
 
-                        <ListenFab status={listeningStatus} start={startListening} stop={stopListening} />
+                        <ListenFab status={listeningStatus} start={startListening} stop={stopListening} compact />
+                        <Stack direction="row" alignItems="center" ref={setNextSlot}/>
+                    </Stack>
                     </Stack>
                 </div>
             </Paper>
