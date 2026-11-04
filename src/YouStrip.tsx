@@ -97,10 +97,11 @@ export function YouStrip({graph, onChange, selectNodeId}: {
             </Stack>
 
             {tugging && <Alert
-                icon={burrow ? false : <Jon size={52} doing="aloft" stringOut={stringOut(tether)} spider="tug"/>}
+                icon={burrow ? false : <Jon size={30} doing="aloft" stringOut={stringOut(tether)} spider="tug"/>}
                 severity="info"
-                //floats above the map, so the canvas never jumps when the tug comes and goes
-                sx={{position: "fixed", left: 8, right: 8, bottom: 88, zIndex: 1200, boxShadow: 3}}
+                //a slim row of the status bar, under the strip, so it never covers the map itself
+                sx={{borderRadius: 0, py: 0, px: 1, alignItems: "center", borderBottom: 1, borderColor: "divider",
+                    "& .MuiAlert-icon": {py: 0.25, mr: 1}, "& .MuiAlert-message": {py: 0.75}, "& .MuiAlert-action": {py: 0, mr: 0}}}
                 data-testid="tug"
                 action={<Stack direction="row">
                     {back && <Button color="inherit" size="small" onClick={reelIn}>{words.reelIn}</Button>}

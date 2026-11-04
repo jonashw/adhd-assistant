@@ -40,16 +40,6 @@ function lineageOf(graph: MindMapGraphData, id: string): string[] {
     return line;
 }
 
-/* the deepest a place's subtree goes, counting the place as 0 */
-function depthBelow(graph: MindMapGraphData, id: string, seen = new Set<string>()): number {
-    if (seen.has(id)) {
-        return 0;
-    }
-    seen.add(id);
-    const kids = MindMap.childrenOf(graph, id);
-    return kids.length === 0 ? 0 : 1 + Math.max(...kids.map(k => depthBelow(graph, k, seen)));
-}
-
 /* eases a number toward its target */
 function useTween(target: number, ms = 650): number {
     const reduced = usePrefersReducedMotion();
@@ -140,18 +130,29 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const reach = Math.max(1.2, (width / 2 - 20) / spacing + 0.3);
 
     //you: feet by the waypoint, head up one level per step deeper than it
-    const s = 1.5;
     const youX = cx + 100;
     const levels = Math.max(0, line.length - 2);
-    const tallest = Math.max(2, levels + 1, waypoint === home ? 0 : depthBelow(graph, waypoint));
-    const headBase = groundY - 74;
-    const levelH = Math.max(106, Math.min(130, (headBase - 60) / tallest));
-    const hand: [number, number] = carrying ? [youX + (24.5 - 18) * s, groundY - (92 - 62.5) * s] : [youX + (31 - 18) * s, groundY - (92 - 50) * s];
-    const restX = youX + (carrying ? 10 : 22);
+    const overHead = 40;
+    /* zoom: the sky holds the levels you've climbed plus the clouds above you. When it needs more room, you and the
+       ground shrink first, so your body always stays in view and the clouds keep their width (and their names stay
+       readable). Only then do the levels close up. Clouds only ever move as part of that zoom. */
+    const above = here !== home && MindMap.childrenOf(graph, here).some(id => visible.has(id)) ? 1 : 0;
+    const rows = Math.max(2, levels + above);
+    const z = useTween(Math.max(0.5, Math.min(1, (groundY - overHead - 34 - rows * 104) / 74)), 800);
+    const zs = Math.max(0.75, z);
+    const s = 1.5 * z;
+    const headBase = groundY - 74 * z;
+    const levelH = useTween(Math.max(66, Math.min(130, (groundY - 74 * Math.max(0.5, Math.min(1, (groundY - overHead - 34 - rows * 104) / 74)) - overHead - 34) / rows)), 800);
+    const aloft = levels > 0;
+    //on the ground the arm hangs relaxed with the string in hand and the balloon close by; aloft the arm reaches up
+    const handAt = (bx: number, by: number): [number, number] => [youX + (bx - 18) * s, groundY - (92 - by) * s];
+    const hand: [number, number] = carrying ? handAt(24.5, 62.5) : aloft ? handAt(31, 50) : handAt(27, 74.5);
+    const restX = carrying ? youX + 10 * z : hand[0] + 7 * z;
+    const restY = carrying ? headBase : hand[1] - 44 * z;
+    const headR = 13 * Math.max(0.7, z);
 
     /* The clouds over a waypoint keep their places. Each level's clouds spread out over the cloud they belong to
        (the first level over your head on the ground), so picking one never moves the others; dimming hides them. */
-    const overHead = 40;
     const cloudY = (level: number) => headBase - level * levelH - overHead;
     const layout = React.useMemo(() => {
         type Placed = {id: string, x: number, y: number, w: number, level: number, parent: string};
@@ -189,9 +190,14 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
 
     //the balloon drifts up and over to sit just under the cloud you're at, which lights as it arrives
     const litPlace = levels > 0 ? layout.placed.get(here) : undefined;
-    const headX = useTween(litPlace ? litPlace.x : restX, 800);
-    const headY = useTween(litPlace ? litPlace.y + overHead : headBase, 800);
-    const altitude = (headBase - headY) / levelH;
+    //at HOME you lie in the hammock strung across the stone ring, and the balloon settles at its far end
+    const resting = here === home;
+    const homeX = cx + ringOffset(0, pos, ring.length) * spacing;
+    const ringD = Math.min(130, Math.max(70, height * 0.24)) * zs;
+    const hammock = hammockOf(ringD);
+    const headX = useTween(resting ? cx + hammock.head[0] : litPlace ? litPlace.x : restX, 800);
+    const headY = useTween(resting ? groundY + hammock.head[1] : litPlace ? litPlace.y + overHead : restY, 800);
+    const altitude = resting ? 0 : Math.max(0, (restY - headY) / levelH);
     //when the clouds above you would leave the top of the sky, the view rises with you and the ground slips down
     const cam = useTween(Math.max(0, 40 - cloudY(levels + 1) - (layout.rows[levels]?.length ? 0 : levelH)), 800);
     const arrival = litPlace ? Math.max(0, Math.min(1, 1 - Math.hypot(headX - litPlace.x, headY - litPlace.y - overHead) / 70)) : 0;
@@ -200,7 +206,9 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
        down shows, the way the rabbit's string runs back through every chamber */
     const pins = line.slice(2, -1).map(id => layout.placed.get(id)).filter((c): c is NonNullable<typeof c> => !!c)
         .map(c => ({id: c.id, x: c.x, y: c.y + pinDrop}));
-    const string = threadThrough([hand, ...pins.map(p => [p.x, p.y] as [number, number]), [headX, headY + 13]]);
+    const string = resting
+        ? threadThrough([[homeX + hammock.hand[0], groundY + hammock.hand[1]], [headX, headY + headR]])
+        : threadThrough([hand, ...pins.map(p => [p.x, p.y] as [number, number]), [headX, headY + headR]]);
     const onPath = new Set(line);
     const all = layout.rows.flat();
     const sightings = all.filter(c => c.parent === here);
@@ -222,7 +230,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
         const per = Math.max(8, Math.floor((c.w - 14) / 6.1));
         const words = wrap(label(c.id), per, 2);
         const lit = kind === "lit" && arrival > 0.5;
-        const top = kind === "passed" ? -12 : -6;
+        const top = words.length === 1 ? 4 : -3;
         return (
             <g key={c.id} className={["trail-cloud-place", `is-${lit ? "lit" : kind === "lit" ? "sighting" : kind}`, onPick && "is-pickable", c.id === selected && "is-selected"].filter(Boolean).join(" ")}
                 transform={`translate(${c.x} ${c.y})`} onClick={onPick ? pick(c.id) : undefined} data-place={c.id}>
@@ -235,7 +243,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                         <circle cx={c.w * 0.04} cy={-h * 0.14} r={h * 0.42}/>
                         <circle cx={c.w * 0.27} cy={h * 0.04} r={h * 0.3}/>
                     </g>)}
-                <text x={0} y={words.length === 1 ? top + 6 : top} textAnchor="middle" className="trail-cloud-text">
+                <text x={0} y={top} textAnchor="middle" className="trail-cloud-text">
                     {words.map((w, i) => <tspan key={i} x={0} dy={i === 0 ? 0 : 13}>{w}</tspan>)}
                 </text>
             </g>
@@ -247,7 +255,6 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const ariaLabel = here === home
         ? "Balloon-head at HOME, feet on the ground"
         : `Balloon-head on the ground at ${label(waypoint)}${levels > 0 ? `, head ${levels} level${levels === 1 ? "" : "s"} up at ${label(here)}` : ""}${carrying ? ", holding the work" : ""}`;
-    const enso = Math.min(130, Math.max(70, height * 0.24));
 
     return (
         <svg className="crew balloon-trail" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}
@@ -277,7 +284,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
             <g transform={`translate(0 ${cam})`}>
 
             {/* one faint line for each level up, so height reads as how deep into the waypoint you are */}
-            {Array.from({length: tallest}, (_, i) => i + 1).map(i =>
+            {Array.from({length: rows + 1}, (_, i) => i + 1).map(i =>
                 <g key={i} className="trail-level">
                     <line x1={0} x2={width} y1={cloudY(i) + 30} y2={cloudY(i) + 30}/>
                     <text x={8} y={cloudY(i) + 26}>{i} up</text>
@@ -303,20 +310,16 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                         onClick={onPick ? pick(id) : undefined} data-place={id}>
                         <title>{label(id)}</title>
                         {isHome
-                            ? <>
-                                <image href="/Enso.svg" x={-enso / 2} y={-enso - 4} width={enso} height={enso}/>
-                                {/* laid out like the Mindful picture: claws over the inside of the enso's top */}
-                                <Sloth size={enso * 44 / 180} bar={false} x={-enso * 44 / 180 * 64 / 48 / 2} y={-enso - 4 + enso * 28 / 180}/>
-                            </>
-                            : <>
+                            ? <StoneRing d={ringD} resting={resting} carrying={carrying} s={s}/>
+                            : <g transform={`scale(${zs})`}>
                                 <line x1={0} y1={-26} x2={0} y2={8} className="trail-stake"/>
                                 <rect x={-60} y={-52} width={120} height={28} rx={5} className="trail-sign"/>
                                 {n?.status === "active" && <circle cx={-48} cy={-38} r={4} className="trail-active"/>}
                                 <text x={n?.status === "active" ? 4 : 0} y={-33} textAnchor="middle" className="trail-sign-text">
                                     {short(label(id), n?.status === "active" ? 15 : 17)}
                                 </text>
-                            </>}
-                        {isHome && <text x={0} y={-enso - 10} textAnchor="middle" className="trail-home-text">HOME</text>}
+                            </g>}
+                        {isHome && <text x={0} y={-ringD - 10} textAnchor="middle" className="trail-home-text">HOME</text>}
                     </g>
                 );
             })}
@@ -339,12 +342,12 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
             </>}
 
             {/* the crew trails you along the ground: spider, squirrel, dog, then you */}
-            <g transform={`translate(${youX - 76} ${groundY - 16})`}><Spider size={16}/></g>
-            <g transform={`translate(${youX - 62} ${groundY - 27})`}><Squirrel size={27} doing="idle"/></g>
-            <g transform={`translate(${youX - 42} ${groundY - 36})`}><Dog size={36} doing={carrying ? "curled" : "idle"}/></g>
+            <g transform={`translate(${youX - 76 * z} ${groundY - 16 * z})`}><Spider size={16 * z}/></g>
+            <g transform={`translate(${youX - 62 * z} ${groundY - 27 * z})`}><Squirrel size={27 * z} doing={resting ? "curled" : "idle"}/></g>
+            <g transform={`translate(${youX - 42 * z} ${groundY - 36 * z})`}><Dog size={36 * z} doing={carrying || resting ? "curled" : "idle"}/></g>
 
-            {/* you: the body stays on the ground */}
-            <g className="crew-jon">
+            {/* you: the body stays on the ground (or in the hammock, at HOME) */}
+            {!resting && <g className="crew-jon">
                 <g transform={`translate(${youX - 18 * s} ${groundY - 92 * s}) scale(${s})`}>
                     <path d="M14.5 80v12M21.5 80v12" className="jon-leg"/>
                     <rect x={11.5} y={59} width={13} height={22} rx={3} className="jon-jacket"/>
@@ -357,10 +360,13 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                         </>
                         : <>
                             <path d="M12 62 L7 74" className="jon-arm"/>
-                            <path d="M24 62 L31 51" className="jon-arm"/>
+                            {aloft
+                                ? <path d="M24 62 L31 51" className="jon-arm"/>
+                                : <path d="M24 62 L27 74" className="jon-arm"/>}
+                            <circle cx={aloft ? 31 : 27} cy={aloft ? 50.5 : 74.5} r={1.6} className="jon-hand"/>
                         </>}
                 </g>
-            </g>
+            </g>}
 
             {/* the other clouds at each level stay where they were, in the shade */}
             {shaded.map(c => cloud(c, "shaded"))}
@@ -378,11 +384,11 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
             <g className="crew-jon">
                 <path d={string} className="jon-string"/>
                 {pins.map(p => <g key={p.id} pointerEvents="none">
-                    <line x1={p.x} y1={p.y - 9} x2={p.x} y2={p.y + 9} className="trail-pin"/>
-                    <circle cx={p.x} cy={p.y - 9} r={2.4} className="trail-pin-head"/>
+                    <line x1={p.x} y1={p.y - 5} x2={p.x} y2={p.y + 6} className="trail-pin"/>
+                    <circle cx={p.x} cy={p.y - 5} r={2.4} className="trail-pin-head"/>
                 </g>)}
                 <g className="trail-head">
-                    <Head x={headX} y={headY} r={13}/>
+                    <Head x={headX} y={headY} r={headR}/>
                 </g>
             </g>
             </g>
@@ -391,7 +397,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
 }
 
 //how far below a cloud's middle its pin sits, under the name
-const pinDrop = 12;
+const pinDrop = 19;
 
 /* a smooth line through points, bending round each one the way a string bends round a pin */
 function threadThrough(points: [number, number][]): string {
@@ -426,4 +432,70 @@ function wrap(text: string, per: number, lines: number): string[] {
         out[out.length - 1] = short(`${out[out.length - 1]} ${rest}`, per);
     }
     return out;
+}
+
+/* where the hammock hangs in the stone ring, from the ring's foot: its ends, the hand that holds the string, and
+   where the balloon settles */
+function hammockOf(d: number) {
+    const cy = -2 - d / 2;
+    return {
+        left: [-d * 0.4, cy - d * 0.04] as [number, number],
+        right: [d * 0.4, cy - d * 0.04] as [number, number],
+        sag: cy + d * 0.2,
+        hand: [d * 0.06, cy + d * 0.08] as [number, number],
+        head: [d * 0.3, cy - d * 0.06] as [number, number]
+    };
+}
+
+/* HOME: a ring of standing stone carved as a snake swallowing its tail, with the sloth hanging from the top and a
+   hammock slung across the middle, where you rest when you're home */
+function StoneRing({d, resting, carrying, s}: {d: number, resting: boolean, carrying: boolean, s: number}) {
+    const r = d / 2;
+    const t = d * 0.15;
+    const cy = -2 - r;
+    const mid = r - t / 2;
+    const h = hammockOf(d);
+    const at = (deg: number, rr = mid): [number, number] => [Math.cos(deg * Math.PI / 180) * rr, cy + Math.sin(deg * Math.PI / 180) * rr];
+    //the head sits at the upper left and faces round the ring, jaws closed on the tip of its own tail
+    const head = -150;
+    const [hx, hy] = at(head);
+    //scales carved along the body, all the way round from the neck to the tail
+    const scales = Array.from({length: 16}, (_, i) => head + 26 + i * 20.5);
+    const sloth = d * 44 / 180;
+    return (
+        <g className="trail-stone-ring">
+            {/* boulders it stands on */}
+            <ellipse cx={-r * 0.55} cy={-2} rx={r * 0.32} ry={r * 0.12} className="trail-boulder"/>
+            <ellipse cx={r * 0.5} cy={-1} rx={r * 0.28} ry={r * 0.1} className="trail-boulder"/>
+            <circle cx={0} cy={cy} r={mid} className="trail-stone" style={{strokeWidth: t}}/>
+            <circle cx={0} cy={cy} r={mid + t * 0.3} className="trail-stone-light"/>
+            <circle cx={0} cy={cy} r={mid - t * 0.3} className="trail-stone-dark"/>
+            {scales.map(a => {
+                const [x, y] = at(a);
+                return <path key={a} transform={`translate(${x} ${y}) rotate(${a + 90}) scale(${t / 20})`}
+                    d="M-3 -6 Q4 0 -3 6" className="trail-carve"/>;
+            })}
+            {/* the snake's head, biting the tip of its tail */}
+            <g transform={`translate(${hx} ${hy}) rotate(${head + 90}) scale(${t / 20})`}>
+                <path d="M-12 -11 C0 -15 14 -12 19 -4 L9 -1 L19 2 C15 10 2 14 -12 11 Q-16 0 -12 -11 Z" className="trail-snake-head"/>
+                <path d="M-6 -10 Q2 -12 10 -8 M-6 10 Q2 12 10 8" className="trail-carve" style={{strokeWidth: 1.4}}/>
+                <circle cx={5} cy={-6} r={2.4} className="trail-snake-eye"/>
+                <circle cx={5} cy={6} r={2.4} className="trail-snake-eye"/>
+            </g>
+            {/* the sloth hooks its claws over the inside of the ring's top */}
+            <Sloth size={sloth} bar={false} x={-sloth * 64 / 48 / 2} y={cy - mid + t * 0.25}/>
+            {/* the hammock: ropes to the stone, and the cloth sagging between */}
+            <path d={`M${h.left[0] - t * 0.4} ${h.left[1] - t * 0.3} L${h.left[0]} ${h.left[1]} M${h.right[0] + t * 0.4} ${h.right[1] - t * 0.3} L${h.right[0]} ${h.right[1]}`} className="trail-rope"/>
+            <path d={`M${h.left[0]} ${h.left[1]} Q0 ${h.sag + d * 0.06} ${h.right[0]} ${h.right[1]} Q0 ${h.sag - d * 0.08} ${h.left[0]} ${h.left[1]} Z`} className="trail-hammock"/>
+            <path d={`M${h.left[0]} ${h.left[1]} Q0 ${h.sag} ${h.right[0]} ${h.right[1]}`} className="trail-hammock-stripe"/>
+            {/* you, lying in it, string in hand */}
+            {resting && <g className="crew-jon" transform={`translate(${-d * 0.08} ${h.sag - d * 0.1}) rotate(84) scale(${s * 0.9}) translate(-18 -75)`}>
+                <path d="M14.5 80v12M21.5 80v12" className="jon-leg"/>
+                <rect x={11.5} y={59} width={13} height={22} rx={3} className="jon-jacket"/>
+                <path d="M12 62 L10 72" className="jon-arm"/>
+                {carrying && <rect x={15} y={66} width={8} height={6} rx={1} className="jon-work"/>}
+            </g>}
+            {resting && <circle cx={h.hand[0]} cy={h.hand[1]} r={1.8 * s} className="trail-hand"/>}
+        </g>
+    );
 }

@@ -45,3 +45,14 @@
 .balloon-trail .trail-head { animation: trail-bob 3.4s ease-in-out infinite; }
 @keyframes trail-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @media (prefers-reduced-motion: reduce) { .balloon-trail .trail-head, .balloon-trail .trail-glow { animation: none; } }
+.balloon-trail .trail-stone { fill: none; stroke: #9b968c; }
+.balloon-trail .trail-stone-light { fill: none; stroke: #c9c4b8; stroke-width: 1.5; opacity: 0.8; }
+.balloon-trail .trail-stone-dark { fill: none; stroke: #77726a; stroke-width: 1.2; opacity: 0.7; }
+.balloon-trail .trail-carve { fill: none; stroke: #6a655c; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.balloon-trail .trail-snake-head { fill: #8a857b; stroke: #5f5a52; stroke-width: 1.6; }
+.balloon-trail .trail-snake-eye { fill: #3b3732; }
+.balloon-trail .trail-boulder { fill: #7d786f; }
+.balloon-trail .trail-rope { fill: none; stroke: #8a6435; stroke-width: 1.6; stroke-linecap: round; }
+.balloon-trail .trail-hammock { fill: #e58e3c; stroke: #b5651d; stroke-width: 1; }
+.balloon-trail .trail-hammock-stripe { fill: none; stroke: #ffd38a; stroke-width: 1.6; stroke-dasharray: 5 4; }
+.balloon-trail .trail-hand, .balloon-trail .jon-hand { fill: #f1c7a5; }
