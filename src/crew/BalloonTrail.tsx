@@ -10,8 +10,10 @@ import "./balloon.css";
 
 /* Balloon-head's day, drawn from the map. HOME and the places right under it stand on the ground as waypoints
    in a ring, so the last one walks on to the first. Your feet stay on the ground at the waypoint you are working
-   under; your head floats up one level for each step deeper into it, ribbons on the string naming the levels
-   passed. The higher you go, the narrower the light: everything outside the beam from your feet to your head dims. */
+   under; your head floats up one level for each step deeper into it. Every level above the ground is a cloud: the
+   ones you passed sit on the string below you, the place you're at glows just over your head and lights the scene,
+   and the places under it float above as clouds to go to next. The rabbit's holes turned upside down. The higher
+   you go, the narrower the light: everything outside the beam from your feet to the lit cloud dims. */
 
 const short = (s: string, n: number) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
 
@@ -149,14 +151,16 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const headX = youX + (carrying ? 10 : 22) + Math.sin(altitude) * 6;
     const string = `M${hand[0]} ${hand[1]} C${hand[0] + 10} ${(hand[1] + headY) / 2 + 20} ${headX - 10} ${(hand[1] + headY) / 2 - 20} ${headX} ${headY + 13}`;
     const stringAt = (y: number) => {
-        //where the string passes a height, close enough for hanging ribbons on it
+        //where the string passes a height, close enough for hanging clouds on it
         const k = (hand[1] - y) / Math.max(1, hand[1] - headY - 13);
         return hand[0] + (headX - hand[0]) * k;
     };
-    const ribbons = line.slice(2, -1).map((id, i) => ({id, y: headBase - (i + 1) * levelH + 14}));
+    //each level's cloud sits just over where your head is at that level
+    const overHead = 34;
+    const passed = line.slice(2, -1).map((id, i) => ({id, y: headBase - (i + 1) * levelH - overHead}));
+    const lit = levels > 0 ? {id: here, x: headX, y: headY - overHead} : undefined;
     const sightings = (here === home ? [] : MindMap.childrenOf(graph, here)).filter(id => visible.has(id));
-    const sightY = headY - levelH * 0.9;
-    const tagW = Math.min(200, short(label(here), 26).length * 7 + 16);
+    const sightY = (lit ? lit.y : headY) - Math.max(56, levelH * 0.85);
 
     //the narrower your focus, the darker everything outside the beam from your feet to your head
     const dim = Math.min(0.42, altitude * 0.11);
@@ -166,6 +170,18 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
     const pick = (id: string) => (e: React.MouseEvent) => {
         e.stopPropagation();
         onPick?.(id);
+    };
+    const cloud = (id: string, x: number, y: number, kind: "passed" | "lit" | "sighting") => {
+        const k = kind === "lit" ? 1.35 : kind === "passed" ? 1.05 : 1;
+        const tip = kind === "lit" ? label(id) : kind === "passed" ? `Come back down to ${label(id)}` : `Float up to ${label(id)}`;
+        return (
+            <g key={`${kind}-${id}`} className={["trail-cloud-place", `is-${kind}`, onPick && "is-pickable", id === selected && "is-selected"].filter(Boolean).join(" ")}
+                transform={`translate(${x} ${y})`} onClick={onPick ? pick(id) : undefined} data-place={id}>
+                <title>{tip}</title>
+                <path transform={`scale(${k})`} d="M-40 6 q-6 -12 8 -14 q4 -12 18 -9 q8 -10 22 -2 q14 -2 16 10 q10 4 2 15 z" className="trail-cloud"/>
+                <text x={0} y={kind === "lit" ? 5 : 4} textAnchor="middle" className="trail-cloud-text">{short(label(id), kind === "lit" ? 16 : 12)}</text>
+            </g>
+        );
     };
     const step = (by: number) => ring[((ringIndex + by) % ring.length + ring.length) % ring.length];
     const offsets = ring.map((id, i) => ({id, off: ringOffset(i, pos, ring.length)})).filter(w => Math.abs(w.off) <= reach);
@@ -179,6 +195,11 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
             style={{display: "block"}}>
             <title>{ariaLabel}</title>
             <defs>
+                <radialGradient id={`${uid}-glow`}>
+                    <stop offset="0" className="trail-glow-core"/>
+                    <stop offset="0.45" className="trail-glow-mid"/>
+                    <stop offset="1" className="trail-glow-edge"/>
+                </radialGradient>
                 <linearGradient id={`${uid}-sky`} x1={0} y1={0} x2={0} y2={1}>
                     <stop offset="0" className="trail-sky-high"/>
                     <stop offset="1" className="trail-sky-low"/>
@@ -187,6 +208,7 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                     <rect x={0} y={0} width={width} height={height} fill="white"/>
                     <path d={`M${youX - beamFoot} ${groundY + 30} L${headX - beamTop} ${headY - 30} Q${headX} ${headY - 60} ${headX + beamTop} ${headY - 30} L${youX + beamFoot} ${groundY + 30} Z`}
                         fill="black" style={{filter: "blur(10px)"}}/>
+                    {lit && <circle cx={lit.x} cy={lit.y} r={Math.max(60, levelH * 0.75)} fill="black" style={{filter: "blur(14px)"}}/>}
                 </mask>
             </defs>
             <rect x={0} y={0} width={width} height={groundY} fill={`url(#${uid}-sky)`}/>
@@ -272,39 +294,26 @@ export function BalloonTrail({width, height, floor = 0, graph, at, selected, car
                         </>}
                 </g>
                 <path d={string} className="jon-string"/>
-                {ribbons.map(r =>
-                    <g key={r.id} className={["trail-ribbon", onPick && "is-pickable", r.id === selected && "is-selected"].filter(Boolean).join(" ")}
-                        transform={`translate(${stringAt(r.y)} ${r.y})`} onClick={onPick ? pick(r.id) : undefined}>
-                        <title>{`Come back down to ${label(r.id)}`}</title>
-                        <path d="M0 0 L18 5 L0 10 Z" className="trail-ribbon-flag"/>
-                        <text x={22} y={9} className="trail-ribbon-text">{short(label(r.id), 22)}</text>
-                    </g>)}
+                {passed.map(c => cloud(c.id, stringAt(c.y + overHead) + 4, c.y, "passed"))}
                 <g className="trail-head">
                     <Head x={headX} y={headY} r={13}/>
                 </g>
-                {here !== home && levels > 0 && <g className={["trail-here", here === selected && "is-selected"].filter(Boolean).join(" ")}
-                    transform={`translate(${headX + 20 + tagW > width - 4 ? headX - 20 - tagW : headX + 20} ${headY - 6})`}>
-                    <rect x={0} y={-12} width={tagW} height={22} rx={11} className="trail-here-tag"/>
-                    <text x={8} y={3} className="trail-here-text">{short(label(here), 26)}</text>
-                </g>}
             </g>
 
-            {/* what the head can see from here: the places one level deeper, as clouds to float up to */}
-            {sightings.map((id, i) => {
-                const spread = Math.min(130, (width - 80) / Math.max(1, sightings.length));
-                const x = Math.min(width - 60, Math.max(60, headX + (i - (sightings.length - 1) / 2) * spread));
-                const y = Math.max(28, sightY - (i % 2) * 12);
-                return (
-                    <g key={id} className={["trail-sighting", onPick && "is-pickable", id === selected && "is-selected"].filter(Boolean).join(" ")}
-                        transform={`translate(${x} ${y})`} onClick={onPick ? pick(id) : undefined} data-place={id}>
-                        <title>{`Float up to ${label(id)}`}</title>
-                        <path d="M-40 6 q-6 -12 8 -14 q4 -12 18 -9 q8 -10 22 -2 q14 -2 16 10 q10 4 2 15 z" className="trail-cloud"/>
-                        <text x={0} y={4} textAnchor="middle" className="trail-cloud-text">{short(label(id), 12)}</text>
-                    </g>
-                );
-            })}
-
             {dim > 0 && <rect x={0} y={0} width={width} height={height} className="trail-dim" opacity={dim} mask={`url(#${uid}-beam)`} pointerEvents="none"/>}
+
+            {/* the place you're at glows over your head and lights everything around it */}
+            {lit && <>
+                <circle cx={lit.x} cy={lit.y + 10} r={Math.max(90, levelH * 1.1)} fill={`url(#${uid}-glow)`} className="trail-glow" pointerEvents="none"/>
+                {cloud(lit.id, lit.x, lit.y, "lit")}
+            </>}
+
+            {/* what the head can see from here: the places one level further, as clouds to float up to */}
+            {sightings.map((id, i) => {
+                const spread = Math.min(140, (width - 80) / Math.max(1, sightings.length));
+                const x = Math.min(width - 60, Math.max(60, headX + (i - (sightings.length - 1) / 2) * spread));
+                return cloud(id, x, Math.max(28, sightY - (i % 2) * 14), "sighting");
+            })}
         </svg>
     );
 }

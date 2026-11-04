@@ -22,17 +22,20 @@
 .balloon-trail .trail-edge-button { fill: #ffffff; opacity: 0.85; stroke: #8a6435; stroke-width: 1.2; }
 .balloon-trail .trail-edge-arrow { fill: none; stroke: #5d4037; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .balloon-trail .trail-more { font: 500 10px system-ui, sans-serif; fill: #4e6b3a; }
-.balloon-trail .trail-ribbon-flag { fill: #ffb300; stroke: #c67c00; stroke-width: 0.8; }
-.balloon-trail .trail-ribbon-text { font: 600 11px system-ui, sans-serif; fill: #37474f; paint-order: stroke; stroke: #ffffff; stroke-width: 3px; }
-.balloon-trail .trail-ribbon.is-selected .trail-ribbon-flag { stroke: #4dd0e1; stroke-width: 2; }
-.balloon-trail .trail-here-tag { fill: #ffffff; stroke: #1976d2; stroke-width: 1.5; }
-.balloon-trail .trail-here.is-selected .trail-here-tag { stroke: #4dd0e1; stroke-width: 2.4; }
-.balloon-trail .trail-here-text { font: 600 12px system-ui, sans-serif; fill: #0d47a1; }
 .balloon-trail .trail-cloud { fill: #ffffff; stroke: #b0c8e0; stroke-width: 1.2; }
-.balloon-trail .trail-sighting.is-pickable:hover .trail-cloud { stroke: #ffb300; }
-.balloon-trail .trail-sighting.is-selected .trail-cloud { stroke: #4dd0e1; stroke-width: 2.2; }
+.balloon-trail .trail-cloud-place.is-pickable:hover .trail-cloud { stroke: #ffb300; }
+.balloon-trail .trail-cloud-place.is-selected .trail-cloud { stroke: #4dd0e1; stroke-width: 2.2; }
+.balloon-trail .trail-cloud-place.is-passed .trail-cloud { fill: #eef3f8; stroke: #9fb4c8; }
+.balloon-trail .trail-cloud-place.is-passed .trail-cloud-text { fill: #546e7a; }
+.balloon-trail .trail-cloud-place.is-lit .trail-cloud { fill: #fff6d8; stroke: #f2c14e; stroke-width: 1.6; filter: drop-shadow(0 0 6px #ffd76a); }
+.balloon-trail .trail-cloud-place.is-lit .trail-cloud-text { font-weight: 700; font-size: 12px; fill: #6d4c00; }
+.balloon-trail .trail-glow-core { stop-color: #ffe29a; stop-opacity: 0.85; }
+.balloon-trail .trail-glow-mid { stop-color: #ffd36a; stop-opacity: 0.32; }
+.balloon-trail .trail-glow-edge { stop-color: #ffe08a; stop-opacity: 0; }
+.balloon-trail .trail-glow { animation: trail-glow 4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes trail-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
 .balloon-trail .trail-cloud-text { font: 500 10px system-ui, sans-serif; fill: #37474f; }
 .balloon-trail .trail-dim { fill: #0d1b2a; }
 .balloon-trail .trail-head { animation: trail-bob 3.4s ease-in-out infinite; }
 @keyframes trail-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-@media (prefers-reduced-motion: reduce) { .balloon-trail .trail-head { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .balloon-trail .trail-head, .balloon-trail .trail-glow { animation: none; } }
