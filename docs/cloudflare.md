@@ -99,6 +99,25 @@ thread up to date. Snapshots land in the `claude_snapshots` inbox before they ar
 snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
 deleted. Decision record: "AA: Mirror Claude threads on the map".
 
+## Read-only viewer token (for Claude's browser)
+
+Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
+A request carrying it in the `x-viewer-token` header can read anything (every `GET` under `/api/`) and
+nothing else: every write, the connector's consent page and sign-out still need a Google session.
+
+1. Make a long random value (at least 32 characters; shorter values are refused):
+   ```sh
+   openssl rand -base64 32
+   ```
+2. Store it as a Worker secret: `npx wrangler secret put VIEWER_TOKEN`, or in the Cloudflare dashboard under
+   the Worker's Settings, Variables and Secrets, as a Secret named `VIEWER_TOKEN`.
+3. Put the same value in the Claude cloud environment as the environment variable `ADHD_VIEWER_TOKEN`,
+   and add `adhd-assist.2jonwilson.workers.dev` to its Allowed domains.
+   Claude's headless browser then adds it to requests for this site only (never to other hosts), for example
+   with Playwright's `page.route` on `https://adhd-assist.2jonwilson.workers.dev/api/**`.
+
+To revoke it, delete the secret or set a new value. Leaving `VIEWER_TOKEN` unset turns the feature off.
+
 ## Local development
 
 Create `.dev.vars` (it is git-ignored):

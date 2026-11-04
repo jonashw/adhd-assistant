@@ -46,6 +46,27 @@ export async function requireUser(request: Request, env: Env): Promise<string> {
     throw new HttpError(401, "Sign in first.");
 }
 
+/* Header that carries the viewer token, the read-only way in for a helper such as Claude's headless browser */
+export const viewerHeader = "x-viewer-token";
+
+/* Shorter values aren't accepted, so a weak VIEWER_TOKEN can't be guessed */
+const viewerTokenMinLength = 32;
+
+/* For read-only requests: the signed-in email, or the allowed email when the request carries the viewer token.
+   Only GET requests may use this; every write still needs a signed-in session. */
+export async function requireReader(request: Request, env: Env): Promise<string> {
+    const presented = request.headers.get(viewerHeader);
+    if (presented === null) {
+        return requireUser(request, env);
+    }
+    const expected = env.VIEWER_TOKEN;
+    if (expected && expected.length >= viewerTokenMinLength
+        && await sha256(presented) === await sha256(expected)) {
+        return env.ALLOWED_EMAIL.toLowerCase();
+    }
+    throw new HttpError(401, "That viewer token isn't valid.");
+}
+
 type IdTokenClaims = {iss: string, aud: string, exp: number, email?: string, email_verified?: boolean};
 
 function decodeIdToken(idToken: string): IdTokenClaims {
