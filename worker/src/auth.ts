@@ -46,21 +46,21 @@ export async function requireUser(request: Request, env: Env): Promise<string> {
     throw new HttpError(401, "Sign in first.");
 }
 
-/* Header that carries the viewer token, the read-only way in for a helper such as Claude's headless browser */
-export const viewerHeader = "x-viewer-token";
-
 /* Shorter values aren't accepted, so a weak VIEWER_TOKEN can't be guessed */
 const viewerTokenMinLength = 32;
 
-/* For read-only requests: the signed-in email, or the allowed email when the request carries the viewer token.
-   Only GET requests may use this; every write still needs a signed-in session. */
+/* For read-only requests: the signed-in email, or the allowed email when the request carries the viewer token
+   as "Authorization: Bearer <VIEWER_TOKEN>". The standard header lets a proxy add the token on the caller's
+   behalf (Claude's network secrets do), so the caller never holds it. Only GET requests may use this;
+   every write still needs a signed-in session. */
 export async function requireReader(request: Request, env: Env): Promise<string> {
-    const presented = request.headers.get(viewerHeader);
-    if (presented === null) {
+    const authorization = request.headers.get("authorization");
+    if (authorization === null) {
         return requireUser(request, env);
     }
+    const presented = /^Bearer\s+(\S+)$/i.exec(authorization)?.[1];
     const expected = env.VIEWER_TOKEN;
-    if (expected && expected.length >= viewerTokenMinLength
+    if (presented && expected && expected.length >= viewerTokenMinLength
         && await sha256(presented) === await sha256(expected)) {
         return env.ALLOWED_EMAIL.toLowerCase();
     }
