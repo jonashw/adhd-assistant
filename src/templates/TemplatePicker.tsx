@@ -95,26 +95,75 @@ function ComparisonTable({onPick, onUse}: {onPick: (t: StarterTemplate) => void,
 /* The same comparison turned on its side: you ask yourself a question up top, each map's question floats in
    a speech bubble pointing back at you, and below it, framed apart, the map that answers it. No header row. */
 
-function SpeechBubble({text, lean, side = "top"}: {text: string, lean: number, side?: "top" | "left"}) {
-    //the tail reaches back toward the speaker: up toward them over the row, or out to the left toward them atop the column
-    const tip = Math.max(-36, Math.min(36, lean));
+/* where the speaker's open mouth is on screen, so every bubble's tail can point at it, even while the speaker
+   rides down the page beside the questions */
+type MouthRef = React.RefObject<HTMLElement>;
+const mouthAt = (speaker: HTMLElement) => {
+    const r = speaker.getBoundingClientRect();
+    //the mouth sits at (24, 48.5) on the speaker's 52 x 96 drawing
+    return {x: r.left + r.width * 24 / 52, y: r.top + r.height * 48.5 / 96};
+};
+
+function useTail(bubble: React.RefObject<HTMLElement>, mouth: MouthRef, side: "top" | "left") {
+    const [tail, setTail] = React.useState<{base: number, tip: [number, number]}>();
+    React.useEffect(() => {
+        let frame = 0;
+        const update = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                const b = bubble.current?.getBoundingClientRect();
+                const m = mouth.current ? mouthAt(mouth.current) : undefined;
+                if (!b || !m) {
+                    return;
+                }
+                //the tail leaves the bubble's edge at the point nearest the mouth, and reaches a short way toward it
+                const base = side === "left"
+                    ? Math.max(12, Math.min(b.height - 12, m.y - b.top))
+                    : Math.max(18, Math.min(b.width - 18, m.x - b.left));
+                const from: [number, number] = side === "left" ? [0, base] : [base, 0];
+                const dx = m.x - (b.left + from[0]), dy = m.y - (b.top + from[1]);
+                const dist = Math.max(1, Math.hypot(dx, dy));
+                const len = Math.min(side === "left" ? 22 : 30, dist - 8);
+                setTail({base, tip: [from[0] + dx / dist * len, from[1] + dy / dist * len]});
+            });
+        };
+        update();
+        window.addEventListener("scroll", update, {passive: true, capture: true});
+        window.addEventListener("resize", update);
+        const observer = new ResizeObserver(update);
+        if (bubble.current) {
+            observer.observe(bubble.current);
+        }
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener("scroll", update, {capture: true});
+            window.removeEventListener("resize", update);
+            observer.disconnect();
+        };
+    }, [bubble, mouth, side]);
+    return tail;
+}
+
+function SpeechBubble({text, mouth, side = "top"}: {text: string, mouth: MouthRef, side?: "top" | "left"}) {
+    const ref = React.useRef<HTMLDivElement>(null);
+    const tail = useTail(ref, mouth, side);
     const edge = "rgba(0,0,0,0.28)";
+    const w = 8;
+    const points = tail && (side === "left"
+        ? [[1.5, tail.base - w], tail.tip, [1.5, tail.base + w]]
+        : [[tail.base - w, 1.5], tail.tip, [tail.base + w, 1.5]]);
     return (
-        <Box sx={{position: "relative", mt: side === "top" ? "20px" : 0, ml: side === "left" ? "18px" : 0.5, mr: 0.5}}>
-            {side === "top"
-                ? <Box component="svg" aria-hidden viewBox="-40 0 80 22" width={80} height={22}
-                    sx={{position: "absolute", top: -20, left: "50%", ml: "-40px", overflow: "visible"}}>
-                    <path d={`M-9 21 L${tip} 0 L9 21`} fill="white" stroke={edge} strokeWidth={1.5} strokeLinejoin="round"/>
-                    <rect x={-10} y={20} width={20} height={4} fill="white"/>
-                </Box>
-                : <Box component="svg" aria-hidden viewBox="0 0 22 30" width={22} height={30}
-                    sx={{position: "absolute", top: 4, left: -19, overflow: "visible"}}>
-                    <path d={`M21 8 L0 ${-tip} L21 22`} fill="white" stroke={edge} strokeWidth={1.5} strokeLinejoin="round"/>
-                    <rect x={20} y={7} width={4} height={16} fill="white"/>
-                </Box>}
-            <Paper variant="outlined" sx={{px: 1.25, py: 1, borderRadius: 3, borderWidth: 1.5, borderColor: edge, textAlign: "center"}}>
+        <Box sx={{position: "relative", mt: side === "top" ? "30px" : 0, ml: side === "left" ? "18px" : 0.5, mr: 0.5}}>
+            <Paper ref={ref} variant="outlined" sx={{px: 1.25, py: 1, borderRadius: 3, borderWidth: 1.5, borderColor: edge, textAlign: "center"}}>
                 <Typography variant="body2" sx={{fontStyle: "italic", lineHeight: 1.35}}>{text}</Typography>
             </Paper>
+            {/* the tail, drawn over the bubble's edge so the gap where it joins is white */}
+            {points && <Box component="svg" aria-hidden width={1} height={1}
+                sx={{position: "absolute", top: 0, left: 0, overflow: "visible", pointerEvents: "none"}}>
+                <path d={`M${points.map(p => p.join(" ")).join(" L")}`} fill="white" stroke={edge} strokeWidth={1.5} strokeLinejoin="round"/>
+                <path d={side === "left" ? `M1.5 ${tail.base - w + 1.5} L1.5 ${tail.base + w - 1.5}` : `M${tail.base - w + 1.5} 1.5 L${tail.base + w - 1.5} 1.5`}
+                    stroke="white" strokeWidth={3}/>
+            </Box>}
         </Box>
     );
 }
@@ -127,7 +176,7 @@ function AnswerCard({template, onPick, onUse}: {template: StarterTemplate, onPic
             <CardActionArea onClick={() => onPick(template)} title={`Read more about ${template.name}`}
                 sx={{flexGrow: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", px: 1.5, pt: 1.5, pb: 1.5, gap: 1}}>
                 <Box sx={{height: 64, display: "flex", alignItems: "center", justifyContent: "center"}}><MapEmblem crew={template.crew} size={60}/></Box>
-                <Typography variant="subtitle2" component="h3" fontWeight={700} sx={{lineHeight: 1.3, textAlign: "center"}}>{template.name}</Typography>
+                <Typography variant="subtitle2" component="h3" fontWeight={400} sx={{lineHeight: 1.3, textAlign: "center"}}>{template.name}</Typography>
             </CardActionArea>
             <Divider/>
             <CardActions sx={{bgcolor: "background.paper", justifyContent: "space-between", px: 0.75, gap: 0.5, "& > :not(style) ~ :not(style)": {ml: 0}}}>
@@ -141,14 +190,15 @@ function AnswerCard({template, onPick, onUse}: {template: StarterTemplate, onPic
 /* Wide screens: you stand over a row of questions, each answered by the card under it */
 function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
     const n = starterTemplates.length;
+    const mouth = React.useRef<HTMLDivElement>(null);
     return (
         <Box>
             {/* you, asking; kept outside the sideways scroll so you stay in the middle of the screen */}
-            <Box sx={{display: "flex", justifyContent: "center", mb: -0.5}}><Speaker size={96}/></Box>
+            <Box sx={{display: "flex", justifyContent: "center", mb: -0.5}}><Box ref={mouth} sx={{lineHeight: 0}}><Speaker size={96}/></Box></Box>
             <Box sx={{overflowX: "auto", pb: 1, mx: -1, px: 1}}>
                 <Box sx={{display: "grid", gridTemplateColumns: `repeat(${n}, minmax(120px, 1fr))`, columnGap: 1.25, rowGap: 1.5, minWidth: n * 130}}>
-                    {starterTemplates.map((t, i) =>
-                        <SpeechBubble key={`${t.id}-ask`} text={t.pickWhen} lean={((n - 1) / 2 - i) * 15}/>)}
+                    {starterTemplates.map(t =>
+                        <SpeechBubble key={`${t.id}-ask`} text={t.pickWhen} mouth={mouth}/>)}
                     {starterTemplates.map(t => <AnswerCard key={t.id} template={t} onPick={onPick} onUse={onUse}/>)}
                 </Box>
             </Box>
@@ -158,13 +208,15 @@ function ComparisonColumns({onPick, onUse}: {onPick: (t: StarterTemplate) => voi
 
 /* Small and mid screens: you stand top left, and the questions run down a column beside you, each over its answer */
 function ComparisonStack({onPick, onUse}: {onPick: (t: StarterTemplate) => void, onUse: (t: StarterTemplate) => void}) {
+    const mouth = React.useRef<HTMLDivElement>(null);
     return (
         <Box sx={{display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", columnGap: 1, alignItems: "start"}}>
-            <Box sx={{position: "sticky", top: 72, pt: 0.5}}><Speaker size={88}/></Box>
+            {/* raised so your mouth is level with the first question; it rides down the page as you scroll */}
+            <Box ref={mouth} sx={{position: "sticky", top: 64, mt: "-24px", lineHeight: 0}}><Speaker size={88}/></Box>
             <Stack gap={2.5} sx={{maxWidth: 360}}>
-                {starterTemplates.map((t, i) =>
+                {starterTemplates.map(t =>
                     <Stack key={t.id} gap={1}>
-                        <SpeechBubble text={t.pickWhen} side="left" lean={Math.min(36, i * 6)}/>
+                        <SpeechBubble text={t.pickWhen} side="left" mouth={mouth}/>
                         <Box sx={{ml: "18px"}}><AnswerCard template={t} onPick={onPick} onUse={onUse}/></Box>
                     </Stack>)}
             </Stack>
@@ -357,17 +409,9 @@ export function TemplatePicker() {
                 onUse={t => { setPreviewing(undefined); use(t); }}/>}
             <Container maxWidth="md" sx={{py: 3}}>
                 <Stack gap={3}>
-                    <Stack direction={{xs: "column", sm: "row"}} gap={2} alignItems={{xs: "flex-start", sm: "center"}}>
+                    <Stack direction="row" gap={2} alignItems="center">
                         <YouScene size={72} aloft={false}/>
-                        <Box>
-                            <Typography variant="body1">
-                                Each starter map begins you somewhere different. Your crew comes along to every map: you with your
-                                balloon head, the dog, the squirrel, the spider and the sloth at HOME. Each map puts one of them forward.
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{mt: 1}}>
-                                Tap a map to read more about it. Each one below has a preview you can try full screen without saving anything.
-                            </Typography>
-                        </Box>
+                        <Typography variant="body1">Each starter map begins you somewhere different.</Typography>
                     </Stack>
                     <Stack gap={1}>
                         <ToggleButtonGroup size="small" exclusive value={compare} onChange={(_, v: Compare | null) => v && setCompare(v)}
