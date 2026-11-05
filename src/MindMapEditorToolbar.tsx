@@ -1,12 +1,13 @@
-import { AppBar, Button, ButtonGroup, Divider, ListItemIcon, ListItemText, Menu, MenuItem, Toolbar} from "@mui/material";
+import { AppBar, Button, ButtonGroup, Divider, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Toolbar} from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode, nodeStatuses } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
-import { AltRoute, Check, Delete, Edit, FormatListBulleted, OutlinedFlag, TaskAlt, Visibility, VisibilityOff } from "@mui/icons-material";
+import { AltRoute, ArrowBack, Check, Delete, Edit, FormatListBulleted, OutlinedFlag, TaskAlt, Visibility, VisibilityOff } from "@mui/icons-material";
 import { PlaceDetailsDialog } from "./PlaceDetailsDialog";
 import { MindMapOutlineModal } from "./MindMapOutlineModal";
+import { useNavigate } from "react-router-dom";
 
 
 export type GraphNodeClickMode = "re-parent" | "select";
@@ -22,6 +23,7 @@ export function MindMapEditorToolbar({
     revealHidden,
     setRevealHidden,
     onNodeRemoved,
+    onBack,
 }: {
     value: MindMapGraphData;
     onChange: (value: MindMapGraphData) => void;
@@ -33,7 +35,10 @@ export function MindMapEditorToolbar({
     revealHidden: boolean;
     setRevealHidden: (value: boolean) => void;
     onNodeRemoved: (node: MindMapGraphNode) => void;
+    /* where the back arrow goes; the map list unless given */
+    onBack?: () => void;
 }) {
+    const navigate = useNavigate();
     const home = value.nodes.find(n => n.type === "HOME");
     const [nodeToRename,setNodeToRename] = React.useState<DirectedGraphNode<MindMapGraphNode>>();
     const [outlineVisible, setOutlineVisible] = React.useState(false);
@@ -81,6 +86,11 @@ export function MindMapEditorToolbar({
 
             <MindMapOutlineModal
                 graph={value}
+                selectedId={selectedNode?.id}
+                onSelect={id => {
+                    selectNodeId(id);
+                    setOutlineVisible(false);
+                }}
                 open={outlineVisible}
                 onClose={() => {
                     setOutlineVisible(false);
@@ -120,6 +130,9 @@ export function MindMapEditorToolbar({
 
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
                 <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between', '& .MuiButton-root': { minWidth: 40, px: 1 } }}>
+                    <IconButton color="inherit" edge="start" title="Back to your maps" aria-label="Back to your maps" onClick={() => onBack ? onBack() : navigate("/")}>
+                        <ArrowBack/>
+                    </IconButton>
                     <UndoRedoToolbar controller={undoController} />
                     <Button 
                         variant="contained"

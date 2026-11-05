@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Weekly review: a week on a calendar page, its last day checked, inside an arrow that loops back to the start -->
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none" stroke="#1d1d1d" stroke-linecap="round" stroke-linejoin="round">
+  <!-- the loop: most of a circle, its head arriving back at the top -->
+  <path d="M74 12.5 A49 49 0 1 1 42 13.5" stroke-width="7"/>
+  <path d="M33 4.5 L44.5 13 L34 23" stroke-width="7"/>
+  <!-- the calendar page -->
+  <rect x="31" y="38" width="58" height="48" rx="6" stroke-width="5"/>
+  <path d="M31 51 H89" stroke-width="5"/>
+  <path d="M44 32 V43 M76 32 V43" stroke-width="5"/>
+  <!-- the week: six days ticked by, the seventh checked -->
+  <g fill="#1d1d1d" stroke="none">
+    <circle cx="41" cy="62" r="3"/><circle cx="53" cy="62" r="3"/><circle cx="65" cy="62" r="3"/>
+    <circle cx="41" cy="75" r="3"/><circle cx="53" cy="75" r="3"/><circle cx="65" cy="75" r="3"/>
+  </g>
+  <path d="M73 69 L78 75 L87 60" stroke-width="5"/>
+</svg>

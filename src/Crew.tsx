@@ -5,8 +5,9 @@ import { Spider, SpiderDoing } from "./crew/Spider";
 import { Squirrel, SquirrelDoing } from "./crew/Squirrel";
 import { Sloth } from "./crew/Sloth";
 import { Jon, JonDoing, StringSpider } from "./crew/Jon";
+import { RabbitBurrow, RabbitBurrowLoop } from "./crew/Rabbit";
 
-export { Dog, Spider, Squirrel, Sloth, Jon };
+export { Dog, Spider, Squirrel, Sloth, Jon, RabbitBurrow, RabbitBurrowLoop };
 export type { DogDoing, SpiderDoing, SquirrelDoing, JonDoing, StringSpider };
 
 type Who = "dog" | "spider" | "squirrel" | "sloth";

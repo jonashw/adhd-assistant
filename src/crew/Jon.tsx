@@ -42,7 +42,7 @@ export function Jon({size = 48, doing = "tied", stringOut = 1, spider}: {
 }
 
 /* Your head is a balloon: the head scouts, floating on the string the body holds */
-function Head({x, y, r}: {x: number, y: number, r: number}) {
+export function Head({x, y, r}: {x: number, y: number, r: number}) {
     const cy = y - 1.5;
     const ry = r;
     const rx = r * 0.86;
