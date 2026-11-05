@@ -3,12 +3,14 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    Paper, Stack, Tab, Tabs, Toolbar, Typography
+    InputAdornment, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
 } from "@mui/material";
-import { ArrowBack, Close, OpenInNew, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Close, OpenInNew, Search, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
-    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeStaleHours
+    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeStaleHours, glanceLine, isNewSince
 } from "./ClaudeMapTypes";
+import { ClaudeThreadGlance, NewDot, PrChip } from "./ClaudeThreadGlance";
+import { matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
 import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
@@ -169,6 +171,17 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
         ctx.fill();
     }
 
+    // something new since Jon last opened it from the map: a small dot on the ring
+    if (node.kind === "thread" && node.thread && isNewSince(node.thread)) {
+        ctx.beginPath();
+        ctx.arc(x + r * 0.75, y - r * 0.75, 1.7, 0, 2 * Math.PI);
+        ctx.fillStyle = claudeStyle.ring;
+        ctx.fill();
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.stroke();
+    }
+
     // label: up to two short lines, so neighbours don't collide
     const fontSize = node.kind === "thread" ? 3.6 : 4.4;
     ctx.textAlign = "center";
@@ -327,6 +340,7 @@ export function ClaudeMap() {
     const [view, setView] = React.useState<"map" | "list">("map");
     const [showHidden, setShowHidden] = React.useState(false);
     const [selectedId, setSelectedId] = React.useState<string>();
+    const [query, setQuery] = React.useState("");
     const [rect, sizeRef] = useElementSize();
     const graphRef = React.useRef<ForceGraphMethods<NodeObject<MapNode>>>();
     const lastClick = React.useRef<{id: string, at: number}>();
@@ -334,8 +348,8 @@ export function ClaudeMap() {
     const visible = React.useMemo(() => (projects ?? []).filter(p => showHidden || !p.hidden), [projects, showHidden]);
     const graphData = useStableGraph(visible);
     if (demo) {
-        // lets the demo's layout be inspected from the console
-        (window as unknown as {claudeMapNodes: unknown}).claudeMapNodes = graphData.nodes;
+        // lets the demo's layout be inspected, and a card opened, from the console
+        Object.assign(window, {claudeMapNodes: graphData.nodes, claudeMapSelect: setSelectedId});
     }
     // forces are set once each time the graph mounts; a data refresh never restarts the whole layout.
     // (The graph's handle is a new object on every render, so it can't tell mounts apart; this can.)
@@ -353,6 +367,18 @@ export function ClaudeMap() {
     }, [showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
+
+    /* Jump to Claude; for a thread, what its card says now is no longer new */
+    const openNode = (url?: string, thread?: ClaudeThread) => {
+        open(url);
+        if (thread) {
+            const openedAt = new Date().toISOString();
+            setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => t.id === thread.id ? {...t, openedAt} : t)})));
+            if (!demo) {
+                ServerApi.markClaudeThreadOpened(thread.id).catch(() => undefined);
+            }
+        }
+    };
 
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
@@ -446,14 +472,27 @@ export function ClaudeMap() {
                     lastClick.current = {id: n.id, at: now};
                     setSelectedId(n.kind === "root" ? undefined : n.id);
                     if (doubled) {
-                        open(n.url);
+                        openNode(n.url, n.thread);
                     }
                 }}
                 onBackgroundClick={() => setSelectedId(undefined)}
             />}
 
             {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
-                {(projects ?? []).filter(p => showHidden || !p.hidden).map(p => <React.Fragment key={p.id}>
+                <Box sx={{px: 2, pt: 1.5, pb: 1}}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search words, topics or a day (monday)"
+                        InputProps={{startAdornment: <InputAdornment position="start"><Search fontSize="small"/></InputAdornment>}}
+                    />
+                </Box>
+                {query.trim() && !visible.some(p => p.threads.some(t => matchesSearch(t, p, query))) && <Typography variant="body2" sx={{px: 2, py: 1}}>
+                    No thread matches that.
+                </Typography>}
+                {visible.filter(p => !query.trim() || p.threads.some(t => matchesSearch(t, p, query))).map(p => <React.Fragment key={p.id}>
                     <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
                         <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
                             {projectLabel(p)}
@@ -464,14 +503,19 @@ export function ClaudeMap() {
                             {p.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}
                         </IconButton>
                     </ListSubheader>
-                    {[...p.threads]
+                    {p.threads.filter(t => matchesSearch(t, p, query))
                         .sort((a, b) => byUrgency(badgeFor(a, p), badgeFor(b, p)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
-                        .map(t => <ListItemButton key={t.id} onClick={() => open(t.url)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
+                        .map(t => <ListItemButton key={t.id} onClick={() => openNode(t.url, t)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
                             <BadgeChip kind={badgeFor(t, p)}/>
                             <ListItemText
                                 primary={t.title}
-                                secondary={t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`}
+                                secondary={[glanceLine(t), t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`]
+                                    .filter(Boolean).join(" · ")}
+                                secondaryTypographyProps={{noWrap: true}}
+                                sx={{minWidth: 0}}
                             />
+                            {t.prs?.filter(pr => pr.state === "open" || pr.state === "draft").map(pr => <PrChip key={`${pr.repo}#${pr.number}`} pr={pr}/>)}
+                            <NewDot thread={t}/>
                         </ListItemButton>)}
                 </React.Fragment>)}
                 {hiddenCount > 0 && <Box sx={{p: 2}}>
@@ -484,7 +528,10 @@ export function ClaudeMap() {
 
         {view === "map" && selected && selected.kind !== "root" && <Paper
             elevation={6}
-            sx={{position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto"}}
+            sx={{
+                position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto",
+                maxHeight: "70dvh", overflowY: "auto"
+            }}
         >
             <Stack direction="row" alignItems="flex-start" gap={1}>
                 <Box sx={{flexGrow: 1, minWidth: 0}}>
@@ -500,6 +547,7 @@ export function ClaudeMap() {
                 </Box>
                 <IconButton size="small" aria-label="Close" onClick={() => setSelectedId(undefined)}><Close fontSize="small"/></IconButton>
             </Stack>
+            {selected.kind === "thread" && selected.thread && <ClaudeThreadGlance thread={selected.thread}/>}
             <Stack direction="row" alignItems="center" gap={1} sx={{mt: 1}}>
                 {selected.badge && <BadgeChip kind={selected.badge} text={selected.badgeText}/>}
                 <Box sx={{flexGrow: 1}}/>
@@ -508,7 +556,7 @@ export function ClaudeMap() {
                     size="small"
                     endIcon={<OpenInNew/>}
                     sx={{bgcolor: claudeStyle.ring, "&:hover": {bgcolor: "#C4623F"}}}
-                    onClick={() => open(selected.url)}
+                    onClick={() => openNode(selected.url, selected.thread)}
                 >
                     Open in Claude
                 </Button>
