@@ -17,7 +17,8 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             thread("demo_garden", "demo_g1", "Price out raised beds", "blocked", 12),
             thread("demo_garden", "demo_g2", "Plan the watering schedule", tick % 3 === 2 ? "review_ready" : "working", 1),
             thread("demo_garden", "demo_g3", "Draft the shed layout", "review_ready", 30),
-            thread("demo_garden", "demo_g4", "Pick hardy perennials", "done", 2000)
+            thread("demo_garden", "demo_g4", "Pick hardy perennials", "done", 2000),
+            thread("demo_garden", "demo_g5", "Choose a compost bin", "blocked", 60 * 24 * 10)
         ]),
         project("demo_trip", "Summer trip planning", "Trip", 3, [
             thread("demo_trip", "demo_t1", "Compare train passes", "working", 3),
