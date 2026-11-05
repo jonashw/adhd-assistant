@@ -9,8 +9,9 @@ import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places
 import { LinkedItem, threadStates } from "../../src/TrailTypes";
 import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates } from "../../src/ClaudeMapTypes";
 import { syncProject } from "./claude";
+import { logMonologue, monologueMaxChars } from "./monologues";
 
-/* The Claude connector: a stateless MCP server at /mcp. Claude can check a thread in, report its state,
+/* The Claude connector: a stateless MCP server at /mcp. Claude can check a thread in, report its state, log Jon's dictation,
    and read Jon's map. It can't change places, statuses or links. */
 
 export type ConnectorProps = {email: string};
@@ -27,7 +28,8 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
   - threads: send the whole list the first time, and whenever any thread's title or state differs from your last sync. Otherwise leave threads out; that means "unchanged" and saves writing the list.
   - this_thread: your own thread id and card (headline, ask, progress, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
   - prs: the project's PR list (list_prs) when it changed since your last sync. Set each PR's thread_id to the thread whose session id ends the same way.
-  - If nothing changed at all, skip the call.`;
+  - If nothing changed at all, skip the call.
+- Monologues: when Jon sends you dictation (spoken words, often several topics in a row) or asks you to log what he said, call log_monologue with his words exactly as he sent them, unedited, plus this thread's link or thread_id. The app turns it into a map he can replay. Don't log your own words or anything he pasted from elsewhere.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
 
@@ -134,6 +136,25 @@ function buildServer(env: Env): McpServer {
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(() => syncProject(env, args)));
+
+    server.registerTool("log_monologue", {
+        title: "Log a monologue",
+        description: "Send Jon's dictated words to the app, exactly as he said them. They're kept as a monologue of sentences that the app reads, charts as dashed stakes and replays. Sending the same words twice from one thread within a minute stores them once.",
+        inputSchema: {
+            text: z.string().max(monologueMaxChars).describe("Jon's words, exactly as he sent them"),
+            url: z.string().max(2000).optional().describe("This thread's link, if you know it"),
+            thread_id: z.string().optional().describe("The thread_id check_in returned, if this thread checked in")
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(async () => {
+        const {monologue, repeat} = await logMonologue(env, {text: args.text, threadUrl: args.url, threadItemId: args.thread_id});
+        return {
+            monologue_id: monologue.id,
+            sentences: monologue.utterances.length,
+            repeat,
+            next: repeat ? "These words were already logged a moment ago; nothing new was stored." : "Logged. Tell Jon in one line."
+        };
+    }));
 
     server.registerTool("suggest_place", {
         title: "Suggest a place",

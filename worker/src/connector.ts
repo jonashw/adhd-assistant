@@ -25,7 +25,7 @@ button{font:inherit;padding:.5em 1.2em;margin-right:.5em}</style>
 <h1>Let ${name} read your map and raise signals on it?</h1>
 <p>${origin} Access goes to <strong>${escape(details.redirectHost)}</strong>.</p>
 ${details.redirectIsLoopback ? "<p><strong>This sends access to an app on this computer.</strong> Allow it only if you just started connecting from it.</p>" : ""}
-<p>It will be able to find and read your places, ask What's next, check its threads in and say when they need you.
+<p>It will be able to find and read your places, ask What's next, check its threads in, say when they need you and log what you dictate to it.
 It can't change places, statuses or links. You can revoke it any time under Connected apps.</p>
 <form method="post">
 <input type="hidden" name="handle" value="${escape(handle)}">

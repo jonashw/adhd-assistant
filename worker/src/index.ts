@@ -7,6 +7,7 @@ import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
 import { listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
+import { getMonologue, listMonologues } from "./monologues";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
     // reads may use the viewer token; writes always need a signed-in session
@@ -24,6 +25,14 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
     if (url.pathname === "/api/claude-map" && request.method === "GET") {
         return json(await listClaudeMap(env));
+    }
+    if (url.pathname === "/api/monologues" && request.method === "GET") {
+        return json(await listMonologues(env));
+    }
+    const monologueMatch = /^\/api\/monologues\/([^/]+)$/.exec(url.pathname);
+    if (monologueMatch && request.method === "GET") {
+        const monologue = await getMonologue(env, decodeURIComponent(monologueMatch[1]));
+        return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
     }
     const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);
     if (hideMatch && request.method === "POST") {
