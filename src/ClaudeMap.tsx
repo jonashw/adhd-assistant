@@ -529,7 +529,10 @@ export function ClaudeMap() {
                     ctx.fill();
                 }}
                 autoPauseRedraw={false}
-                cooldownTime={2500}
+                // settle by ticks, not by the clock: a background tab draws no frames, and a clock-based
+                // cooldown would end the moment Jon came back, leaving new threads on top of their project
+                cooldownTicks={120}
+                cooldownTime={Infinity}
                 onEngineTick={() => {
                     if (graphData.pins?.size) {
                         graphData.nodes.forEach(n => {
