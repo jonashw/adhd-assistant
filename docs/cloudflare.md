@@ -99,6 +99,16 @@ thread up to date. Snapshots land in the `claude_snapshots` inbox before they ar
 snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
 deleted. Decision record: "AA: Mirror Claude threads on the map".
 
+**Glance cards.** Each thread also sends its own card with `sync_project` as `this_thread`: a one-line headline of
+its latest reply, what it asks of Jon (question, decision, go-ahead or review), its checklist counted ("3 of 5",
+the step in progress), its latest artifact, and a topic line with a few keywords. Any thread passes on the
+project's PRs (`prs`, from the platform's PR list) with each matched to the thread that opened it, so the card shows
+the PR number, state and checks. A card replaces the last one whole; a repeat keeps its time. "New" means the card
+changed since Jon last opened that thread from the map. Every topic a thread has had stays searchable from the
+list view, along with day words like "monday". To save tokens, a sync may leave `threads` out when no title or state
+changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
+thread cards on the Claude map: design proposal" (Jon chose Glance).
+
 ## Read-only viewer token (for Claude's browser)
 
 Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.

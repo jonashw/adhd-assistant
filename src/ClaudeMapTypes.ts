@@ -15,8 +15,55 @@ export type ClaudeThread = {
     /* the last snapshot that listed it */
     lastSeenAt: string,
     /* false when the project's latest snapshot didn't list it: it is shown as not seen since lastSeenAt */
-    inLatest: boolean
+    inLatest: boolean,
+    /* what the thread last said about itself, if it ever did */
+    card?: ClaudeCard,
+    /* PRs it opened, newest first */
+    prs?: ClaudePr[],
+    /* when Jon last opened it from the map */
+    openedAt?: string,
+    /* topics and keywords it had before, for search */
+    pastTopics?: string[]
 };
+
+/* What a thread needs from Jon, if anything */
+export const claudeAskKinds = ["question", "decision", "approval", "review"] as const;
+export type ClaudeAskKind = typeof claudeAskKinds[number];
+
+/* A thread's glance card: the answers to "should I look now?" without opening it */
+export type ClaudeCard = {
+    /* its latest reply in a line */
+    headline?: string,
+    ask?: {kind: ClaudeAskKind, text: string},
+    progress?: {done: number, total: number, now?: string},
+    artifact?: {title: string, url: string},
+    topic?: string,
+    keywords?: string[],
+    /* when the card last changed */
+    at: string
+};
+
+export const claudePrStates = ["open", "draft", "merged", "closed"] as const;
+export type ClaudePrState = typeof claudePrStates[number];
+export const claudeCiStates = ["success", "failure", "pending", "none"] as const;
+export type ClaudeCiState = typeof claudeCiStates[number];
+
+export type ClaudePr = {
+    repo: string,
+    number: number,
+    title: string,
+    state: ClaudePrState,
+    ci?: ClaudeCiState,
+    url: string
+};
+
+/* The card has something Jon hasn't seen since he last opened the thread from the map */
+export const isNewSince = (thread: ClaudeThread) =>
+    !!thread.card && (!thread.openedAt || thread.card.at > thread.openedAt);
+
+/* An ask only stands while the thread is waiting on Jon */
+export const standingAsk = (thread: ClaudeThread) =>
+    thread.state === "blocked" || thread.state === "review_ready" ? thread.card?.ask : undefined;
 
 export type ClaudeProject = {
     id: string,
@@ -62,3 +109,16 @@ export function badgeFor(thread: ClaudeThread, project: ClaudeProject, now = Dat
 
 /* Most urgent first, for lists and for a project's summary */
 export const badgeOrder: ClaudeBadgeKind[] = ["blocked", "failed", "review_ready", "working", "stale", "gone", "stopped", "done"];
+
+export const askLabels: Record<ClaudeAskKind, string> = {
+    question: "Question",
+    decision: "Decision",
+    approval: "Go-ahead",
+    review: "Review"
+};
+
+/* One line for a list row: the ask if there is one, else the headline */
+export function glanceLine(thread: ClaudeThread): string | undefined {
+    const ask = standingAsk(thread);
+    return ask ? `${askLabels[ask.kind]}: ${ask.text}` : thread.card?.headline;
+}
