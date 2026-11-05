@@ -237,16 +237,17 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
 }
 
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
-type OpenIn = "new-tab" | "one-tab" | "desktop";
+/* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
+   from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
+type OpenIn = "new-tab" | "desktop";
 const openInKey = "claudeMap.openIn";
 const openInLabels: Record<OpenIn, string> = {
     "new-tab": "A new browser tab each time",
-    "one-tab": "One browser tab, reused",
-    "desktop": "The Claude desktop app (experimental)"
+    "desktop": "The Claude desktop app"
 };
 
 /* claude.ai's links work in the desktop app as claude://claude.ai/<same path>. Its help page lists chats and
-   projects; whether it routes Claude Code project threads is untested, hence "experimental". */
+   projects; Jon confirmed on 2026-11-05 that it lands on Claude Code project threads too. */
 const desktopUrl = (url: string) => url.replace(/^https:\/\/claude\.ai\//, "claude://claude.ai/");
 
 const open = (url: string | undefined, openIn: OpenIn) => {
@@ -257,16 +258,21 @@ const open = (url: string | undefined, openIn: OpenIn) => {
         window.location.href = desktopUrl(url);
         return;
     }
-    const tab = window.open(url, openIn === "one-tab" ? "adhd-assist-claude" : "_blank");
+    const tab = window.open(url, "_blank");
     if (tab) {
         tab.opener = null;
     }
 };
 
+/* A real link, so the URL shows on hover, can be copied, and cmd- or middle-click makes a tab of its own */
+const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
+    ? {component: "a" as const, href: desktopUrl(url)}
+    : {component: "a" as const, href: url, target: "_blank", rel: "noopener noreferrer"};
+
 const readOpenIn = (): OpenIn => {
     try {
         const value = localStorage.getItem(openInKey);
-        return value === "one-tab" || value === "desktop" ? value : "new-tab";
+        return value === "desktop" ? value : "new-tab";
     } catch {
         return "new-tab";
     }
@@ -421,6 +427,10 @@ export function ClaudeMap() {
     /* Jump to Claude; for a thread, what its card says now is no longer new */
     const openNode = (url?: string, thread?: ClaudeThread) => {
         open(url, openIn);
+        markOpened(thread);
+    };
+    /* what its card says now is no longer new */
+    const markOpened = (thread?: ClaudeThread) => {
         if (thread) {
             const openedAt = new Date().toISOString();
             setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => t.id === thread.id ? {...t, openedAt} : t)})));
@@ -575,14 +585,14 @@ export function ClaudeMap() {
                             {projectLabel(p)}
                         </Typography>
                         <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
-                        <IconButton size="small" title="Open this project in Claude" onClick={() => openNode(p.url)}><OpenInNew fontSize="small"/></IconButton>
+                        <IconButton size="small" title="Open this project in Claude" {...linkProps(p.url, openIn)}><OpenInNew fontSize="small"/></IconButton>
                         <IconButton size="small" title={p.hidden ? "Show this project" : "Hide this project"} onClick={() => toggleHidden(p)}>
                             {p.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}
                         </IconButton>
                     </ListSubheader>
                     {[...p.threads]
                         .sort((a, b) => byUrgency(badgeFor(a, p), badgeFor(b, p)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
-                        .map(t => <ListItemButton key={t.id} onClick={() => openNode(t.url, t)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
+                        .map(t => <ListItemButton key={t.id} {...linkProps(t.url, openIn)} onClick={() => markOpened(t)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
                             <BadgeChip kind={badgeFor(t, p)}/>
                             <ListItemText
                                 primary={t.title}
@@ -634,7 +644,8 @@ export function ClaudeMap() {
                     size="small"
                     endIcon={<OpenInNew/>}
                     sx={{bgcolor: claudeStyle.ring, "&:hover": {bgcolor: "#C4623F"}}}
-                    onClick={() => openNode(selected.url, selected.thread)}
+                    {...linkProps(selected.url, openIn)}
+                    onClick={() => markOpened(selected.thread)}
                 >
                     Open in Claude
                 </Button>
