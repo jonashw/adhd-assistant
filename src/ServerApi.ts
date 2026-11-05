@@ -84,6 +84,8 @@ export const ServerApi = {
     claudeMap: () => request<ClaudeProject[]>("/api/claude-map"),
     setClaudeProjectHidden: (id: string, hidden: boolean) =>
         request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    markClaudeThreadOpened: (id: string) =>
+        request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
     listConnections: () => request<Connection[]>("/api/connections"),
     revokeConnection: (id: string) => request<void>(`/api/connections/${encodeURIComponent(id)}/revoke`, {method: "POST"})

@@ -99,6 +99,35 @@ thread up to date. Snapshots land in the `claude_snapshots` inbox before they ar
 snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
 deleted. Decision record: "AA: Mirror Claude threads on the map".
 
+**Glance cards.** Each thread also sends its own card with `sync_project` as `this_thread`: a one-line headline of
+its latest reply, what it asks of Jon (question, decision, go-ahead or review), its checklist counted ("3 of 5",
+the step in progress), its latest artifact, and a topic line with a few keywords. Any thread passes on the
+project's PRs (`prs`, from the platform's PR list) with each matched to the thread that opened it, so the card shows
+the PR number, state and checks. A card replaces the last one whole; a repeat keeps its time. "New" means the card
+changed since Jon last opened that thread from the map. Every topic a thread has had stays searchable from the
+list view, along with day words like "monday". To save tokens, a sync may leave `threads` out when no title or state
+changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
+thread cards on the Claude map: design proposal" (Jon chose Glance).
+
+## Read-only viewer token (for Claude's browser)
+
+Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
+A request carrying `Authorization: Bearer <VIEWER_TOKEN>` can read anything (every `GET` under `/api/`) and
+nothing else: every write, the connector's consent page and sign-out still need a Google session.
+
+1. Make a long random value (at least 32 characters; shorter values are refused):
+   ```sh
+   openssl rand -base64 32
+   ```
+2. Store it as a Worker secret: `npx wrangler secret put VIEWER_TOKEN`, or in the Cloudflare dashboard under
+   the Worker's Settings, Variables and Secrets, as a Secret named `VIEWER_TOKEN`.
+3. Give it to Claude as a **network secret**, not an environment variable: in the Claude cloud environment's
+   settings, add it under Network secrets for the host `adhd-assist.2jonwilson.workers.dev` (and allow that
+   domain). The environment's proxy then adds the header to requests for that host only. Claude's sessions,
+   shell and browser never see the value, and it is never sent to any other host.
+
+To revoke it, delete the secret or set a new value. Leaving `VIEWER_TOKEN` unset turns the feature off.
+
 ## Local development
 
 Create `.dev.vars` (it is git-ignored):
