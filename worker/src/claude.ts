@@ -40,7 +40,8 @@ export type Snapshot = {
     short_name?: string,
     /* left out = the list hasn't changed since the last sync (only once the project is on the map) */
     threads?: SnapshotThread[],
-    this_thread?: {thread_id: string, card: SnapshotCard},
+    /* state: what the thread leaves itself as when this turn ends; the platform's own list only catches up later */
+    this_thread?: {thread_id: string, card: SnapshotCard, state?: ClaudeThreadState},
     /* left out = unchanged; sent = the project's whole PR list */
     prs?: SnapshotPr[]
 };
@@ -116,6 +117,9 @@ export function checkSnapshot(input: Snapshot): Snapshot {
             fail("this_thread must be one of the threads listed.");
         }
         checkCard(input.this_thread.card);
+        if (input.this_thread.state !== undefined && !claudeThreadStates.includes(input.this_thread.state)) {
+            fail("this_thread has an unknown state.");
+        }
     }
     if (input.prs) {
         checkPrs(input.prs);
@@ -197,6 +201,10 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
                 created_at = COALESCE(claude_threads.created_at, excluded.created_at),
                 last_seen_at = excluded.last_seen_at`
         ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, now, now)),
+        // a thread's word on its own state as its turn ends beats the platform's list, which lags behind by a turn
+        ...(snapshot.this_thread?.state ? [env.DB.prepare(
+            `UPDATE claude_threads SET state = ?, last_activity_at = ? WHERE id = ? AND project_id = ?`
+        ).bind(snapshot.this_thread.state, now, snapshot.this_thread.thread_id, snapshot.project_id)] : []),
         ...(snapshot.this_thread ? cardStatements(env, snapshot.project_id, snapshot.this_thread.thread_id, snapshot.this_thread.card, now) : []),
         ...(snapshot.prs ? [
             env.DB.prepare("DELETE FROM claude_prs WHERE project_id = ?").bind(snapshot.project_id),
