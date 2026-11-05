@@ -1,4 +1,4 @@
-import { handleAuth, requireUser } from "./auth";
+import { handleAuth, requireReader, requireUser } from "./auth";
 import { Env } from "./env";
 import { HttpError, json } from "./http";
 import { deleteMap, listMaps, saveMap } from "./maps";
@@ -9,7 +9,8 @@ import { getMedia, uploadMedia } from "./media";
 import { listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
-    const email = await requireUser(request, env);
+    // reads may use the viewer token; writes always need a signed-in session
+    const email = request.method === "GET" ? await requireReader(request, env) : await requireUser(request, env);
     // writes must come from this site's own pages
     if (request.method !== "GET" && request.headers.get("origin") !== url.origin) {
         throw new HttpError(403, "Cross-site request refused.");
