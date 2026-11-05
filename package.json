@@ -13,6 +13,7 @@
     "worker:deploy": "npm run build && wrangler d1 migrations apply adhd-assist --remote && wrangler deploy"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
     "@cfworker/json-schema": "^4.1.4",
     "@cloudflare/workers-oauth-provider": "^1.2.3",
     "@emotion/react": "^11.11.1",

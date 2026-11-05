@@ -1,9 +1,10 @@
 import { Env } from "./env";
 import { HttpError, sha256 } from "./http";
 import { checkUrl } from "./items";
+import { latestReadings, readMonologue, ReadState, readStateOf, Reading } from "./readings";
 
 /* The spoken map (PRD v1.0, E7): something Jon said, kept exactly as sent and split into sentence-sized
-   utterances. Later stories read each utterance (moves and topics), plant dashed stakes and replay it.
+   utterances, each read for its move and topic (readings.ts). Later stories plant dashed stakes and replay it.
    Nothing here edits a monologue once stored. */
 
 export const monologueMaxChars = 50_000;
@@ -12,18 +13,20 @@ const maxWordsPerUtterance = 40;
 /* The same words from the same thread within this long are one monologue sent twice */
 const repeatWindowMs = 60_000;
 
-export type Utterance = {seq: number, text: string, startChar: number, endChar: number};
+export type Utterance = {seq: number, text: string, startChar: number, endChar: number, reading?: Reading};
 export type Monologue = {
     id: string,
     source: "claude_thread" | "app",
     threadUrl?: string,
     threadItemId?: string,
     receivedAt: string,
+    /* "waiting" until Claude has read every utterance (E7.S2) */
+    read: ReadState,
     utterances: Utterance[]
 };
 export type MonologueSummary = {
     id: string, source: Monologue["source"], threadUrl?: string, receivedAt: string,
-    firstLine: string, utteranceCount: number
+    firstLine: string, utteranceCount: number, read: ReadState
 };
 
 type Span = {start: number, end: number};
@@ -65,7 +68,7 @@ export function splitUtterances(text: string): Utterance[] {
 
 export type LogMonologue = {text: string, threadUrl?: string, threadItemId?: string};
 
-/* Store what Jon said. Sending the same words again from the same thread within a minute returns the first copy. */
+/* Store what Jon said, then have Claude read it. Sending the same words again from the same thread within a minute returns the first copy. */
 export async function logMonologue(env: Env, input: LogMonologue): Promise<{monologue: Monologue, repeat: boolean}> {
     const text = input.text.trim();
     if (text.length === 0) {
@@ -107,10 +110,9 @@ export async function logMonologue(env: Env, input: LogMonologue): Promise<{mono
             "INSERT INTO utterances (monologue_id, seq, text, start_char, end_char) VALUES (?, ?, ?, ?, ?)"
         ).bind(id, u.seq, u.text, u.startChar, u.endChar))
     ]);
-    return {
-        monologue: {id, source: "claude_thread", threadUrl, threadItemId, receivedAt, utterances},
-        repeat: false
-    };
+    // read inline: the thread gets the topics back, and a failure only leaves the monologue waiting to be read
+    await readMonologue(env, id, utterances);
+    return {monologue: (await getMonologue(env, id))!, repeat: false};
 }
 
 type MonologueRow = {
@@ -127,9 +129,16 @@ export async function getMonologue(env: Env, id: string): Promise<Monologue | nu
     const {results} = await env.DB.prepare(
         "SELECT seq, text, start_char, end_char FROM utterances WHERE monologue_id = ? ORDER BY seq"
     ).bind(id).all<{seq: number, text: string, start_char: number, end_char: number}>();
+    const readings = await latestReadings(env, id);
     const monologue: Monologue = {
         id: row.id, source: row.source, receivedAt: row.received_at,
-        utterances: results.map(u => ({seq: u.seq, text: u.text, startChar: u.start_char, endChar: u.end_char}))
+        read: await readStateOf(env, id, results.length, readings.size),
+        utterances: results.map(u => {
+            const utterance: Utterance = {seq: u.seq, text: u.text, startChar: u.start_char, endChar: u.end_char};
+            const reading = readings.get(u.seq);
+            if (reading) utterance.reading = reading;
+            return utterance;
+        })
     };
     if (row.thread_url) monologue.threadUrl = row.thread_url;
     if (row.thread_item_id) monologue.threadItemId = row.thread_item_id;
@@ -141,15 +150,27 @@ export async function listMonologues(env: Env, limit = 100): Promise<MonologueSu
     const {results} = await env.DB.prepare(
         `SELECT m.id, m.source, m.thread_url, m.received_at,
                 (SELECT text FROM utterances u WHERE u.monologue_id = m.id ORDER BY seq LIMIT 1) AS first_line,
-                (SELECT COUNT(*) FROM utterances u WHERE u.monologue_id = m.id) AS utterance_count
+                (SELECT COUNT(*) FROM utterances u WHERE u.monologue_id = m.id) AS utterance_count,
+                (SELECT COUNT(DISTINCT seq) FROM readings r WHERE r.monologue_id = m.id) AS read_count
          FROM monologues m ORDER BY m.received_at DESC LIMIT ?`
-    ).bind(limit).all<MonologueRow & {first_line: string | null, utterance_count: number}>();
-    return results.map(r => {
+    ).bind(limit).all<MonologueRow & {first_line: string | null, utterance_count: number, read_count: number}>();
+    return Promise.all(results.map(async r => {
         const summary: MonologueSummary = {
             id: r.id, source: r.source, receivedAt: r.received_at,
-            firstLine: r.first_line ?? "", utteranceCount: r.utterance_count
+            firstLine: r.first_line ?? "", utteranceCount: r.utterance_count,
+            read: await readStateOf(env, r.id, r.utterance_count, r.read_count)
         };
         if (r.thread_url) summary.threadUrl = r.thread_url;
         return summary;
-    });
+    }));
+}
+
+/* Try reading again, e.g. after the key was added or a call failed. Already-read monologues are left alone. */
+export async function rereadMonologue(env: Env, id: string): Promise<Monologue | null> {
+    const monologue = await getMonologue(env, id);
+    if (!monologue || monologue.read.state === "read") {
+        return monologue;
+    }
+    await readMonologue(env, id, monologue.utterances);
+    return getMonologue(env, id);
 }
