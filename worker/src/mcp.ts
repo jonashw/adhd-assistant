@@ -27,6 +27,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
   - threads: send the whole list the first time, and whenever any thread's title or state differs from your last sync. Otherwise leave threads out; that means "unchanged" and saves writing the list.
   - this_thread: your own thread id and card (headline, ask, progress, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
+  - this_thread.state: in your last sync of a turn, the state you leave your own thread in: "done" if you resolve it this turn, "blocked" if you end waiting on Jon, "review_ready" if you hand him finished work. Claude's own list still shows you as working until your turn ends, so without this your badge stays a turn behind.
   - prs: the project's PR list (list_prs) when it changed since your last sync. Set each PR's thread_id to the thread whose session id ends the same way.
   - If nothing changed at all, skip the call.
 - Monologues: when Jon sends you dictation (spoken words, often several topics in a row) or asks you to log what he said, call log_monologue with his words exactly as he sent them, unedited, plus this thread's link or thread_id. The app turns it into a map he can replay. Don't log your own words or anything he pasted from elsewhere.`;
@@ -122,8 +123,9 @@ function buildServer(env: Env): McpServer {
                     }).optional().describe("The artifact or doc this thread last made or updated"),
                     topic: z.string().max(160).optional().describe("What this thread is about, in Jon's words, so he can find it later"),
                     keywords: z.array(z.string().min(1).max(40)).max(5).optional().describe("A few words Jon might search for")
-                })
-            }).optional().describe("Your own glance card; send the whole card whenever it changed"),
+                }),
+                state: z.enum(claudeThreadStates).optional().describe("In your last sync of a turn: the state you leave this thread in (done if you resolve it, blocked if waiting on Jon, review_ready if handing over work)")
+            }).optional().describe("Your own glance card, and the state you end your turn in; send the whole card whenever it changed"),
             prs: z.array(z.object({
                 repo: z.string().min(1).max(200).describe("owner/name"),
                 number: z.number().int().min(1),

@@ -109,6 +109,11 @@ list view, along with day words like "monday". To save tokens, a sync may leave 
 changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
 thread cards on the Claude map: design proposal" (Jon chose Glance).
 
+**A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
+thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
+sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
+thread until a later list from the platform says otherwise.
+
 ## Read-only viewer token (for Claude's browser)
 
 Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
