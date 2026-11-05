@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import { ArrowBack, Check, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
-    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeStaleHours, glanceLine, isNewSince
+    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
 import { ClaudeThreadGlance, NewDot, PrChip } from "./ClaudeThreadGlance";
 import { matchesSearch } from "./claudeSearch";
@@ -135,7 +135,7 @@ const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "proj
 function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, selectedId?: string) {
     const x = node.x ?? 0, y = node.y ?? 0;
     const r = radiusOf(node.kind);
-    const dimmed = node.badge === "done" && node.kind === "thread";
+    const dimmed = (node.badge === "done" || node.badge === "someday") && node.kind === "thread";
     ctx.save();
     ctx.globalAlpha = dimmed ? 0.55 : 1;
 
@@ -157,7 +157,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     ctx.fill();
     ctx.lineWidth = node.id === selectedId ? 2.2 : 1.2;
     ctx.strokeStyle = node.id === selectedId ? claudeStyle.ink : claudeStyle.ring;
-    if (node.badge === "stale" || node.badge === "gone") {
+    if (node.badge && quietBadges.includes(node.badge)) {
         ctx.setLineDash([1.5, 1.5]);
     }
     ctx.stroke();
@@ -209,7 +209,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
             ctx.beginPath();
             ctx.roundRect(x - w / 2, top, w, h, h / 2);
             ctx.fill();
-            if (node.badge === "stale" || node.badge === "gone") {
+            if (quietBadges.includes(node.badge)) {
                 ctx.setLineDash([0.8, 0.8]);
                 ctx.strokeStyle = "#9CA3AF";
                 ctx.lineWidth = 0.3;
@@ -231,7 +231,7 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
         label={text ?? badge.label}
         sx={{
             bgcolor: badge.color, color: badge.text, fontWeight: 600,
-            border: kind === "stale" || kind === "gone" ? "1px dashed #9CA3AF" : undefined
+            border: quietBadges.includes(kind) ? "1px dashed #9CA3AF" : undefined
         }}
     />;
 }
@@ -650,9 +650,11 @@ export function ClaudeMap() {
                     Open in Claude
                 </Button>
             </Stack>
-            {(selected.badge === "stale" || selected.badge === "gone") && <Typography variant="caption" display="block" sx={{mt: 1}}>
+            {selected.badge && quietBadges.includes(selected.badge) && <Typography variant="caption" display="block" sx={{mt: 1}}>
                 {selected.badge === "stale"
                     ? `No Claude in this project has synced for over ${claudeStaleHours} hours, so this may be out of date.`
+                    : selected.badge === "someday"
+                    ? `This has waited on you for over ${claudeSomedayDays} days. Pick it up, or resolve it in Claude to clear it.`
                     : "The project's latest sync didn't list this thread."}
             </Typography>}
         </Paper>}
