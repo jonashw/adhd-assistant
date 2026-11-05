@@ -237,11 +237,12 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
 }
 
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
-type OpenIn = "new-tab" | "one-tab" | "desktop";
+/* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
+   from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
+type OpenIn = "new-tab" | "desktop";
 const openInKey = "claudeMap.openIn";
 const openInLabels: Record<OpenIn, string> = {
     "new-tab": "A new browser tab each time",
-    "one-tab": "One browser tab, reused",
     "desktop": "The Claude desktop app"
 };
 
@@ -257,7 +258,7 @@ const open = (url: string | undefined, openIn: OpenIn) => {
         window.location.href = desktopUrl(url);
         return;
     }
-    const tab = window.open(url, openIn === "one-tab" ? "adhd-assist-claude" : "_blank");
+    const tab = window.open(url, "_blank");
     if (tab) {
         tab.opener = null;
     }
@@ -266,12 +267,12 @@ const open = (url: string | undefined, openIn: OpenIn) => {
 /* A real link, so the URL shows on hover, can be copied, and cmd- or middle-click makes a tab of its own */
 const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
     ? {component: "a" as const, href: desktopUrl(url)}
-    : {component: "a" as const, href: url, target: openIn === "one-tab" ? "adhd-assist-claude" : "_blank", rel: "noopener noreferrer"};
+    : {component: "a" as const, href: url, target: "_blank", rel: "noopener noreferrer"};
 
 const readOpenIn = (): OpenIn => {
     try {
         const value = localStorage.getItem(openInKey);
-        return value === "one-tab" || value === "desktop" ? value : "new-tab";
+        return value === "desktop" ? value : "new-tab";
     } catch {
         return "new-tab";
     }
