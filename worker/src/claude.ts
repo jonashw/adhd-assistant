@@ -186,21 +186,24 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
         env.DB.prepare(
             `INSERT INTO claude_projects (id, name, short_name, first_seen_at, last_synced_at) VALUES (?, ?, ?, ?, ?)
              ON CONFLICT (id) DO UPDATE SET name = excluded.name,
-                short_name = COALESCE(excluded.short_name, claude_projects.short_name),
+                -- the project instructions are the only source of a short name, so a sync without one means it was dropped
+                short_name = excluded.short_name,
                 last_synced_at = excluded.last_synced_at`
         ).bind(snapshot.project_id, snapshot.project_name, snapshot.short_name ?? null, now, now),
         // a thread's state only moves forward in time: an older list can't undo a newer one
         ...(snapshot.threads ?? []).map(t => env.DB.prepare(
-            `INSERT INTO claude_threads (id, project_id, title, state, created_at, last_activity_at, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO claude_threads (id, project_id, title, state, created_at, last_activity_at, listed_activity_at, first_seen_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT (id) DO UPDATE SET
                 project_id = excluded.project_id,
-                title = CASE WHEN ${newer} THEN excluded.title ELSE claude_threads.title END,
+                -- a rename doesn't move the platform's time, so a title only needs a list no older than the last one
+                title = CASE WHEN ${listedNotOlder} THEN excluded.title ELSE claude_threads.title END,
+                listed_activity_at = CASE WHEN ${listedNotOlder} THEN excluded.listed_activity_at ELSE claude_threads.listed_activity_at END,
                 state = CASE WHEN ${newer} THEN excluded.state ELSE claude_threads.state END,
                 last_activity_at = CASE WHEN ${newer} THEN excluded.last_activity_at ELSE claude_threads.last_activity_at END,
                 created_at = COALESCE(claude_threads.created_at, excluded.created_at),
                 last_seen_at = excluded.last_seen_at`
-        ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, now, now)),
+        ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, t.last_activity_at ?? null, now, now)),
         // a thread's word on its own state as its turn ends beats the platform's list, which lags behind by a turn
         ...(snapshot.this_thread?.state ? [env.DB.prepare(
             `UPDATE claude_threads SET state = ?, last_activity_at = ? WHERE id = ? AND project_id = ?`
@@ -269,6 +272,9 @@ function cardStatements(env: Env, projectId: string, threadId: string, card: Sna
 /* true when the incoming row is at least as recent as the stored one (or either has no time) */
 const newer = `(excluded.last_activity_at IS NULL OR claude_threads.last_activity_at IS NULL
     OR excluded.last_activity_at >= claude_threads.last_activity_at)`;
+/* Against the platform's own time only: a thread's self-reported state stamps last_activity_at with the server's clock. */
+const listedNotOlder = `(excluded.listed_activity_at IS NULL OR claude_threads.listed_activity_at IS NULL
+    OR excluded.listed_activity_at >= claude_threads.listed_activity_at)`;
 
 export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
     const [projects, threads, prs, topics] = await env.DB.batch([
