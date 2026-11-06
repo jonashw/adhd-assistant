@@ -8,6 +8,7 @@ import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
 import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
 import { getMonologue, listMonologues } from "./monologues";
+import { removeChecklistItem, setChecklistDone } from "./checklist";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
     // reads may use the viewer token; writes always need a signed-in session
@@ -77,6 +78,16 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
             return new Response(null, {status: 204});
         }
         return json(await addLink(env, place, await readJson()), 201);
+    }
+    const checklistMatch = /^\/api\/checklist\/([^/]+)\/(check|uncheck|remove)$/.exec(url.pathname);
+    if (checklistMatch && request.method === "POST") {
+        const id = decodeURIComponent(checklistMatch[1]);
+        if (checklistMatch[2] === "remove") {
+            await removeChecklistItem(env, id);
+        } else {
+            await setChecklistDone(env, id, checklistMatch[2] === "check");
+        }
+        return new Response(null, {status: 204});
     }
     const itemMatch = /^\/api\/items\/([^/]+)\/(place|forget)$/.exec(url.pathname);
     if (itemMatch && request.method === "POST") {

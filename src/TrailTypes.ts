@@ -37,6 +37,26 @@ export type LinkedItem = {
 /* New place names (outermost first) under an existing place; the last name is the thread's place */
 export type PlaceSuggestion = {mapId: string, underNoteId: string, path: string[]};
 
+/* A to-do a Claude thread left for Jon at a place: something only he can do */
+export type ChecklistItem = {
+    id: string,
+    /* the place it sits at; unset while it waits on the place its thread suggested */
+    noteId?: string,
+    text: string,
+    /* an optional heading, like "From home" or "Anytime" */
+    group?: string,
+    link?: string,
+    addedAt: string,
+    /* the thread that added it, with a link back when the thread gave one */
+    thread: {id?: string, title: string, url?: string},
+    doneAt?: string,
+    doneBy?: "jon" | "claude"
+};
+
+export const checklistMaxPerCall = 10;
+/* Done items stay in view (struck through) this many days */
+export const checklistDoneDays = 7;
+
 export type TrailData = {
     /* recent visits, oldest first, always including the last tie-off or untie */
     recent: Visit[],
@@ -45,7 +65,9 @@ export type TrailData = {
     /* items linked to places on this map */
     items: LinkedItem[],
     /* Claude threads that checked in without naming a place yet (on any map) */
-    unplaced: LinkedItem[]
+    unplaced: LinkedItem[],
+    /* to-dos Claude threads left at this map's places (open, and done lately), and those waiting on a suggested place */
+    checklist: ChecklistItem[]
 };
 
 /* A working thread silent this long reads "check in?" */
