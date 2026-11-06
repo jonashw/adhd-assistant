@@ -41,17 +41,18 @@ export async function listMaps(env: Env, onlyId?: string): Promise<WireMap[]> {
     const where = onlyId ? " WHERE map_id = ?" : "";
     const bind = (sql: string) => onlyId ? env.DB.prepare(sql).bind(onlyId) : env.DB.prepare(sql);
     const [maps, notes, links] = await env.DB.batch([
-        bind(`SELECT id, revision FROM maps${onlyId ? " WHERE id = ?" : ""} ORDER BY created_at`),
+        bind(`SELECT id, revision, title FROM maps${onlyId ? " WHERE id = ?" : ""} ORDER BY created_at`),
         bind(`SELECT * FROM notes${where} ORDER BY position`),
         bind(`SELECT * FROM links${where}`)
     ]);
     const noteRows = notes.results as NoteRow[];
     const linkRows = links.results as LinkRow[];
-    return (maps.results as {id: string, revision: number}[]).map(m => {
+    return (maps.results as {id: string, revision: number, title: string | null}[]).map(m => {
         const mapNotes = noteRows.filter(n => n.map_id === m.id);
         return {
             id: m.id,
             revision: m.revision,
+            ...(m.title ? {title: m.title} : {}),
             nodes: mapNotes.map(toNode),
             links: toLinks(mapNotes, linkRows.filter(l => l.map_id === m.id))
         };
@@ -69,7 +70,7 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
     if (!/^[\w-]{1,100}$/.test(id)) {
         throw new HttpError(400, "That map id isn't valid.");
     }
-    const {nodes, links} = validateMap(input);
+    const {title, nodes, links} = validateMap(input);
     const sentRevision = (input as {revision?: unknown}).revision ?? null;
     const current = await env.DB.prepare("SELECT revision FROM maps WHERE id = ?").bind(id).first<{revision: number}>();
     if ((current?.revision ?? null) !== sentRevision) {
@@ -84,8 +85,9 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
     const parentOf = new Map(links.filter(l => l.type === "PART_OF").map(l => [l.source, l.target]));
     const statements = [
         current
-            ? env.DB.prepare("UPDATE maps SET revision = ?, updated_at = ? WHERE id = ?").bind(revision, now, id)
-            : env.DB.prepare("INSERT INTO maps (id, revision, created_at, updated_at) VALUES (?, ?, ?, ?)").bind(id, revision, now, now),
+            ? env.DB.prepare("UPDATE maps SET revision = ?, title = CASE WHEN ? THEN ? ELSE title END, updated_at = ? WHERE id = ?")
+                .bind(revision, title === undefined ? 0 : 1, title ?? null, now, id)
+            : env.DB.prepare("INSERT INTO maps (id, revision, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(id, revision, title ?? null, now, now),
         env.DB.prepare("DELETE FROM notes WHERE map_id = ? AND id NOT IN (SELECT value FROM json_each(?))")
             .bind(id, JSON.stringify(nodes.map(n => n.id))),
         env.DB.prepare("DELETE FROM links WHERE map_id = ?").bind(id),

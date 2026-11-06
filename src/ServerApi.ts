@@ -69,7 +69,7 @@ export const ServerApi = {
     saveMap: (graph: MindMapGraphDataRecord, revision: number | null) =>
         request<{revision: number}>(`/api/maps/${encodeURIComponent(graph.id)}`, {
             method: "PUT",
-            body: JSON.stringify({revision, nodes: graph.nodes, links: graph.links})
+            body: JSON.stringify({revision, title: graph.title ?? null, nodes: graph.nodes, links: graph.links})
         }),
     deleteMap: (id: string) => request<void>(`/api/maps/${encodeURIComponent(id)}`, {method: "DELETE"}),
     /* A photo for a place's note; answers the URL the note points at */
