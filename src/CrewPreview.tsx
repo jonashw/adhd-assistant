@@ -2,9 +2,10 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
 import { ArrowBack } from "@mui/icons-material";
-import { CrewAtRest, Dog, Jon, MindfulScene, RabbitBurrow, RabbitBurrowLoop, Sloth, Spider, Squirrel, YouScene } from "./Crew";
+import { CrewAtRest, Dog, Jon, MindfulScene, RabbitBurrow, RabbitBurrowLoop, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
 import { burrowDemoGraph } from "./crew/burrowDemo";
 import { Mindful } from "./WhatsNextDialog";
+import { CrewDemo } from "./CrewDemo";
 
 /* /crew: every crew member in every move, to review the art without hunting for the screen it lives on */
 function Tile({title, children}: {title: string, children: React.ReactNode}) {
@@ -49,6 +50,9 @@ export function CrewPreview() {
             <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
                 Each one fidgets on its own clock. With reduced motion on, they all hold still.
             </Typography>
+            <Typography variant="h6" gutterBottom>A typical stretch of your day</Typography>
+            <Box sx={{mb: 3}}><CrewDemo/></Box>
+            <Typography variant="h6" gutterBottom>Every illustration</Typography>
             <Stack direction="row" flexWrap="wrap" gap={2}>
                 <Tile title="You, tied off"><Jon size={110} doing="tied"/></Tile>
                 <Tile title="You, aloft, 1 step out"><Jon size={110} doing="aloft" stringOut={1} spider="wrist"/></Tile>
@@ -87,6 +91,20 @@ export function CrewPreview() {
                 <Tile title="Carrying a piece of work"><RabbitBurrow size={110} graph={burrowDemoGraph} at="wrench" carrying labels={false}/></Tile>
                 <Tile title="On a loop, as on the page"><RabbitBurrowLoop size={110}/></Tile>
                 <Tile title="Small, as in the table"><RabbitBurrowLoop size={32}/></Tile>
+            </Stack>
+            <Typography variant="h6" sx={{mt: 3}}>The stage, as the day demo draws it</Typography>
+            <Stack gap={1} sx={{maxWidth: 360}}>
+                {([
+                    ["Tied off", false, 0, false],
+                    ["Aloft, 1 step out", true, 1, false],
+                    ["Aloft, 3 steps out, head in the clouds", true, 3, true],
+                    ["Aloft, 5 steps out, head in the clouds", true, 5, true]
+                ] as const).map(([title, aloft, out, clouds]) => (
+                    <Box key={title} sx={{borderBottom: 1, borderColor: "divider", pb: 1}}>
+                        <YouStage height={96} aloft={aloft} stringOut={out} inClouds={clouds}/>
+                        <Typography variant="caption" color="text.secondary">{title}</Typography>
+                    </Box>
+                ))}
             </Stack>
             <Typography variant="h6" sx={{mt: 3}}>The Mindful screen in What's next</Typography>
             <Mindful/>

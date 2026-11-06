@@ -560,7 +560,8 @@ export default function MindMapGraph({
                             disabled={!selectedNode}
                             onClick={guideUserDeeper}
                         >
-                            {view === "burrow" ? "Down a hole" : "Deeper"}
+                            {/* in the scout's words: aloft you float higher toward a new sighting; tied off you dig in under the work */}
+                            {view === "burrow" ? "Down a hole" : nav.tether.state === "aloft" ? "Float higher" : "Dig in"}
                         </Fab>
 
                         <ListenFab status={listeningStatus} start={startListening} stop={stopListening} compact />
