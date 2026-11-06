@@ -7,7 +7,7 @@ import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
 import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden } from "./claude";
-import { getMonologue, listMonologues } from "./monologues";
+import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
 
@@ -49,6 +49,11 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const monologueMatch = /^\/api\/monologues\/([^/]+)$/.exec(url.pathname);
     if (monologueMatch && request.method === "GET") {
         const monologue = await getMonologue(env, decodeURIComponent(monologueMatch[1]));
+        return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
+    }
+    const rereadMatch = /^\/api\/monologues\/([^/]+)\/read$/.exec(url.pathname);
+    if (rereadMatch && request.method === "POST") {
+        const monologue = await rereadMonologue(env, decodeURIComponent(rereadMatch[1]));
         return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
     }
     const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);

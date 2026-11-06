@@ -169,7 +169,7 @@ function buildServer(env: Env): McpServer {
 
     server.registerTool("log_monologue", {
         title: "Log a monologue",
-        description: "Send Jon's dictated words to the app, exactly as he said them. They're kept as a monologue of sentences that the app reads, charts as dashed stakes and replays. Sending the same words twice from one thread within a minute stores them once.",
+        description: "Send Jon's dictated words to the app, exactly as he said them. They're kept as a monologue of sentences; Claude reads each one for its move and topic, and the app charts them as dashed stakes and replays them. The call can take a few seconds while it reads. Sending the same words twice from one thread within a minute stores them once.",
         inputSchema: {
             text: z.string().max(monologueMaxChars).describe("Jon's words, exactly as he sent them"),
             url: z.string().max(2000).optional().describe("This thread's link, if you know it"),
@@ -178,11 +178,16 @@ function buildServer(env: Env): McpServer {
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(async () => {
         const {monologue, repeat} = await logMonologue(env, {text: args.text, threadUrl: args.url, threadItemId: args.thread_id});
+        const topics = [...new Set(monologue.utterances.flatMap(u => u.reading ? [u.reading.topic] : []))];
         return {
             monologue_id: monologue.id,
             sentences: monologue.utterances.length,
             repeat,
-            next: repeat ? "These words were already logged a moment ago; nothing new was stored." : "Logged. Tell Jon in one line."
+            read: monologue.read.state === "read" ? "read" : `waiting to be read${monologue.read.note ? ` (${monologue.read.note})` : ""}`,
+            topics,
+            next: repeat ? "These words were already logged a moment ago; nothing new was stored."
+                : monologue.read.state === "read" ? "Logged and read. Tell Jon in one line, naming the topics if there are a few."
+                : "Logged; the app will read it later. Tell Jon in one line that it's logged; don't make the wait sound like an error."
         };
     }, monologues));
 
