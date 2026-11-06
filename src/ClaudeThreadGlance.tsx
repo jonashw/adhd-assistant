@@ -1,9 +1,13 @@
-import { Box, Chip, LinearProgress, Stack, Typography } from "@mui/material";
+import React from "react";
+import { Box, Button, Chip, LinearProgress, Stack, Typography } from "@mui/material";
 import { CallMerge, Description } from "@mui/icons-material";
-import { ClaudeCiState, ClaudePr, ClaudeThread, askLabels, isNewSince, standingAsk } from "./ClaudeMapTypes";
+import {
+    ClaudeArtifact, ClaudeCiState, ClaudePr, ClaudeProject, ClaudeThread, artifactFlag, artifactsOf, askLabels, isNewSince, standingAsk
+} from "./ClaudeMapTypes";
+import { Pill, artifactLinkProps, artifactPill } from "./claudeArtifacts";
 
 /* What a thread said about itself, at a glance: what it asks of Jon, its latest reply, how far along
-   its checklist is, its PRs and its latest artifact. Answers "should I open it now?" without opening it. */
+   its checklist is, its PRs and every artifact it made. Answers "should I open it now?" without opening it. */
 
 const ciColors: Record<ClaudeCiState, string> = {
     success: "#16A34A",
@@ -45,17 +49,56 @@ export function PrChip({pr}: {pr: ClaudePr}) {
     />;
 }
 
+export function PillChip({pill}: {pill: Pill}) {
+    return <Chip
+        size="small"
+        label={pill.text}
+        sx={{bgcolor: pill.bg, color: pill.fg, fontWeight: 600, height: 20, border: pill.outline ? `1px solid ${pill.outline}` : undefined}}
+    />;
+}
+
+export function ArtifactChip({artifact, project, onOpen}: {artifact: ClaudeArtifact, project: ClaudeProject, onOpen?: (a: ClaudeArtifact) => void}) {
+    const flag = artifactFlag(artifact, project);
+    return <Chip
+        size="small"
+        variant={flag ? "filled" : "outlined"}
+        {...artifactLinkProps(artifact.url)}
+        clickable
+        onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            onOpen?.(artifact);
+        }}
+        icon={<Description sx={{fontSize: 16, color: flag ? "inherit" : undefined}}/>}
+        title={`${artifact.title} (${artifactPill(artifact, flag).text.toLowerCase()})`}
+        label={flag === "new" ? `${artifact.title} · New` : flag === "updated" ? `${artifact.title} · Updated` : artifact.title}
+        sx={{
+            maxWidth: 280,
+            ...(flag === "new" ? {bgcolor: "#7C3AED", color: "#fff"} : flag === "updated" ? {bgcolor: "#F3E8FF", color: "#5B21B6", border: "1px solid #7C3AED"} : {})
+        }}
+    />;
+}
+
+/* How many of a thread's artifacts its card shows before "Show all" */
+const artifactsAtFirst = 4;
+
 export function NewDot({thread}: {thread: ClaudeThread}) {
     return isNewSince(thread)
         ? <Chip size="small" label="New" sx={{bgcolor: "#D97757", color: "#fff", fontWeight: 600, height: 20}}/>
         : null;
 }
 
-export function ClaudeThreadGlance({thread}: {thread: ClaudeThread}) {
+export function ClaudeThreadGlance({thread, project, onOpenArtifact}: {
+    thread: ClaudeThread, project: ClaudeProject, onOpenArtifact?: (a: ClaudeArtifact) => void
+}) {
     const card = thread.card;
     const ask = standingAsk(thread);
     const prs = thread.prs ?? [];
-    if (!card && !prs.length) {
+    const [allArtifacts, setAllArtifacts] = React.useState(false);
+    const own = artifactsOf(thread, project);
+    // a card from before the map kept every artifact still names its latest one
+    const latestOnly = !own.length && card?.artifact ? card.artifact : undefined;
+    const artifacts = allArtifacts ? own : own.slice(0, artifactsAtFirst);
+    if (!card && !prs.length && !own.length) {
         return <Typography variant="caption" color="text.secondary" display="block" sx={{mt: 1}}>
             This thread hasn't sent a card yet.
         </Typography>;
@@ -86,21 +129,29 @@ export function ClaudeThreadGlance({thread}: {thread: ClaudeThread}) {
                 sx={{height: 4, borderRadius: 2, bgcolor: "#F1E4DA", "& .MuiLinearProgress-bar": {bgcolor: "#D97757"}}}
             />
         </Box>}
-        {(prs.length > 0 || card?.artifact) && <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
+        {prs.length > 0 && <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
             {prs.map(pr => <PrChip key={`${pr.repo}#${pr.number}`} pr={pr}/>)}
-            {card?.artifact && <Chip
-                size="small"
-                variant="outlined"
-                component="a"
-                href={card.artifact.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                clickable
-                icon={<Description sx={{fontSize: 16}}/>}
-                label={card.artifact.title}
-                sx={{maxWidth: 260}}
-            />}
         </Stack>}
+        {(own.length > 0 || latestOnly) && <Box>
+            {own.length > 1 && <Typography variant="caption" color="text.secondary" display="block" sx={{mb: 0.5}}>
+                {own.length} artifacts, newest first
+            </Typography>}
+            <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
+                {artifacts.map(a => <ArtifactChip key={a.id} artifact={a} project={project} onOpen={onOpenArtifact}/>)}
+                {latestOnly && <Chip
+                    size="small"
+                    variant="outlined"
+                    {...artifactLinkProps(latestOnly.url)}
+                    clickable
+                    icon={<Description sx={{fontSize: 16}}/>}
+                    label={latestOnly.title}
+                    sx={{maxWidth: 280}}
+                />}
+                {own.length > artifactsAtFirst && <Button size="small" onClick={() => setAllArtifacts(v => !v)} sx={{color: "#5B21B6"}}>
+                    {allArtifacts ? "Fewer" : `All ${own.length}`}
+                </Button>}
+            </Stack>
+        </Box>}
         {card?.topic && <Typography variant="caption" color="text.secondary" sx={{fontStyle: "italic"}}>
             {card.topic}
             {card.keywords?.length ? <> · {card.keywords.join(", ")}</> : null}

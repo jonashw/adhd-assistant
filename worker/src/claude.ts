@@ -1,7 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import {
-    ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState,
+    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
@@ -16,12 +16,20 @@ export type SnapshotThread = {
     created_at?: string,
     last_activity_at?: string
 };
+export type SnapshotArtifact = {
+    title: string,
+    url: string,
+    updated_at?: string
+};
 /* What the sending thread says about itself; the whole card each time */
 export type SnapshotCard = {
     headline?: string,
     ask?: {kind: ClaudeAskKind, text: string},
     progress?: {done: number, total: number, now?: string},
+    /* the one it made or updated last */
     artifact?: {title: string, url: string},
+    /* every one it made or updated; the map keeps what earlier cards named too, so a short list loses nothing */
+    artifacts?: SnapshotArtifact[],
     topic?: string,
     keywords?: string[]
 };
@@ -43,12 +51,21 @@ export type Snapshot = {
     /* state: what the thread leaves itself as when this turn ends; the platform's own list only catches up later */
     this_thread?: {thread_id: string, card: SnapshotCard, state?: ClaudeThreadState},
     /* left out = unchanged; sent = the project's whole PR list */
-    prs?: SnapshotPr[]
+    prs?: SnapshotPr[],
+    /* the project's artifacts as the platform lists them (newest first, maybe cut short). Added to what the map
+       has, never a replacement, so a short list loses nothing. */
+    artifacts?: (SnapshotArtifact & {artifact_id?: string})[]
 };
 
 type ProjectRow = {
-    id: string, name: string, short_name: string | null, hidden: number, first_seen_at: string, last_synced_at: string
+    id: string, name: string, short_name: string | null, hidden: number, first_seen_at: string, last_synced_at: string,
+    artifacts_since: string | null
 };
+type ArtifactRow = {
+    id: number, project_id: string, url: string, title: string, updated_at: string | null,
+    first_seen_at: string, last_seen_at: string, opened_at: string | null
+};
+type ArtifactThreadRow = {artifact_id: number, thread_id: string, at: string};
 type ThreadRow = {
     id: string, project_id: string, title: string, state: ClaudeThreadState, created_at: string | null,
     last_activity_at: string | null, first_seen_at: string, last_seen_at: string,
@@ -87,6 +104,17 @@ function checkCard(card: SnapshotCard) {
     if (card.artifact && !isHttps(card.artifact.url)) {
         fail("The card's artifact link must be an https link.");
     }
+    checkArtifacts(card.artifacts ?? [], "The card's");
+}
+
+function checkArtifacts(artifacts: SnapshotArtifact[], whose: string) {
+    const seen = new Set<string>();
+    for (const a of artifacts) {
+        if (!isHttps(a.url) || seen.has(a.url) || !a.title || (a.updated_at !== undefined && !isTime(a.updated_at))) {
+            fail(`${whose} artifact ${a.url} isn't valid or is listed twice.`);
+        }
+        seen.add(a.url);
+    }
 }
 
 function checkPrs(prs: SnapshotPr[]) {
@@ -124,6 +152,7 @@ export function checkSnapshot(input: Snapshot): Snapshot {
     if (input.prs) {
         checkPrs(input.prs);
     }
+    checkArtifacts(input.artifacts ?? [], "The project's");
     const seen = new Set<string>();
     for (const t of input.threads ?? []) {
         if (!idPattern.test(t.thread_id)) {
@@ -185,7 +214,7 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
              WHERE project_id = ?2 AND last_seen_at >= (SELECT last_synced_at FROM claude_projects WHERE id = ?2)`
         ).bind(now, snapshot.project_id)]),
         env.DB.prepare(
-            `INSERT INTO claude_projects (id, name, short_name, first_seen_at, last_synced_at) VALUES (?, ?, ?, ?, ?)
+            `INSERT INTO claude_projects (id, name, short_name, first_seen_at, last_synced_at, artifacts_since) VALUES (?1, ?2, ?3, ?4, ?5, ?4)
              ON CONFLICT (id) DO UPDATE SET name = excluded.name,
                 -- the project instructions are the only source of a short name, so a sync without one means it was dropped
                 short_name = excluded.short_name,
@@ -210,6 +239,7 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
             `UPDATE claude_threads SET state = ?, last_activity_at = ? WHERE id = ? AND project_id = ?`
         ).bind(snapshot.this_thread.state, now, snapshot.this_thread.thread_id, snapshot.project_id)] : []),
         ...(snapshot.this_thread ? cardStatements(env, snapshot.project_id, snapshot.this_thread.thread_id, snapshot.this_thread.card, now) : []),
+        ...artifactStatements(env, snapshot, now),
         ...(snapshot.prs ? [
             env.DB.prepare("DELETE FROM claude_prs WHERE project_id = ?").bind(snapshot.project_id),
             ...snapshot.prs.map(pr => env.DB.prepare(
@@ -240,6 +270,38 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
          WHERE project_id = ? AND last_seen_at = ?`
     ).bind(snapshot.project_id, now).first<{threads: number, needsYou: number | null}>();
     return {project: snapshot.short_name ?? snapshot.project_name, threads: counts?.threads ?? 0, needsYou: counts?.needsYou ?? 0};
+}
+
+/* Artifacts: the project's list first, then what the sending thread says it made. A thread's latest one
+   moves it to the top of that artifact's threads; the rest of its list only adds it if it isn't there yet. */
+function artifactStatements(env: Env, snapshot: Snapshot, now: string) {
+    const upsert = (a: SnapshotArtifact) => env.DB.prepare(
+        `INSERT INTO claude_artifacts (project_id, url, title, updated_at, first_seen_at, last_seen_at) VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+         ON CONFLICT (project_id, url) DO UPDATE SET title = excluded.title, last_seen_at = excluded.last_seen_at,
+            updated_at = CASE WHEN excluded.updated_at IS NULL THEN claude_artifacts.updated_at
+                WHEN claude_artifacts.updated_at IS NULL OR excluded.updated_at > claude_artifacts.updated_at THEN excluded.updated_at
+                ELSE claude_artifacts.updated_at END`
+    ).bind(snapshot.project_id, a.url, a.title, a.updated_at ?? null, now);
+    const claim = (url: string, threadId: string, latest: boolean) => env.DB.prepare(
+        `INSERT INTO claude_artifact_threads (artifact_id, thread_id, at)
+         SELECT id, ?1, ?2 FROM claude_artifacts WHERE project_id = ?3 AND url = ?4
+         ON CONFLICT (artifact_id, thread_id) DO ${latest ? "UPDATE SET at = excluded.at" : "NOTHING"}`
+    ).bind(threadId, now, snapshot.project_id, url);
+    const statements = (snapshot.artifacts ?? []).map(upsert);
+    const self = snapshot.this_thread;
+    if (self) {
+        const card = self.card;
+        // a list is newest first, so claim it oldest first; the card's latest one goes last, on top
+        const listed = (card.artifacts ?? []).filter(a => a.url !== card.artifact?.url).reverse();
+        for (const a of listed) {
+            statements.push(upsert(a), claim(a.url, self.thread_id, false));
+        }
+        if (card.artifact) {
+            const fromList = card.artifacts?.find(a => a.url === card.artifact!.url);
+            statements.push(upsert({...card.artifact, updated_at: fromList?.updated_at}), claim(card.artifact.url, self.thread_id, true));
+        }
+    }
+    return statements;
 }
 
 /* The card's columns, in order. A card that matches the stored one keeps its time, so a repeat isn't "New". */
@@ -285,16 +347,23 @@ const listedNotOlder = `(excluded.listed_activity_at IS NULL OR claude_threads.l
     OR excluded.listed_activity_at >= claude_threads.listed_activity_at)`;
 
 export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
-    const [projects, threads, prs, topics] = await env.DB.batch([
+    const [projects, threads, prs, topics, artifacts, claims] = await env.DB.batch([
         env.DB.prepare("SELECT * FROM claude_projects ORDER BY last_synced_at DESC"),
         env.DB.prepare("SELECT * FROM claude_threads ORDER BY created_at"),
         env.DB.prepare("SELECT * FROM claude_prs WHERE thread_id IS NOT NULL ORDER BY number DESC"),
-        env.DB.prepare("SELECT * FROM claude_topics ORDER BY at DESC")
+        env.DB.prepare("SELECT * FROM claude_topics ORDER BY at DESC"),
+        env.DB.prepare("SELECT * FROM claude_artifacts ORDER BY COALESCE(updated_at, first_seen_at) DESC, id DESC"),
+        env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC")
     ]);
     const threadRows = threads.results as ThreadRow[];
     const prsBy = groupBy(prs.results as PrRow[], r => r.thread_id!);
     const topicsBy = groupBy(topics.results as TopicRow[], r => r.thread_id);
+    const artifactsBy = groupBy(artifacts.results as ArtifactRow[], r => r.project_id);
+    const claimRows = claims.results as ArtifactThreadRow[];
+    const threadsOf = groupBy(claimRows, r => String(r.artifact_id));
+    const artifactIdsBy = groupBy(claimRows, r => r.thread_id);
     return (projects.results as ProjectRow[]).map(p => {
+        const projectArtifacts = (artifactsBy.get(p.id) ?? []).map(a => artifactOf(a, threadsOf.get(String(a.id)) ?? []));
         const project: ClaudeProject = {
             id: p.id,
             name: p.name,
@@ -318,6 +387,9 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
                 if (card) thread.card = card;
                 const threadPrs = prsBy.get(t.id)?.filter(r => r.project_id === p.id);
                 if (threadPrs?.length) thread.prs = threadPrs.map(prOf);
+                const ownIds = new Set((artifactIdsBy.get(t.id) ?? []).map(r => r.artifact_id));
+                const own = projectArtifacts.filter(a => ownIds.has(a.id));
+                if (own.length) thread.artifactIds = own.map(a => a.id);
                 const past = (topicsBy.get(t.id) ?? []).filter(r => r.topic !== t.topic)
                     .map(r => [r.topic, ...parseKeywords(r.keywords)].join(" "));
                 if (past.length) thread.pastTopics = past;
@@ -325,6 +397,8 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
             })
         };
         if (p.short_name) project.shortName = p.short_name;
+        if (p.artifacts_since) project.artifactsSince = p.artifacts_since;
+        if (projectArtifacts.length) project.artifacts = projectArtifacts;
         return project;
     });
 }
@@ -364,6 +438,13 @@ function cardOf(t: ThreadRow): ClaudeCard | undefined {
     return card;
 }
 
+function artifactOf(r: ArtifactRow, claims: ArtifactThreadRow[]): ClaudeArtifact {
+    const artifact: ClaudeArtifact = {id: r.id, title: r.title, url: r.url, firstSeenAt: r.first_seen_at, threadIds: claims.map(c => c.thread_id)};
+    if (r.updated_at) artifact.updatedAt = r.updated_at;
+    if (r.opened_at) artifact.openedAt = r.opened_at;
+    return artifact;
+}
+
 function prOf(r: PrRow): ClaudePr {
     const pr: ClaudePr = {repo: r.repo, number: r.number, title: r.title, state: r.state, url: r.url};
     if (r.ci) pr.ci = r.ci;
@@ -379,6 +460,15 @@ export async function markThreadOpened(env: Env, threadId: string): Promise<void
     }
 }
 
+/* Jon opened it from the map: it stops reading "New" or "Updated" until it changes again */
+export async function markArtifactOpened(env: Env, artifactId: number): Promise<void> {
+    const result = await env.DB.prepare("UPDATE claude_artifacts SET opened_at = ? WHERE id = ?")
+        .bind(new Date().toISOString(), artifactId).run();
+    if (!result.meta.changes) {
+        throw new HttpError(404, "There is no such artifact on the Claude map.");
+    }
+}
+
 export async function setProjectHidden(env: Env, projectId: string, hidden: boolean): Promise<void> {
     const result = await env.DB.prepare("UPDATE claude_projects SET hidden = ? WHERE id = ?").bind(hidden ? 1 : 0, projectId).run();
     if (!result.meta.changes) {
@@ -391,19 +481,27 @@ export async function setProjectHidden(env: Env, projectId: string, hidden: bool
 type MapState = {
     project: ProjectRow | null,
     threads: Map<string, ThreadRow>,
-    prs: Map<string, PrRow>
+    prs: Map<string, PrRow>,
+    /* by link, with the thread that last claimed it */
+    artifacts: Map<string, ArtifactState>
 };
+type ArtifactState = ArtifactRow & {thread_id: string | null};
 
 async function mapOf(env: Env, projectId: string): Promise<MapState> {
-    const [project, threads, prs] = await env.DB.batch([
+    const [project, threads, prs, artifacts] = await env.DB.batch([
         env.DB.prepare("SELECT * FROM claude_projects WHERE id = ?").bind(projectId),
         env.DB.prepare("SELECT * FROM claude_threads WHERE project_id = ?").bind(projectId),
-        env.DB.prepare("SELECT * FROM claude_prs WHERE project_id = ?").bind(projectId)
+        env.DB.prepare("SELECT * FROM claude_prs WHERE project_id = ?").bind(projectId),
+        env.DB.prepare(
+            `SELECT a.*, (SELECT thread_id FROM claude_artifact_threads c WHERE c.artifact_id = a.id ORDER BY at DESC LIMIT 1) AS thread_id
+             FROM claude_artifacts a WHERE project_id = ?`
+        ).bind(projectId)
     ]);
     return {
         project: (project.results[0] as ProjectRow | undefined) ?? null,
         threads: new Map((threads.results as ThreadRow[]).map(t => [t.id, t])),
-        prs: new Map((prs.results as PrRow[]).map(r => [`${r.repo}#${r.number}`, r]))
+        prs: new Map((prs.results as PrRow[]).map(r => [`${r.repo}#${r.number}`, r])),
+        artifacts: new Map((artifacts.results as ArtifactState[]).map(a => [a.url, a]))
     };
 }
 
@@ -449,6 +547,21 @@ export function changesBetween(before: MapState, after: MapState): Change[] {
         if (r.state !== old.state) changes.push({kind: "pr_state", pr: key, threadId, from: old.state, to: r.state});
         if ((r.ci ?? null) !== (old.ci ?? null) && r.ci) changes.push({kind: "pr_ci", pr: key, threadId, from: old.ci, to: r.ci});
     }
+    // what was already there when the map started counting artifacts isn't news, here as on the map
+    const since = new Date(Date.parse(a.artifacts_since ?? a.first_seen_at) + 5 * 60000).toISOString();
+    for (const [url, r] of after.artifacts) {
+        const old = before.artifacts.get(url);
+        const threadId = r.thread_id ?? undefined;
+        if (!old) {
+            if (r.first_seen_at > since && (r.updated_at ?? r.first_seen_at) > since) {
+                changes.push({kind: "artifact_new", threadId, to: r.title});
+            }
+            continue;
+        }
+        if (r.updated_at && r.updated_at !== old.updated_at && r.updated_at > since) {
+            changes.push({kind: "artifact_updated", threadId, to: r.title});
+        }
+    }
     return changes;
 }
 
@@ -485,6 +598,7 @@ function syncOf(r: SnapshotRow): ClaudeLogEntry {
     if (s.this_thread?.thread_id) sync.by = s.this_thread.thread_id;
     if (s.threads) sync.threads = s.threads.length;
     if (s.prs) sync.prs = s.prs.length;
+    if (s.artifacts) sync.artifacts = s.artifacts.length;
     if (s.this_thread?.state) sync.selfState = s.this_thread.state;
     return sync;
 }

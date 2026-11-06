@@ -93,6 +93,8 @@ export const ServerApi = {
     claudeSync: (hash: string) => request<unknown>(`/api/claude-map/syncs/${encodeURIComponent(hash)}`),
     setClaudeProjectHidden: (id: string, hidden: boolean) =>
         request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    markClaudeArtifactOpened: (id: number) =>
+        request<void>(`/api/claude-map/artifacts/${id}/opened`, {method: "POST"}),
     markClaudeThreadOpened: (id: string) =>
         request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),

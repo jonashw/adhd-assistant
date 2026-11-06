@@ -6,7 +6,7 @@ import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
-import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
+import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden } from "./claude";
 import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
@@ -64,6 +64,11 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const openedMatch = /^\/api\/claude-map\/threads\/([^/]+)\/opened$/.exec(url.pathname);
     if (openedMatch && request.method === "POST") {
         await markThreadOpened(env, decodeURIComponent(openedMatch[1]));
+        return new Response(null, {status: 204});
+    }
+    const artifactMatch = /^\/api\/claude-map\/artifacts\/(\d{1,15})\/opened$/.exec(url.pathname);
+    if (artifactMatch && request.method === "POST") {
+        await markArtifactOpened(env, Number(artifactMatch[1]));
         return new Response(null, {status: 204});
     }
     const mediaMatch = /^\/api\/media\/([^/]+)$/.exec(url.pathname);
