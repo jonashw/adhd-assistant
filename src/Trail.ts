@@ -1,6 +1,7 @@
 /* The trail (visits) and the signals over places, kept beside the map.
    Signed in, they live on the server; on the local-only site, in this browser. */
 
+import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 import { LinkedItem, Signal, TrailData, Visit, VisitKind } from "./TrailTypes";
 export * from "./TrailTypes";
 
@@ -26,9 +27,12 @@ async function send<T>(path: string, body?: unknown): Promise<T> {
     const response = await fetch(path, {
         method: body === undefined ? "GET" : "POST",
         credentials: "same-origin",
-        headers: {"content-type": "application/json"},
+        headers: {"content-type": "application/json", [liveTabHeader]: liveTabId},
         body: body === undefined ? undefined : JSON.stringify(body)
     });
+    if (response.ok) {
+        announceFromResponse(response);
+    }
     if (response.status === 204) {
         return undefined as T;
     }

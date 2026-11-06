@@ -1,5 +1,6 @@
 import { MindMapGraphDataRecord } from "./MindMap";
 import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
+import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 
 /* A map as the server holds it: the app's graph plus the revision last saved */
 export type ServerMap = MindMapGraphDataRecord & {revision: number};
@@ -25,8 +26,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(path, {
         ...init,
         credentials: "same-origin",
-        headers: {"content-type": "application/json", ...init?.headers}
+        headers: {"content-type": "application/json", [liveTabHeader]: liveTabId, ...init?.headers}
     });
+    if (response.ok) {
+        announceFromResponse(response);
+    }
     if (response.status === 204) {
         return undefined as T;
     }
@@ -59,6 +63,8 @@ export const ServerApi = {
         return {mode: "local"};
     },
     listMaps: () => request<ServerMap[]>("/api/maps"),
+    /* Just each map's id and revision, to tell cheaply which maps changed somewhere else */
+    mapRevisions: () => request<{id: string, revision: number}[]>("/api/maps/revisions"),
     getMap: (id: string) => request<ServerMap>(`/api/maps/${encodeURIComponent(id)}`),
     saveMap: (graph: MindMapGraphDataRecord, revision: number | null) =>
         request<{revision: number}>(`/api/maps/${encodeURIComponent(graph.id)}`, {

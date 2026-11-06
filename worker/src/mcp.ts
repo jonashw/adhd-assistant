@@ -10,6 +10,7 @@ import { LinkedItem, threadStates } from "../../src/TrailTypes";
 import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates } from "../../src/ClaudeMapTypes";
 import { syncProject } from "./claude";
 import { logMonologue, monologueMaxChars } from "./monologues";
+import { LiveRing, ring } from "./live";
 import { addChecklistItems, completeChecklistItem, listChecklistItems } from "./checklist";
 import { checklistMaxPerCall } from "../../src/TrailTypes";
 
@@ -49,9 +50,14 @@ const describeThread = (item: LinkedItem) => {
     };
 };
 
-async function run<T>(work: () => Promise<T>) {
+/* Runs a tool. A tool that writes names what it changed, and every open tab of the app hears it at once. */
+async function run<T>(work: () => Promise<T>, after?: {env: Env, rings: LiveRing[]}) {
     try {
-        return text(await work());
+        const result = await work();
+        if (after) {
+            await ring(after.env, after.rings);
+        }
+        return text(result);
     } catch (e) {
         if (e instanceof HttpError) {
             return {content: [{type: "text" as const, text: e.message}], isError: true};
@@ -65,6 +71,11 @@ function buildServer(env: Env): McpServer {
         {name: "adhd-assist", title: "ADHD Assist", version: "1.0.0"},
         {instructions, jsonSchemaValidator: new CfWorkerJsonSchemaValidator()}
     );
+    // what each kind of write changed, for the tabs that are open
+    const trail = {env, rings: [{topic: "trail"}] as LiveRing[]};
+    const threads = {env, rings: [{topic: "trail"}, {topic: "claude"}] as LiveRing[]};
+    const claude = {env, rings: [{topic: "claude"}] as LiveRing[]};
+    const monologues = {env, rings: [{topic: "monologues"}] as LiveRing[]};
     const place = z.string().describe("A place value from find_places, like \"<map id>/<place id>\"");
 
     server.registerTool("check_in", {
@@ -82,7 +93,7 @@ function buildServer(env: Env): McpServer {
         title: args.title, url: args.url, threadId: args.thread_id,
         place: args.place ? parsePlace(args.place) : undefined,
         alsoAt: args.also_at?.map(parsePlace)
-    }))));
+    })), threads));
 
     server.registerTool("report_state", {
         title: "Report state",
@@ -93,7 +104,7 @@ function buildServer(env: Env): McpServer {
             note: z.string().max(240).optional().describe("One line in plain words, e.g. \"PR #7 is ready for your review\"")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(async () => describeThread(await reportState(env, args.thread_id, args.state, args.note))));
+    }, args => run(async () => describeThread(await reportState(env, args.thread_id, args.state, args.note)), threads));
 
     server.registerTool("sync_project", {
         title: "Sync a project",
@@ -142,7 +153,7 @@ function buildServer(env: Env): McpServer {
             })).max(100).optional().describe("The project's PRs as list_prs gives them, when they changed since your last sync")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(() => syncProject(env, args)));
+    }, args => run(() => syncProject(env, args), claude));
 
     server.registerTool("log_monologue", {
         title: "Log a monologue",
@@ -161,7 +172,7 @@ function buildServer(env: Env): McpServer {
             repeat,
             next: repeat ? "These words were already logged a moment ago; nothing new was stored." : "Logged. Tell Jon in one line."
         };
-    }));
+    }, monologues));
 
     server.registerTool("suggest_place", {
         title: "Suggest a place",
@@ -176,7 +187,7 @@ function buildServer(env: Env): McpServer {
     }, args => run(async () => {
         const suggestion = await suggestPlace(env, args.thread_id, parsePlace(args.under), args.names);
         return {suggested: suggestion.path.join(" › "), next: "Jon will see it in What's next. Once he charts it, this thread's signals land there."};
-    }));
+    }, trail));
 
     const checklistItem = z.object({
         text: z.string().min(1).max(300).describe("One step only Jon can do, in plain words, e.g. \"Add the CLOUDFLARE_API_TOKEN secret to the House Party environment\""),
@@ -193,7 +204,7 @@ function buildServer(env: Env): McpServer {
             place: place.optional().describe("The place the to-dos belong to, from find_places. Leave out for this thread's own place, or its suggested place")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(() => addChecklistItems(env, args.thread_id, args.place ? parsePlace(args.place) : undefined, args.items)));
+    }, args => run(() => addChecklistItems(env, args.thread_id, args.place ? parsePlace(args.place) : undefined, args.items), trail));
 
     server.registerTool("list_checklist_items", {
         title: "List to-dos at a place",
@@ -213,7 +224,7 @@ function buildServer(env: Env): McpServer {
             id: z.string().min(1).max(100).describe("The item's id, from add_checklist_items or list_checklist_items")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(() => completeChecklistItem(env, args.thread_id, args.id)));
+    }, args => run(() => completeChecklistItem(env, args.thread_id, args.id), trail));
 
     server.registerTool("find_places", {
         title: "Find places",
