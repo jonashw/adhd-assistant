@@ -1,7 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import {
-    ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState,
+    ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
@@ -176,7 +176,8 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
          ON CONFLICT (hash) DO UPDATE SET received_at = excluded.received_at`
     ).bind(hash, snapshot.project_id, payload, now).run();
 
-    // 2. the map
+    // 2. the map, as it was, so the event log can say what this sync changed
+    const before = await mapOf(env, snapshot.project_id);
     const statements = [
         // an unchanged list: every thread the last sync listed counts as listed again
         ...(snapshot.threads ? [] : [env.DB.prepare(
@@ -219,6 +220,13 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
         env.DB.prepare("UPDATE claude_snapshots SET applied_at = ? WHERE hash = ?").bind(now, hash)
     ];
     await env.DB.batch(statements);
+
+    // 3. the event log; a failure here must not fail a sync that already landed
+    try {
+        await logChanges(env, before, await mapOf(env, snapshot.project_id), hash, snapshot.this_thread?.thread_id, now);
+    } catch (e) {
+        console.error("Couldn't write the Claude event log", e);
+    }
 
     if (snapshot.threads) {
         return {
@@ -376,4 +384,153 @@ export async function setProjectHidden(env: Env, projectId: string, hidden: bool
     if (!result.meta.changes) {
         throw new HttpError(404, "There is no such project on the Claude map.");
     }
+}
+
+/* ---- The event log ---- */
+
+type MapState = {
+    project: ProjectRow | null,
+    threads: Map<string, ThreadRow>,
+    prs: Map<string, PrRow>
+};
+
+async function mapOf(env: Env, projectId: string): Promise<MapState> {
+    const [project, threads, prs] = await env.DB.batch([
+        env.DB.prepare("SELECT * FROM claude_projects WHERE id = ?").bind(projectId),
+        env.DB.prepare("SELECT * FROM claude_threads WHERE project_id = ?").bind(projectId),
+        env.DB.prepare("SELECT * FROM claude_prs WHERE project_id = ?").bind(projectId)
+    ]);
+    return {
+        project: (project.results[0] as ProjectRow | undefined) ?? null,
+        threads: new Map((threads.results as ThreadRow[]).map(t => [t.id, t])),
+        prs: new Map((prs.results as PrRow[]).map(r => [`${r.repo}#${r.number}`, r]))
+    };
+}
+
+type Change = {kind: ClaudeEventKind, threadId?: string, pr?: string, from?: string | null, to?: string | null};
+
+const askOf = (t: ThreadRow) => t.ask_kind && t.ask_text ? `${t.ask_kind}: ${t.ask_text}` : null;
+/* listed in the project's latest sync */
+const listed = (t: ThreadRow, p: ProjectRow | null) => !!p && t.last_seen_at >= p.last_synced_at;
+
+/* What one sync changed, comparing the map before and after it */
+export function changesBetween(before: MapState, after: MapState): Change[] {
+    const changes: Change[] = [];
+    const a = after.project, b = before.project;
+    if (!a) {
+        return changes;
+    }
+    if (!b) {
+        changes.push({kind: "project_new", to: a.name});
+    } else {
+        if (a.name !== b.name) changes.push({kind: "project_renamed", from: b.name, to: a.name});
+        if (a.short_name !== b.short_name) changes.push({kind: "short_name", from: b.short_name, to: a.short_name});
+    }
+    for (const [id, t] of after.threads) {
+        const old = before.threads.get(id);
+        if (!old) {
+            changes.push({kind: "thread_new", threadId: id, to: t.title, from: null});
+            changes.push({kind: "thread_state", threadId: id, from: null, to: t.state});
+            continue;
+        }
+        if (t.title !== old.title) changes.push({kind: "thread_renamed", threadId: id, from: old.title, to: t.title});
+        if (t.state !== old.state) changes.push({kind: "thread_state", threadId: id, from: old.state, to: t.state});
+        if (askOf(t) !== askOf(old)) changes.push({kind: "ask", threadId: id, from: askOf(old), to: askOf(t)});
+        if (t.headline !== old.headline && t.headline) changes.push({kind: "reply", threadId: id, from: old.headline, to: t.headline});
+        if (listed(old, b) && !listed(t, a)) changes.push({kind: "thread_unlisted", threadId: id, to: t.title});
+    }
+    for (const [key, r] of after.prs) {
+        const old = before.prs.get(key);
+        const threadId = r.thread_id ?? undefined;
+        if (!old) {
+            changes.push({kind: "pr_new", pr: key, threadId, to: r.title});
+            continue;
+        }
+        if (r.state !== old.state) changes.push({kind: "pr_state", pr: key, threadId, from: old.state, to: r.state});
+        if ((r.ci ?? null) !== (old.ci ?? null) && r.ci) changes.push({kind: "pr_ci", pr: key, threadId, from: old.ci, to: r.ci});
+    }
+    return changes;
+}
+
+async function logChanges(env: Env, before: MapState, after: MapState, hash: string, by: string | undefined, now: string) {
+    const projectId = after.project?.id;
+    const changes = changesBetween(before, after);
+    if (!projectId || changes.length === 0) {
+        return;
+    }
+    await env.DB.batch(changes.map(c => env.DB.prepare(
+        `INSERT INTO claude_events (at, kind, project_id, thread_id, pr, from_value, to_value, snapshot_hash, by_thread)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(now, c.kind, projectId, c.threadId ?? null, c.pr ?? null, c.from ?? null, c.to ?? null, hash, by ?? null)));
+}
+
+type EventRow = {
+    id: number, at: string, kind: ClaudeEventKind, project_id: string, thread_id: string | null, pr: string | null,
+    from_value: string | null, to_value: string | null, snapshot_hash: string, by_thread: string | null
+};
+type SnapshotRow = {hash: string, project_id: string, payload: string, received_at: string, applied_at: string | null};
+
+function syncOf(r: SnapshotRow): ClaudeLogEntry {
+    let s: Partial<Snapshot> = {};
+    try {
+        s = JSON.parse(r.payload);
+    } catch {
+        // kept as sent; a payload that doesn't parse still shows up as a sync
+    }
+    const sync: ClaudeLogEntry = {
+        type: "sync", hash: r.hash, at: r.received_at, projectId: r.project_id,
+        card: !!s.this_thread?.card, applied: !!r.applied_at
+    };
+    if (s.project_name) sync.projectName = s.project_name;
+    if (s.this_thread?.thread_id) sync.by = s.this_thread.thread_id;
+    if (s.threads) sync.threads = s.threads.length;
+    if (s.prs) sync.prs = s.prs.length;
+    if (s.this_thread?.state) sync.selfState = s.this_thread.state;
+    return sync;
+}
+
+/* The log, newest first: what changed, and every sync, before the given time */
+export async function listClaudeLog(env: Env, before: string | null, limit = 200): Promise<ClaudeLogEntry[]> {
+    const until = before && isTime(before) ? before : "9999";
+    const [events, syncs] = await env.DB.batch([
+        env.DB.prepare("SELECT * FROM claude_events WHERE at < ? ORDER BY at DESC, id DESC LIMIT ?").bind(until, limit),
+        env.DB.prepare("SELECT * FROM claude_snapshots WHERE received_at < ? ORDER BY received_at DESC LIMIT ?").bind(until, limit)
+    ]);
+    const entries: ClaudeLogEntry[] = [
+        ...(events.results as EventRow[]).map(e => {
+            const event: ClaudeLogEntry = {type: "event", id: e.id, at: e.at, kind: e.kind, projectId: e.project_id, sync: e.snapshot_hash};
+            if (e.thread_id) event.threadId = e.thread_id;
+            if (e.pr) event.pr = e.pr;
+            if (e.from_value !== null) event.from = e.from_value;
+            if (e.to_value !== null) event.to = e.to_value;
+            if (e.by_thread) event.by = e.by_thread;
+            return event;
+        }),
+        ...(syncs.results as SnapshotRow[]).map(syncOf)
+    ];
+    // a sync sorts below the changes it brought, which share its time
+    const rank = (e: ClaudeLogEntry) => e.type === "event" ? 1 : 0;
+    entries.sort((x, y) => y.at.localeCompare(x.at) || rank(y) - rank(x)
+        || (x.type === "event" && y.type === "event" ? y.id - x.id : 0));
+    // both lists stop at the limit, so past the older of their two ends the merge could miss entries
+    const ends = [events.results, syncs.results].filter(r => r.length === limit)
+        .map(r => (r.at(-1) as {at?: string, received_at?: string}))
+        .map(r => r.at ?? r.received_at ?? "");
+    const floor = ends.sort().at(-1);
+    return floor ? entries.filter(e => e.at >= floor) : entries;
+}
+
+/* One sync exactly as Claude sent it, for debugging */
+export async function getClaudeSnapshot(env: Env, hash: string): Promise<unknown> {
+    const row = await env.DB.prepare("SELECT * FROM claude_snapshots WHERE hash = ?").bind(hash).first<SnapshotRow>();
+    if (!row) {
+        throw new HttpError(404, "There is no such sync.");
+    }
+    let payload: unknown = row.payload;
+    try {
+        payload = JSON.parse(row.payload);
+    } catch {
+        // shown as the text it was
+    }
+    return {hash: row.hash, projectId: row.project_id, receivedAt: row.received_at, appliedAt: row.applied_at, payload};
 }
