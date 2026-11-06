@@ -1,8 +1,9 @@
 import React from "react";
 import { MindMapGraphDataRecord } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
-import { emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, Visit, VisitKind } from "./Trail";
+import { ChecklistItem, emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, TrailStore, Visit, VisitKind } from "./Trail";
 import { readTether, standingAt, Tether, WeatherAnswer } from "./Navigator";
+import { safetyPollMs, useRing } from "./live";
 
 export type Navigator = {
     mapId: string,
@@ -28,6 +29,10 @@ export type Navigator = {
     /* Jon answers "Which place does this thread serve?", or moves a thread */
     placeItem: (itemId: string, noteId: string) => Promise<void>,
     forgetItem: (itemId: string) => Promise<void>,
+    /* to-dos Claude threads left at a place, open first */
+    checklistAt: (noteId: string) => ChecklistItem[],
+    setChecklistDone: (id: string, done: boolean) => Promise<void>,
+    removeChecklistItem: (id: string) => Promise<void>,
     refresh: () => void
 };
 
@@ -43,9 +48,14 @@ export function useNavigator(): Navigator {
 
 const weatherKey = (mapId: string) => `weather:${mapId}`;
 
-export function NavigatorProvider({graph, children}: {graph: MindMapGraphDataRecord, children: React.ReactNode}) {
+export function NavigatorProvider({graph, children, trailStore}: {
+    graph: MindMapGraphDataRecord,
+    children: React.ReactNode,
+    /* where the trail is kept; the server or this browser unless given (a preview keeps it in memory) */
+    trailStore?: TrailStore
+}) {
     const {status} = React.useContext(GraphRepositoryContext);
-    const store = status?.mode === "server" ? serverTrailStore : localTrailStore;
+    const store = trailStore ?? (status?.mode === "server" ? serverTrailStore : localTrailStore);
     const mapId = graph.id;
     const homeId = graph.nodes.find(n => n.type === "HOME")?.id ?? "";
     const [trail, setTrail] = React.useState<TrailData>(emptyTrail);
@@ -83,13 +93,15 @@ export function NavigatorProvider({graph, children}: {graph: MindMapGraphDataRec
         };
     }, [refresh]);
 
-    //signals from Claude arrive on their own: look again every 30 seconds while the app is visible, and on return
+    //signals from Claude arrive on their own: the server rings when this map's trail changes, and the app looks
+    //again on return to the tab, plus a slow safety look in case a ring was lost
+    useRing("trail", mapId, refresh, store === serverTrailStore);
     React.useEffect(() => {
         if (store !== serverTrailStore) {
             return;
         }
         const visible = () => document.visibilityState === "visible";
-        const timer = setInterval(() => visible() && refresh(), 30_000);
+        const timer = setInterval(() => visible() && refresh(), safetyPollMs);
         const onReturn = () => visible() && refresh();
         document.addEventListener("visibilitychange", onReturn);
         window.addEventListener("focus", onReturn);
@@ -212,10 +224,35 @@ export function NavigatorProvider({graph, children}: {graph: MindMapGraphDataRec
         refresh();
     }, [store, refresh]);
 
+    const checklistAt = React.useCallback((noteId: string) =>
+        trail.checklist.filter(c => c.noteId === noteId).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt)),
+        [trail.checklist]);
+
+    //shown at once; the server copy follows, and a failure puts it back
+    const setChecklistDone = React.useCallback(async (id: string, done: boolean) => {
+        const doneAt = done ? new Date().toISOString() : undefined;
+        setTrail(t => ({...t, checklist: t.checklist.map(c => c.id === id ? {...c, doneAt, doneBy: done ? "jon" : undefined} : c)}));
+        try {
+            await store.setChecklistDone(id, done);
+        } finally {
+            refresh();
+        }
+    }, [store, refresh]);
+
+    const removeChecklistItem = React.useCallback(async (id: string) => {
+        setTrail(t => ({...t, checklist: t.checklist.filter(c => c.id !== id)}));
+        try {
+            await store.removeChecklistItem(id);
+        } finally {
+            refresh();
+        }
+    }, [store, refresh]);
+
     const value: Navigator = {
         mapId, loaded, trail, tether, now, weatherAnswer,
         arrive, tieOff, untie, answerWeather, flagOf, plantFlag, clearFlag,
-        signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem, refresh
+        signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem,
+        checklistAt, setChecklistDone, removeChecklistItem, refresh
     };
     return <NavigatorContext.Provider value={value}>{children}</NavigatorContext.Provider>;
 }

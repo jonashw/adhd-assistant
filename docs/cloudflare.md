@@ -66,7 +66,7 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`.
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, and the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`.
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
@@ -108,6 +108,26 @@ changed since Jon last opened that thread from the map. Every topic a thread has
 list view, along with day words like "monday". To save tokens, a sync may leave `threads` out when no title or state
 changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
 thread cards on the Claude map: design proposal" (Jon chose Glance).
+
+**A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
+thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
+sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
+thread until a later list from the platform says otherwise.
+
+## Live updates
+
+Every open tab keeps a WebSocket to one Durable Object, `LiveHub` (`worker/src/live.ts`), at `/api/live`. After
+each write, from the app or from the connector, the Worker rings the hub with what changed (`maps`, `trail`,
+`claude` or `monologues`, plus the map id where there is one), and each tab refetches just that piece from the
+usual endpoints. The ring carries no data. A tab skips the ring for its own writes (the `x-live-tab` header).
+
+- Nothing to set up: the binding and its migration are in `wrangler.jsonc`, and Workers Builds applies them on
+  deploy. The class is SQLite-backed, which the free plan allows.
+- The sockets hibernate, so the hub sleeps between rings; a tab's "ping" every 25 seconds is answered "pong"
+  without waking it.
+- If the socket drops, the tab shows a grey dot, retries with backoff, and refetches everything once it is back.
+  Tabs also refetch when they come to the front, and take a safety look every 5 minutes while visible.
+- A failed ring never fails the write.
 
 ## Read-only viewer token (for Claude's browser)
 

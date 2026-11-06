@@ -13,6 +13,7 @@ type GraphFileContents = {
 /* Only the stored fields, so a graph re-imports with identical nodes and links */
 const plain = (graph: MindMapGraphDataRecord): MindMapGraphDataRecord => ({
     id: graph.id,
+    ...(graph.title ? {title: graph.title} : {}),
     nodes: graph.nodes.map(n => ({...n})),
     links: graph.links.map(({source, target, type, label}) => label ? {source, target, type, label} : {source, target, type})
 });

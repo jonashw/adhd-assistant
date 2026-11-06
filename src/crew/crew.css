@@ -148,11 +148,11 @@
 .crew-spider.doing-ask .leg-r1 { animation: spider-wave 3s ease-in-out infinite; }
 
 /* climbing the string, hand over hand */
-.crew-spider.doing-climb .spider-body { animation: spider-climb 1.6s ease-in-out infinite; }
+.crew-spider.doing-climb .spider-body { animation: spider-climb 3.2s ease-in-out infinite; }
 .crew-spider.doing-climb .leg-l1, .crew-spider.doing-climb .leg-r2,
-.crew-spider.doing-climb .leg-l3, .crew-spider.doing-climb .leg-r4 { animation: spider-scurry 400ms ease-in-out infinite; }
+.crew-spider.doing-climb .leg-l3, .crew-spider.doing-climb .leg-r4 { animation: spider-scurry 800ms ease-in-out infinite; }
 .crew-spider.doing-climb .leg-r1, .crew-spider.doing-climb .leg-l2,
-.crew-spider.doing-climb .leg-r3, .crew-spider.doing-climb .leg-l4 { animation: spider-scurry 400ms ease-in-out infinite reverse; }
+.crew-spider.doing-climb .leg-r3, .crew-spider.doing-climb .leg-l4 { animation: spider-scurry 800ms ease-in-out infinite reverse; }
 
 @keyframes spider-tap {
     0%, 100% { transform: rotate(0); }
@@ -169,7 +169,7 @@
 }
 @keyframes spider-tug {
     0%, 18%, 36%, 100% { transform: translateY(0); }
-    9%, 27% { transform: translateY(3px); }
+    9%, 27% { transform: translateY(8px); }
 }
 @keyframes spider-grip {
     0%, 18%, 36%, 100% { transform: rotate(0); }
@@ -327,22 +327,28 @@
 .crew-jon .jon-smile { fill: none; stroke: var(--crew-balloon-face); stroke-width: 1.6; stroke-linecap: round; }
 .crew-jon .jon-knot { fill: none; stroke: var(--crew-eye); stroke-width: 1.4; }
 .crew-jon .jon-string { fill: none; stroke: var(--crew-ink); stroke-width: 1; stroke-linecap: round; }
+.crew-jon .jon-hand { fill: var(--crew-metal-dark); }
 .crew-jon .jon-work { fill: var(--crew-work); stroke: var(--crew-work-edge); stroke-width: 1.2; }
 .crew-jon .jon-work-lines { fill: none; stroke: var(--crew-work-edge); stroke-width: 0.7; opacity: 0.6; stroke-linecap: round; }
 .crew-jon .spider-mini { fill: var(--crew-spider-dark); }
 .crew-jon .spider-mini-leg { fill: none; stroke: var(--crew-spider-dark); stroke-width: 0.8; stroke-linecap: round; }
 .crew-jon .jon-head { transform-origin: 50% 100%; }
+/* the face's expressions are layers in art/you/face.svg: calm, and blink for the moment of a blink */
+.crew-jon .face-blink { display: none; }
+.crew-jon.is-blink .face-blink { display: inline; }
+.crew-jon.is-blink .face-calm { display: none; }
+.crew-jon.is-blink .eyes { animation: none; }
 .crew-jon .jon-bob { transform-origin: 50% 100%; animation: jon-bob 4s ease-in-out infinite; }
 .crew-jon .jon-breathe { transform-origin: 50% 100%; animation: jon-bob 6s ease-in-out infinite; }
 .crew-jon .jon-kite { transform-origin: 0% 100%; animation: jon-kite 5s ease-in-out infinite alternate; }
 .crew-jon.is-look .jon-head { animation: jon-look 1400ms ease-in-out; }
 .crew-jon .jon-tugged { transform-origin: 50% 100%; animation: jon-tugged 2.4s ease-in-out infinite; }
 /* climbing: up your string from the wrist to your head, then back down for the next note */
-.crew-jon .jon-spider-climb { animation: jon-spider-climb 4s ease-in-out infinite; }
+.crew-jon .jon-spider-climb { animation: jon-spider-climb 8s ease-in-out infinite; }
 
 @keyframes jon-tugged {
     0%, 18%, 36%, 100% { transform: translateY(0); }
-    9%, 27% { transform: translateY(1.2px); }
+    9%, 27% { transform: translateY(3.5px); }
 }
 @keyframes jon-spider-climb {
     0%, 8% { transform: translateY(0); }
@@ -363,9 +369,194 @@
     30%, 70% { transform: rotate(-8deg); }
 }
 
+
+/* ---- you: moves between states ---- */
+.crew-jon .jon-upper { transform-box: view-box; transform-origin: 18px 80px; }
+.crew-jon .jon-legs, .crew-jon .jon-leg-a, .crew-jon .jon-leg-b { transform-box: view-box; transform-origin: 18px 92px; }
+.crew-jon .jon-lifted { transform-box: view-box; }
+
+/* untying / tying: the hands work at the belt; tying, the whole body wiggles with it */
+.crew-jon .jon-fiddle { transform-box: view-box; transform-origin: 18px 62px; animation: jon-fiddle 360ms ease-in-out infinite; }
+.crew-jon.doing-tying .jon-upper { animation: jon-wiggle 520ms ease-in-out infinite; }
+
+/* picking the work up: crouch, take it in both hands, rise with it */
+.crew-jon.doing-pickup .jon-upper { animation: jon-crouch 1600ms ease-in-out forwards; }
+.crew-jon.doing-pickup .jon-legs { animation: jon-knees 1600ms ease-in-out forwards; }
+.crew-jon.doing-pickup .jon-lifted { animation: jon-lift 1600ms ease-in-out forwards; }
+/* setting it down: the same move played backwards */
+.crew-jon.doing-setdown .jon-upper { animation: jon-crouch 1600ms ease-in-out reverse forwards; }
+.crew-jon.doing-setdown .jon-legs { animation: jon-knees 1600ms ease-in-out reverse forwards; }
+.crew-jon.doing-setdown .jon-lifted { animation: jon-lift 1600ms ease-in-out reverse forwards; }
+
+/* walking: legs scissor, arms swing, the body bobs */
+.crew-jon.doing-walk .jon-leg-a { animation: jon-stride 520ms ease-in-out infinite; }
+.crew-jon.doing-walk .jon-leg-b { animation: jon-stride 520ms ease-in-out infinite reverse; }
+.crew-jon.doing-walk .jon-swing-a { transform-box: view-box; transform-origin: 12px 62px; animation: jon-stride 520ms ease-in-out infinite reverse; }
+.crew-jon.doing-walk .jon-swing-b { transform-box: view-box; transform-origin: 24px 62px; animation: jon-stride 520ms ease-in-out infinite; }
+.crew-jon.doing-walk .jon-upper { animation: jon-step-bob 260ms ease-in-out infinite; }
+
+/* aloft, on the move */
+.crew-jon.motion-float .jon-kite { animation: jon-kite-hard 1.1s ease-in-out infinite alternate; }
+.crew-jon.motion-float .jon-head { animation: jon-head-bob 700ms ease-in-out infinite; }
+.crew-jon.motion-scout .jon-head { transform-origin: 50% 50%; animation: jon-scout 3.2s ease-in-out infinite; }
+.crew-jon.motion-drift .jon-kite { animation: jon-kite-drift 1.6s ease-in-out infinite alternate; }
+.crew-jon.motion-drift .jon-head { animation: jon-head-bob 900ms ease-in-out infinite; }
+.crew-jon.motion-reel .jon-kite { animation: jon-kite-hard 700ms ease-in-out infinite alternate; }
+.crew-jon.motion-reel .jon-arm-string { transform-box: view-box; transform-origin: 24px 62px; animation: jon-pull 700ms ease-in-out infinite; }
+.crew-jon.motion-reel .jon-arm-free { transform-box: view-box; transform-origin: 12px 62px; animation: jon-pull-free 700ms ease-in-out infinite; }
+
+@keyframes jon-fiddle {
+    0%, 100% { transform: translateX(0) rotate(0); }
+    50% { transform: translateX(0.6px) rotate(3deg); }
+}
+@keyframes jon-wiggle {
+    0%, 100% { transform: rotate(-3deg); }
+    50% { transform: rotate(3deg); }
+}
+@keyframes jon-crouch {
+    0%, 8% { transform: translateY(0); }
+    40%, 55% { transform: translateY(6px); }
+    100% { transform: translateY(0); }
+}
+@keyframes jon-knees {
+    0%, 8% { transform: scaleY(1); }
+    40%, 55% { transform: scaleY(0.5); }
+    100% { transform: scaleY(1); }
+}
+@keyframes jon-lift {
+    0%, 40% { transform: translate(14px, 16px); }
+    55% { transform: translate(0, 6px); }
+    100% { transform: translateY(0); }
+}
+@keyframes jon-stride {
+    0%, 100% { transform: rotate(-16deg); }
+    50% { transform: rotate(16deg); }
+}
+@keyframes jon-step-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-0.9px); }
+}
+@keyframes jon-kite-hard {
+    0% { transform: rotate(-9deg); }
+    100% { transform: rotate(9deg); }
+}
+@keyframes jon-kite-drift {
+    0% { transform: rotate(-14deg) translateX(-1px); }
+    100% { transform: rotate(12deg) translateX(1.5px); }
+}
+@keyframes jon-head-bob {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    30% { transform: translateY(-1.6px) rotate(-6deg); }
+    70% { transform: translateY(0.6px) rotate(5deg); }
+}
+@keyframes jon-scout {
+    0%, 12%, 100% { transform: rotate(0) scaleX(1); }
+    25%, 40% { transform: rotate(-22deg) scaleX(0.92); }
+    55% { transform: rotate(0) scaleX(1); }
+    70%, 85% { transform: rotate(22deg) scaleX(0.92); }
+}
+@keyframes jon-pull {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(38deg); }
+}
+@keyframes jon-pull-free {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(-90deg) translateY(-2px); }
+}
+
+/* ---- the crew, joining in ---- */
+/* the tug: the dog rears up and pulls your free arm down on each beat; the squirrel jumps on the same beats */
+.crew-dog.doing-pull .dog-all { transform-box: view-box; transform-origin: 20px 46px; animation: dog-pull 2.4s ease-in-out infinite; }
+.crew-dog.doing-pull .leg-front-near, .crew-dog.doing-pull .leg-front-far { transform: rotate(-110deg); }
+.crew-dog.doing-pull .dog-tail { animation: dog-wag-fast 240ms ease-in-out infinite; }
+.crew-squirrel.doing-jump .sq-all { animation: sq-jump 2.4s ease-in-out infinite; }
+.crew-jon.spider-tug .jon-arm-free { transform-box: view-box; transform-origin: 12px 62px; animation: jon-arm-yank 2.4s ease-in-out infinite; }
+
+/* getting up: a stretch, a shake, tail going */
+.crew-dog.doing-rouse .dog-all { animation: dog-rouse 1600ms ease-in-out; }
+.crew-dog.doing-rouse .dog-tail { animation: dog-wag-fast 220ms ease-in-out infinite; }
+
+/* following you: the squirrel hops, the spider scurries */
+.crew-squirrel.doing-hop .sq-all { animation: sq-hop 520ms ease-in-out infinite; }
+.crew-spider.doing-walk .spider-body { animation: spider-climb 260ms ease-in-out infinite; }
+.crew-spider.doing-walk .leg-l1, .crew-spider.doing-walk .leg-r2,
+.crew-spider.doing-walk .leg-l3, .crew-spider.doing-walk .leg-r4 { animation: spider-scurry 260ms ease-in-out infinite; }
+.crew-spider.doing-walk .leg-r1, .crew-spider.doing-walk .leg-l2,
+.crew-spider.doing-walk .leg-r3, .crew-spider.doing-walk .leg-l4 { animation: spider-scurry 260ms ease-in-out infinite reverse; }
+
+/* the stage: ground sliding by, the work ahead coming closer, a cloud rolling in */
+.crew-ground-to, .crew-ground-home {
+    background: repeating-linear-gradient(90deg, #a9b4bf 0 10px, transparent 10px 16px) !important;
+    background-size: 16px 2px !important;
+}
+.crew-ground-to { animation: crew-ground-left 520ms linear infinite; }
+.crew-ground-home { animation: crew-ground-right 520ms linear infinite; }
+.crew-work-ahead { animation: crew-work-closer 2.6s ease-out forwards; }
+.crew-cloud-rolling { animation: crew-cloud-roll 1.6s ease-out forwards, crew-cloud-churn 800ms ease-in-out 1.6s infinite alternate; }
+
+@keyframes crew-ground-left { from { background-position: 0 0; } to { background-position: -16px 0; } }
+@keyframes crew-ground-right { from { background-position: 0 0; } to { background-position: 16px 0; } }
+@keyframes crew-work-closer {
+    from { transform: translateX(60px); opacity: 0; }
+    20% { opacity: 1; }
+    to { transform: translateX(0); opacity: 1; }
+}
+@keyframes crew-cloud-roll {
+    from { transform: translateX(-46px) scale(0.6); opacity: 0; }
+    to { transform: translateX(0) scale(1); opacity: 0.95; }
+}
+@keyframes crew-cloud-churn {
+    from { transform: translateX(-2px); }
+    to { transform: translateX(2px); }
+}
+
+/* Mindful, poked: everyone wiggles at once */
+.crew-poked .crew-dog .dog-tail { animation: dog-wag-fast 160ms ease-in-out 10 !important; }
+.crew-poked .crew-squirrel .sq-tail { animation: sq-flick 400ms ease-in-out 4 !important; }
+.crew-poked .crew-spider .spider-body { animation: spider-shuffle 400ms ease-in-out 4 !important; }
+.crew-poked .crew-jon .jon-head { animation: jon-head-bob 500ms ease-in-out 3 !important; }
+
+@keyframes dog-pull {
+    0%, 18%, 36%, 100% { transform: rotate(-30deg); }
+    9%, 27% { transform: rotate(-20deg) translateY(2px); }
+}
+@keyframes sq-jump {
+    0%, 18%, 36%, 100% { transform: translateY(0); }
+    5%, 23% { transform: translateY(-9px); }
+}
+@keyframes jon-arm-yank {
+    0%, 18%, 36%, 100% { transform: rotate(0); }
+    9%, 27% { transform: rotate(14deg); }
+}
+@keyframes dog-rouse {
+    0% { transform: translateY(4px) scaleY(0.85); }
+    35% { transform: rotate(4deg) scaleX(1.06); }
+    55% { transform: rotate(-3deg); }
+    70% { transform: rotate(3deg); }
+    100% { transform: none; }
+}
+@keyframes sq-hop {
+    0%, 100% { transform: translateY(0); }
+    45% { transform: translateY(-4px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .crew, .crew * {
+    .crew, .crew *, .crew-ground-to, .crew-ground-home, .crew-work-ahead, .crew-cloud-rolling {
         animation: none !important;
         transition: none !important;
     }
 }
+
+/* Balloon-head asking a question (Speaker.tsx) */
+.crew .person-skin { fill: #e0a77f; stroke: #b77b55; stroke-width: 0.5; }
+.crew .person-hair { fill: #4a3426; }
+.crew .person-ink { fill: #2b2b2b; }
+.crew .person-line { fill: none; stroke: #4a2c22; stroke-width: 0.9; stroke-linecap: round; }
+.crew-speaker .speaker-skin { fill: #e0a77f; stroke: #b77b55; stroke-width: 0.5; }
+.crew-speaker .speaker-hair { fill: #4a3426; }
+.crew-speaker .speaker-ink { fill: #2b2b2b; }
+.crew-speaker .speaker-brow { fill: none; stroke: #4a3426; stroke-width: 0.8; stroke-linecap: round; }
+.crew-speaker .speaker-mouth { fill: #7a2e2a; transform-box: fill-box; transform-origin: center; }
+.crew-speaker.is-talk .speaker-mouth { animation: speaker-talk 1200ms ease-in-out; }
+@keyframes speaker-talk { 0%, 100% { transform: scaleY(1); } 20%, 60% { transform: scaleY(0.45); } 40%, 80% { transform: scaleY(1.1); } }
+@media (prefers-reduced-motion: reduce) { .crew-speaker.is-talk .speaker-mouth { animation: none; } }

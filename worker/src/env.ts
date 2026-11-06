@@ -1,5 +1,9 @@
+import type { LiveHub } from "./live";
+
 export interface Env {
     DB: D1Database;
+    /* the doorbell every open tab listens to (worker/src/live.ts) */
+    LIVE: DurableObjectNamespace<LiveHub>;
     ASSETS: Fetcher;
     /* grants and tokens for the Claude connector, kept by Cloudflare's OAuth library */
     OAUTH_KV: KVNamespace;

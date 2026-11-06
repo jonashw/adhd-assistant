@@ -46,7 +46,11 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             glance(thread("demo_garden", "demo_g4", "Pick hardy perennials", "done", 2000), {
                 headline: "Picked eight perennials that survive zone 6 winters",
                 topic: "Hardy perennials for the front border"
-            }, 2000, [pr(9, "Perennial planting plan", "merged")], 1500)
+            }, 2000, [pr(9, "Perennial planting plan", "merged")], 1500),
+            thread("demo_garden", "demo_g5", "Choose a compost bin", "blocked", 60 * 24 * 10),
+            thread("demo_garden", "demo_g6", "Measure the patio", "done", 60 * 5),
+            thread("demo_garden", "demo_g7", "Find a hedge trimmer", "done", 60 * 26),
+            thread("demo_garden", "demo_g8", "Test the soil pH", "done", 60 * 24 * 4)
         ]),
         project("demo_trip", "Summer trip planning", "Trip", 3, [
             glance(thread("demo_trip", "demo_t1", "Compare train passes", "working", 3), {

@@ -3,17 +3,20 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    InputAdornment, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
 } from "@mui/material";
-import { ArrowBack, Check, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
-    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeStaleHours, glanceLine, isNewSince
+    ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
 import { ClaudeThreadGlance, NewDot, PrChip } from "./ClaudeThreadGlance";
 import { matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
+import { safetyPollMs, useRing } from "./live";
 import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
+import { ClaudeEventLog } from "./ClaudeEventLog";
+import { LiveDot } from "./LiveDot";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -26,7 +29,6 @@ export const claudeStyle = {
     font: "'Source Serif 4', Georgia, 'Times New Roman', serif"
 };
 
-const refreshMs = 30_000;
 
 type MapNode = {
     id: string,
@@ -63,21 +65,25 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
     }
     const count = badges.filter(b => b === top).length;
     const text = top === "blocked" ? `${count} need${count === 1 ? "s" : ""} you`
-        : top === "done" ? "All done"
+        : top === "done" ? "All resolved"
         : count > 1 ? `${count} ${claudeBadges[top].label.toLowerCase()}` : claudeBadges[top].label;
     return {badge: top, text};
 }
 
-const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
+export const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
 
-function graphOf(projects: ClaudeProject[]): {nodes: MapNode[], links: {source: string, target: string}[]} {
+/* Which threads get a node. A project's badge still counts every thread, hidden or not. */
+type ThreadFilter = (thread: ClaudeThread, project: ClaudeProject) => boolean;
+const everyThread: ThreadFilter = () => true;
+
+function graphOf(projects: ClaudeProject[], onMap: ThreadFilter = everyThread): {nodes: MapNode[], links: {source: string, target: string}[]} {
     const nodes: MapNode[] = [{id: "claude", kind: "root", label: "Claude"}];
     const links: {source: string, target: string}[] = [];
     for (const p of projects) {
         const summary = projectSummary(p);
         nodes.push({id: p.id, kind: "project", label: projectLabel(p), badge: summary.badge, badgeText: summary.text, url: p.url, project: p});
         links.push({source: "claude", target: p.id});
-        for (const t of p.threads) {
+        for (const t of p.threads.filter(t => onMap(t, p))) {
             const badge = badgeFor(t, p);
             nodes.push({id: t.id, kind: "thread", label: t.title, badge, url: t.url, project: p, thread: t});
             links.push({source: p.id, target: t.id});
@@ -135,7 +141,7 @@ const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "proj
 function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, selectedId?: string) {
     const x = node.x ?? 0, y = node.y ?? 0;
     const r = radiusOf(node.kind);
-    const dimmed = node.badge === "done" && node.kind === "thread";
+    const dimmed = (node.badge === "done" || node.badge === "someday") && node.kind === "thread";
     ctx.save();
     ctx.globalAlpha = dimmed ? 0.55 : 1;
 
@@ -157,7 +163,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     ctx.fill();
     ctx.lineWidth = node.id === selectedId ? 2.2 : 1.2;
     ctx.strokeStyle = node.id === selectedId ? claudeStyle.ink : claudeStyle.ring;
-    if (node.badge === "stale" || node.badge === "gone") {
+    if (node.badge && quietBadges.includes(node.badge)) {
         ctx.setLineDash([1.5, 1.5]);
     }
     ctx.stroke();
@@ -209,7 +215,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
             ctx.beginPath();
             ctx.roundRect(x - w / 2, top, w, h, h / 2);
             ctx.fill();
-            if (node.badge === "stale" || node.badge === "gone") {
+            if (quietBadges.includes(node.badge)) {
                 ctx.setLineDash([0.8, 0.8]);
                 ctx.strokeStyle = "#9CA3AF";
                 ctx.lineWidth = 0.3;
@@ -231,7 +237,7 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
         label={text ?? badge.label}
         sx={{
             bgcolor: badge.color, color: badge.text, fontWeight: 600,
-            border: kind === "stale" || kind === "gone" ? "1px dashed #9CA3AF" : undefined
+            border: quietBadges.includes(kind) ? "1px dashed #9CA3AF" : undefined
         }}
     />;
 }
@@ -239,7 +245,7 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
 /* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
    from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
-type OpenIn = "new-tab" | "desktop";
+export type OpenIn = "new-tab" | "desktop";
 const openInKey = "claudeMap.openIn";
 const openInLabels: Record<OpenIn, string> = {
     "new-tab": "A new browser tab each time",
@@ -265,7 +271,7 @@ const open = (url: string | undefined, openIn: OpenIn) => {
 };
 
 /* A real link, so the URL shows on hover, can be copied, and cmd- or middle-click makes a tab of its own */
-const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
+export const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
     ? {component: "a" as const, href: desktopUrl(url)}
     : {component: "a" as const, href: url, target: "_blank", rel: "noopener noreferrer"};
 
@@ -275,6 +281,35 @@ const readOpenIn = (): OpenIn => {
         return value === "desktop" ? value : "new-tab";
     } catch {
         return "new-tab";
+    }
+};
+
+/* Done threads leave the map unless Jon asks for one back. Both choices are kept per device, like Open in. */
+const hideDoneKey = "claudeMap.hideDone";
+const shownDoneKey = "claudeMap.shownDone";
+
+const readHideDone = (): boolean => {
+    try {
+        return localStorage.getItem(hideDoneKey) !== "false";
+    } catch {
+        return true;
+    }
+};
+
+const readShownDone = (): Set<string> => {
+    try {
+        const ids = JSON.parse(localStorage.getItem(shownDoneKey) ?? "[]");
+        return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+    } catch {
+        return new Set();
+    }
+};
+
+export const keep = (key: string, value: string) => {
+    try {
+        localStorage.setItem(key, value);
+    } catch {
+        // private window: the choice lasts until the page closes
     }
 };
 
@@ -291,10 +326,10 @@ const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: 
 /* Keeps the same node objects (and so their positions) across refreshes. A refresh that only changes
    states or titles updates the nodes in place and leaves the layout alone; new nodes start next to
    their parent, so only they and their neighbours move. */
-function useStableGraph(projects: ClaudeProject[]): GraphData {
+function useStableGraph(projects: ClaudeProject[], onMap: ThreadFilter): GraphData {
     const current = React.useRef<{data: GraphData, structure: string}>();
     return React.useMemo(() => {
-        const fresh = graphOf(projects);
+        const fresh = graphOf(projects, onMap);
         const structure = structureOf(fresh);
         const previous = current.current;
         const byId = new Map((previous?.data.nodes ?? []).map(n => [n.id, n]));
@@ -330,7 +365,7 @@ function useStableGraph(projects: ClaudeProject[]): GraphData {
         const data: GraphData = {nodes, links: fresh.links.map(l => ({...l})), pins};
         current.current = {data, structure};
         return data;
-    }, [projects]);
+    }, [projects, onMap]);
 }
 
 function useClaudeMap(demo: boolean) {
@@ -350,15 +385,21 @@ function useClaudeMap(demo: boolean) {
             })
             .catch((e: Error) => setError(e.message));
     }, [demo]);
+    // the server rings whenever a thread syncs, so the map shows it at once
+    useRing("claude", undefined, load, !demo);
     React.useEffect(() => {
-        const refocus = () => load();
+        const visible = () => document.visibilityState === "visible";
+        const refocus = () => visible() && load();
         load();
-        // the demo refreshes faster, so changes are easy to watch
-        const timer = window.setInterval(() => load(true), demo ? 8000 : refreshMs);
+        // the demo moves on by itself, faster, so changes are easy to watch; the real map only takes a slow
+        // safety look while visible, in case a ring was lost
+        const timer = window.setInterval(() => demo ? load(true) : refocus(), demo ? 8000 : safetyPollMs);
         window.addEventListener("focus", refocus);
+        document.addEventListener("visibilitychange", refocus);
         return () => {
             window.clearInterval(timer);
             window.removeEventListener("focus", refocus);
+            document.removeEventListener("visibilitychange", refocus);
         };
     }, [load, demo]);
     return {projects, error, reload: load, setProjects};
@@ -369,7 +410,7 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
-    const [view, setView] = React.useState<"map" | "list">("map");
+    const [view, setView] = React.useState<"map" | "list" | "events">("map");
     const [showHidden, setShowHidden] = React.useState(false);
     const [selectedId, setSelectedId] = React.useState<string>();
     const [query, setQuery] = React.useState("");
@@ -377,12 +418,26 @@ export function ClaudeMap() {
     const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
     const setOpenIn = (value: OpenIn) => {
         setOpenInState(value);
-        try {
-            localStorage.setItem(openInKey, value);
-        } catch {
-            // private window: the choice lasts until the page closes
-        }
+        keep(openInKey, value);
     };
+    const [hideDone, setHideDoneState] = React.useState(readHideDone);
+    const setHideDone = (value: boolean) => {
+        setHideDoneState(value);
+        keep(hideDoneKey, String(value));
+    };
+    /* done threads Jon brought back onto the map, one by one */
+    const [shownDone, setShownDoneState] = React.useState(readShownDone);
+    const setShownDone = (threadId: string, show: boolean) => setShownDoneState(previous => {
+        const next = new Set(previous);
+        if (show) {
+            next.add(threadId);
+        } else {
+            next.delete(threadId);
+        }
+        keep(shownDoneKey, JSON.stringify([...next]));
+        return next;
+    });
+    const [doneListOpen, setDoneListOpen] = React.useState(false);
     const [rect, sizeRef] = useElementSize();
     const graphRef = React.useRef<ForceGraphMethods<NodeObject<MapNode>>>();
     const lastClick = React.useRef<{id: string, at: number}>();
@@ -393,7 +448,16 @@ export function ClaudeMap() {
     const shown = React.useMemo(() => searching
         ? visible.map(p => ({...p, threads: p.threads.filter(t => matchesSearch(t, p, query))})).filter(p => p.threads.length > 0)
         : visible, [visible, query, searching]);
-    const graphData = useStableGraph(shown);
+    const isHiddenDone = React.useCallback<ThreadFilter>(
+        (t, p) => hideDone && badgeFor(t, p) === "done" && !shownDone.has(t.id), [hideDone, shownDone]);
+    // a search finds done threads too, so nothing is out of reach
+    const onMap = React.useCallback<ThreadFilter>((t, p) => searching || !isHiddenDone(t, p), [searching, isHiddenDone]);
+    const graphData = useStableGraph(shown, onMap);
+    /* the done threads left off the map, latest first */
+    const hiddenDone = React.useMemo(() => visible
+        .flatMap(p => p.threads.filter(t => isHiddenDone(t, p)).map(thread => ({thread, project: p})))
+        .sort((a, b) => (b.thread.lastActivityAt ?? b.thread.lastSeenAt).localeCompare(a.thread.lastActivityAt ?? a.thread.lastSeenAt)),
+        [visible, isHiddenDone]);
     const lastSynced = visible.map(p => p.lastSyncedAt).sort().at(-1);
     if (demo) {
         // lets the demo's layout be inspected, and a card opened, from the console
@@ -454,18 +518,24 @@ export function ClaudeMap() {
                 <IconButton color="inherit" edge="start" aria-label="Back to your maps" onClick={() => navigate("/")}>
                     <ArrowBack/>
                 </IconButton>
-                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem"}}>
+                {/* three tabs leave no room for the title on a phone */}
+                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem", display: {xs: "none", sm: "block"}}}>
                     Claude map
                 </Typography>
+                <Box sx={{flexGrow: 1, display: {xs: "block", sm: "none"}}}/>
                 <Tabs
                     value={view}
                     onChange={(_, v) => setView(v)}
                     textColor="inherit"
                     TabIndicatorProps={{style: {backgroundColor: "#fff"}}}
+                    // three tabs fit a phone only without the default minimum width
+                    sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
                     <Tab value="map" label="Map"/>
                     <Tab value="list" label="List"/>
+                    <Tab value="events" label="Log"/>
                 </Tabs>
+                <LiveDot/>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
                 </IconButton>
@@ -482,6 +552,11 @@ export function ClaudeMap() {
                         <ListItemIcon>{openIn === value ? <Check fontSize="small"/> : null}</ListItemIcon>
                         {openInLabels[value]}
                     </MenuItem>)}
+                    <ListSubheader sx={{lineHeight: "32px"}}>On the map</ListSubheader>
+                    <MenuItem onClick={() => setHideDone(!hideDone)}>
+                        <ListItemIcon>{hideDone ? <CheckBox fontSize="small"/> : <CheckBoxOutlineBlank fontSize="small"/>}</ListItemIcon>
+                        Hide resolved threads
+                    </MenuItem>
                 </Menu>
             </Toolbar>
         </AppBar>
@@ -504,7 +579,7 @@ export function ClaudeMap() {
                 Synced {ago(lastSynced)}
             </Typography>}
         </Stack>}
-        {searching && shown.length === 0 && <Typography variant="body2" sx={{px: 2, py: 1.5}}>No thread matches that.</Typography>}
+        {view !== "events" && searching && shown.length === 0 && <Typography variant="body2" sx={{px: 2, py: 1.5}}>No thread matches that.</Typography>}
 
         {error && <Alert severity="warning" sx={{borderRadius: 0}}>Couldn't refresh the Claude map. {error}</Alert>}
         {demo && <Alert severity="info" sx={{borderRadius: 0}}>Sample data. Nothing here is real.</Alert>}
@@ -571,12 +646,17 @@ export function ClaudeMap() {
                     const doubled = lastClick.current?.id === n.id && now - lastClick.current.at < 400;
                     lastClick.current = {id: n.id, at: now};
                     setSelectedId(n.kind === "root" ? undefined : n.id);
+                    if (n.kind !== "root") {
+                        setDoneListOpen(false);
+                    }
                     if (doubled) {
                         openNode(n.url, n.thread);
                     }
                 }}
                 onBackgroundClick={() => setSelectedId(undefined)}
             />}
+
+            {view === "events" && <ClaudeEventLog projects={projects ?? []} query={query} openIn={openIn} demo={demo}/>}
 
             {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
                 {shown.map(p => <React.Fragment key={p.id}>
@@ -613,6 +693,54 @@ export function ClaudeMap() {
             </List>}
         </Box>
 
+        {view === "map" && showingGraph && !searching && hiddenDone.length > 0 && !doneListOpen && !selected && <Button
+            size="small"
+            variant="outlined"
+            startIcon={<VisibilityOff/>}
+            onClick={() => setDoneListOpen(true)}
+            sx={{
+                position: "fixed", left: 16, bottom: 16, bgcolor: "#fff", color: claudeStyle.ink, borderColor: claudeStyle.link,
+                "&:hover": {bgcolor: "#fff", borderColor: claudeStyle.ring}
+            }}
+        >
+            {hiddenDone.length} resolved thread{hiddenDone.length === 1 ? "" : "s"} hidden
+        </Button>}
+
+        {view === "map" && doneListOpen && <Paper
+            elevation={6}
+            sx={{
+                position: "fixed", left: 16, right: 16, bottom: 16, borderTop: `4px solid ${claudeBadges.done.color}`, maxWidth: 560, mx: "auto",
+                maxHeight: "60dvh", display: "flex", flexDirection: "column"
+            }}
+        >
+            <Stack direction="row" alignItems="center" gap={1} sx={{p: 2, pb: 1}}>
+                <Box sx={{flexGrow: 1, minWidth: 0}}>
+                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
+                        Resolved, off the map
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Latest first. Show one to put it back on the map.
+                    </Typography>
+                </Box>
+                <IconButton size="small" aria-label="Close" onClick={() => setDoneListOpen(false)}><Close fontSize="small"/></IconButton>
+            </Stack>
+            <List dense sx={{overflowY: "auto", pt: 0}}>
+                {hiddenDone.map(({thread: t, project: p}) => <ListItem
+                    key={t.id}
+                    secondaryAction={<Button size="small" startIcon={<Visibility/>} onClick={() => setShownDone(t.id, true)}>Show on map</Button>}
+                    sx={{pr: 18}}
+                >
+                    <ListItemText
+                        primary={t.title}
+                        secondary={[projectLabel(p), ago(t.lastActivityAt ?? t.lastSeenAt), t.card?.headline].filter(Boolean).join(" · ")}
+                        primaryTypographyProps={{noWrap: true}}
+                        secondaryTypographyProps={{noWrap: true}}
+                    />
+                </ListItem>)}
+                {hiddenDone.length === 0 && <Typography variant="body2" sx={{px: 2, pb: 2}}>Every resolved thread is on the map.</Typography>}
+            </List>
+        </Paper>}
+
         {view === "map" && selected && selected.kind !== "root" && <Paper
             elevation={6}
             sx={{
@@ -639,6 +767,17 @@ export function ClaudeMap() {
             <Stack direction="row" alignItems="center" gap={1} sx={{mt: 1}}>
                 {selected.badge && <BadgeChip kind={selected.badge} text={selected.badgeText}/>}
                 <Box sx={{flexGrow: 1}}/>
+                {hideDone && selected.kind === "thread" && selected.badge === "done" && shownDone.has(selected.id) && <Button
+                    size="small"
+                    startIcon={<VisibilityOff/>}
+                    sx={{color: claudeStyle.ink}}
+                    onClick={() => {
+                        setShownDone(selected.id, false);
+                        setSelectedId(undefined);
+                    }}
+                >
+                    Hide again
+                </Button>}
                 <Button
                     variant="contained"
                     size="small"
@@ -650,9 +789,11 @@ export function ClaudeMap() {
                     Open in Claude
                 </Button>
             </Stack>
-            {(selected.badge === "stale" || selected.badge === "gone") && <Typography variant="caption" display="block" sx={{mt: 1}}>
+            {selected.badge && quietBadges.includes(selected.badge) && <Typography variant="caption" display="block" sx={{mt: 1}}>
                 {selected.badge === "stale"
                     ? `No Claude in this project has synced for over ${claudeStaleHours} hours, so this may be out of date.`
+                    : selected.badge === "someday"
+                    ? `This has waited on you for over ${claudeSomedayDays} days. Pick it up, or resolve it in Claude to clear it.`
                     : "The project's latest sync didn't list this thread."}
             </Typography>}
         </Paper>}
