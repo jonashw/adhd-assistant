@@ -1,4 +1,4 @@
-import { ClaudeProject, ClaudeThread } from "./ClaudeMapTypes";
+import { ClaudeArtifact, ClaudeProject, ClaudeThread, artifactsOf } from "./ClaudeMapTypes";
 
 /* Search for "that thing on Monday about robots": words must all appear in what the map knows about a
    thread (title, topic, keywords, earlier topics, headline, project), and a day word (monday, yesterday,
@@ -26,13 +26,23 @@ export function threadText(thread: ClaudeThread, project: ClaudeProject): string
     const card = thread.card;
     return [
         thread.title, card?.topic, ...(card?.keywords ?? []), ...(thread.pastTopics ?? []), card?.headline,
-        card?.ask?.text, project.shortName, project.name, ...(thread.prs ?? []).map(p => `#${p.number} ${p.title}`)
+        card?.ask?.text, project.shortName, project.name, ...(thread.prs ?? []).map(p => `#${p.number} ${p.title}`),
+        ...artifactsOf(thread, project).map(a => a.title)
     ].filter(Boolean).join(" ").toLowerCase();
 }
 
+/* An artifact matches when every word of the search is in its title (day words don't apply to it) */
+export function artifactMatches(artifact: ClaudeArtifact, query: string): boolean {
+    const words = searchWords(query).filter(w => !dayOf(w, new Date()));
+    const title = artifact.title.toLowerCase();
+    return words.length > 0 && words.every(word => title.includes(stem(word)));
+}
+
+// words shorter than 3 letters and filler like "that thing about" are left out
+const searchWords = (query: string) => query.toLowerCase().split(/[^\p{L}\p{N}#]+/u).filter(w => w.length >= 3 && !filler.has(w));
+
 export function matchesSearch(thread: ClaudeThread, project: ClaudeProject, query: string, now = new Date()): boolean {
-    // words shorter than 3 letters and filler like "that thing about" are left out
-    const words = query.toLowerCase().split(/[^\p{L}\p{N}#]+/u).filter(w => w.length >= 3 && !filler.has(w));
+    const words = searchWords(query);
     if (!words.length) {
         return true;
     }

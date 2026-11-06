@@ -1,4 +1,4 @@
-import { ClaudeCard, ClaudePr, ClaudeProject, ClaudeThread, ClaudeThreadState, claudeProjectUrl, claudeThreadUrl } from "./ClaudeMapTypes";
+import { ClaudeArtifact, ClaudeCard, ClaudePr, ClaudeProject, ClaudeThread, ClaudeThreadState, claudeProjectUrl, claudeThreadUrl } from "./ClaudeMapTypes";
 
 /* Sample data for /claude?demo, so the Claude map can be tried without a server. Each tick (a refresh)
    moves it along a little, the way real syncs would: states change, and now and then a thread starts. */
@@ -8,9 +8,18 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
         id, title, state, url: claudeThreadUrl(projectId, id),
         createdAt: at(minutesAgo + 60), lastActivityAt: at(minutesAgo), lastSeenAt: at(inLatest ? 2 : 300), inLatest
     });
-    const project = (id: string, name: string, shortName: string | undefined, syncedMinutesAgo: number, threads: ClaudeThread[]): ClaudeProject => ({
+    // made by the given threads; seen = minutes since the map first saw it (each project joined 5000 minutes ago)
+    let artifactId = 0;
+    const artifact = (title: string, threadIds: string[], updatedMinutesAgo: number, seenMinutesAgo: number, openedMinutesAgo?: number): ClaudeArtifact => ({
+        id: ++artifactId, title, url: `https://claude.ai/artifact/demo-${artifactId}`, threadIds,
+        updatedAt: at(updatedMinutesAgo), firstSeenAt: at(seenMinutesAgo),
+        openedAt: openedMinutesAgo === undefined ? undefined : at(openedMinutesAgo)
+    });
+    const project = (id: string, name: string, shortName: string | undefined, syncedMinutesAgo: number, threads: ClaudeThread[], artifacts?: ClaudeArtifact[]): ClaudeProject => ({
         id, name, shortName, url: claudeProjectUrl(id), hidden: false,
-        firstSeenAt: at(5000), lastSyncedAt: at(syncedMinutesAgo), threads
+        firstSeenAt: at(5000), lastSyncedAt: at(syncedMinutesAgo), threads: threads.map(t => artifacts ? {
+            ...t, artifactIds: artifacts.filter(a => a.threadIds.includes(t.id)).map(a => a.id)
+        } : t), artifacts
     });
     const glance = (t: ClaudeThread, card: Omit<ClaudeCard, "at">, minutesAgo: number, prs?: ClaudePr[], openedMinutesAgo?: number): ClaudeThread => ({
         ...t, card: {...card, at: at(minutesAgo)}, prs,
@@ -51,6 +60,14 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             thread("demo_garden", "demo_g6", "Measure the patio", "done", 60 * 5),
             thread("demo_garden", "demo_g7", "Find a hedge trimmer", "done", 60 * 26),
             thread("demo_garden", "demo_g8", "Test the soil pH", "done", 60 * 24 * 4)
+        ], [
+            artifact("Shed layout", ["demo_g3"], 30, 30),
+            artifact("Shelving parts list", ["demo_g3"], 45, 4000, 60 * 20),
+            artifact("Shed options compared", ["demo_g3"], 60 * 30, 4000, 60 * 24),
+            artifact("Raised bed price sheet", ["demo_g1"], 14, 3000, 60),
+            artifact("Perennials shortlist", ["demo_g4"], 2000, 4800, 1900),
+            artifact("Front border planting plan", ["demo_g4"], 2100, 4800, 1900),
+            artifact("Garden budget", [], 60 * 50, 4900, 60 * 49)
         ]),
         project("demo_trip", "Summer trip planning", "Trip", 3, [
             glance(thread("demo_trip", "demo_t1", "Compare train passes", "working", 3), {
@@ -62,6 +79,8 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             thread("demo_trip", "demo_t3", "Packing list", "failed", 90),
             thread("demo_trip", "demo_t4", "Old itinerary idea", "stopped", 400, false),
             ...extraTrips(tick).map((title, i) => thread("demo_trip", `demo_t_new${i}`, title, "working", 0))
+        ], [
+            artifact("Rail pass comparison", ["demo_t1"], 3, 900, 300)
         ]),
         project("demo_taxes", "Taxes", undefined, 60 * 7, [
             thread("demo_taxes", "demo_x1", "Sort receipts by category", "working", 60 * 7),
