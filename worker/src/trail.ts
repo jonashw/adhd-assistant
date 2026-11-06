@@ -1,6 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import { itemsFor } from "./items";
+import { checklistFor } from "./checklist";
 import { Signal, TrailData, Visit, VisitKind } from "../../src/TrailTypes";
 
 /* The trail (visits) and the signals over places. Both live beside the map, so adding one never bumps the map's revision. */
@@ -48,8 +49,9 @@ export async function getTrail(env: Env, mapId: string): Promise<Trail> {
     ).bind(mapId, since).first<VisitRow>();
     const recentVisits = (recent.results as VisitRow[]).map(toVisit);
     const {items, unplaced} = await itemsFor(env, mapId);
+    const checklist = await checklistFor(env, mapId);
     return {
-        items, unplaced,
+        items, unplaced, checklist,
         recent: tether ? [toVisit(tether), ...recentVisits] : recentVisits,
         lastArrivedAt: Object.fromEntries((last.results as {note_id: string, at: string}[]).map(r => [r.note_id, r.at])),
         signals: (signals.results as SignalRow[]).map(toSignal)

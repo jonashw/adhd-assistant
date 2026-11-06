@@ -10,9 +10,11 @@ import { LinkedItem, threadStates } from "../../src/TrailTypes";
 import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates } from "../../src/ClaudeMapTypes";
 import { syncProject } from "./claude";
 import { logMonologue, monologueMaxChars } from "./monologues";
+import { addChecklistItems, completeChecklistItem, listChecklistItems } from "./checklist";
+import { checklistMaxPerCall } from "../../src/TrailTypes";
 
 /* The Claude connector: a stateless MCP server at /mcp. Claude can check a thread in, report its state, log Jon's dictation,
-   and read Jon's map. It can't change places, statuses or links. */
+   leave Jon to-dos at a place, and read Jon's map. It can't change places, statuses or links. */
 
 export type ConnectorProps = {email: string};
 
@@ -24,6 +26,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
+- To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
   - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
@@ -175,6 +178,43 @@ function buildServer(env: Env): McpServer {
         return {suggested: suggestion.path.join(" › "), next: "Jon will see it in What's next. Once he charts it, this thread's signals land there."};
     }));
 
+    const checklistItem = z.object({
+        text: z.string().min(1).max(300).describe("One step only Jon can do, in plain words, e.g. \"Add the CLOUDFLARE_API_TOKEN secret to the House Party environment\""),
+        group: z.string().min(1).max(40).optional().describe("An optional heading Jon sorts by, like \"From home\" (needs his laptop or accounts) or \"Anytime\" (a phone will do)"),
+        link: z.string().max(2000).optional().describe("Where he does it, if there is a page for it: the PR, the settings page, the sign-up page")
+    });
+
+    server.registerTool("add_checklist_items", {
+        title: "Add to-dos for Jon",
+        description: `Leave Jon to-dos at a place on his map: steps only he can do, such as creating an account, adding a secret or merging a PR. Not your own steps. Each item is marked with this thread and links back to it, shows in his What's next, and makes the place "need him" until he checks it off. Up to ${checklistMaxPerCall} items per call. The same text twice at one place is stored once, so it is safe to repeat; call list_checklist_items first anyway to see what is there and what he finished. Leave out place to use this thread's place; if this thread only has a suggested place (suggest_place), the items wait there and move over when Jon charts it.`,
+        inputSchema: {
+            thread_id: z.string().describe("The thread_id check_in returned; check in with this thread's link so the items link back to it"),
+            items: z.array(checklistItem).min(1).max(checklistMaxPerCall).describe(`1 to ${checklistMaxPerCall} to-dos, in the order Jon should do them`),
+            place: place.optional().describe("The place the to-dos belong to, from find_places. Leave out for this thread's own place, or its suggested place")
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(() => addChecklistItems(env, args.thread_id, args.place ? parsePlace(args.place) : undefined, args.items)));
+
+    server.registerTool("list_checklist_items", {
+        title: "List to-dos at a place",
+        description: "List the to-dos at a place, open ones first: their text, group, link, whether Jon (or a thread) checked them off, and which thread added each. Use it before add_checklist_items to avoid duplicates, and to see what Jon finished. Pass place, or just thread_id for this thread's own place (or its suggested place).",
+        inputSchema: {
+            place: place.optional().describe("A place value from find_places"),
+            thread_id: z.string().optional().describe("The thread_id check_in returned; without place, lists this thread's own place")
+        },
+        annotations: {readOnlyHint: true, openWorldHint: false}
+    }, args => run(() => listChecklistItems(env, {place: args.place ? parsePlace(args.place) : undefined, threadId: args.thread_id})));
+
+    server.registerTool("complete_checklist_item", {
+        title: "Check off a to-do",
+        description: "Check off a to-do this thread added, only when you saw it happen yourself (e.g. the PR it names is merged). Never for steps Jon has to confirm, like adding a secret: he checks those himself. Items other threads added can't be checked here.",
+        inputSchema: {
+            thread_id: z.string().describe("The thread_id check_in returned; it must be the thread that added the item"),
+            id: z.string().min(1).max(100).describe("The item's id, from add_checklist_items or list_checklist_items")
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(() => completeChecklistItem(env, args.thread_id, args.id)));
+
     server.registerTool("find_places", {
         title: "Find places",
         description: "Search Jon's map for places by their words. Returns each place's value (for check_in), its path and status. canTarget is false for HOME and the regions right under it (use those as \"under\" for suggest_place).",
@@ -184,7 +224,7 @@ function buildServer(env: Env): McpServer {
 
     server.registerTool("read_place", {
         title: "Read a place",
-        description: "Read one place: its path, status, notes, children, what it waits on, its signals and linked items.",
+        description: "Read one place: its path, status, notes, children, what it waits on, its signals, linked items and to-dos.",
         inputSchema: {place},
         annotations: {readOnlyHint: true, openWorldHint: false}
     }, args => run(() => readPlace(env, args.place)));

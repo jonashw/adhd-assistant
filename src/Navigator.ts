@@ -1,5 +1,5 @@
 import { MindMap, MindMapGraphData, MindMapGraphNode } from "./MindMap";
-import { LinkedItem, Signal, Visit } from "./TrailTypes";
+import { ChecklistItem, LinkedItem, Signal, Visit } from "./TrailTypes";
 
 /* Where Jon stands, read from the trail. Pure functions, so they are easy to check. */
 
@@ -133,8 +133,14 @@ export type NavigatorInput = {
     now: Date,
     weights?: Weights,
     /* linked items, so a reason can name the Claude thread behind a signal */
-    items?: LinkedItem[]
+    items?: LinkedItem[],
+    /* to-dos Claude threads left; a place with open ones needs Jon */
+    checklist?: ChecklistItem[]
 };
+
+/* The to-dos still open at a place */
+export const openTodosAt = (checklist: ChecklistItem[] | undefined, noteId: string): ChecklistItem[] =>
+    (checklist ?? []).filter(c => c.noteId === noteId && !c.doneAt);
 
 const dayMs = 24 * 3600_000;
 const dueTime = (dueAt: string) => Date.parse(`${dueAt}T23:59:59`);
@@ -196,8 +202,11 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
     const setDown = tether.state === "aloft" && tether.setDown !== graph.nodes.find(n => n.type === "HOME")?.id
         ? tether.setDown : undefined;
 
+    const todosAt = (noteId: string) => openTodosAt(input.checklist, noteId);
+
     const suggest = (node: MindMapGraphNode): Suggestion => {
         const flag = flagOf.get(node.id);
+        const todos = todosAt(node.id);
         const scores = {
             flags: flagScore(flag, now),
             flares: hasSignal(node.id, "request") ? 5 : 3,
@@ -213,6 +222,7 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
             flag ? `Flag: ${flag.label}, due ${formatDue(flag.dueAt!, now)}`
             : hasSignal(node.id, "request") ? `Flare: ${fromClaude(signalOf(node.id, "request")!, "Claude is waiting on you", "someone is waiting on you")}`
             : hasSignal(node.id, "trouble") ? `Smoke: ${fromClaude(signalOf(node.id, "trouble")!, "Claude ran into trouble", "something is going wrong")}`
+            : todos.length > 0 ? `To do: ${todos[0].text}${todos.length > 1 ? ` (and ${todos.length - 1} more)` : ""}`
             : hasSignal(node.id, "news") ? `Fresh tracks: ${fromClaude(signalOf(node.id, "news")!, "Claude finished", "news to read")}`
             : node.id === setDown ? "You set this down at your feet"
             : (node.interest ?? 0) >= 4 ? "You marked this as interesting"
@@ -234,9 +244,9 @@ export function whatsNext(input: NavigatorInput): WhatsNext {
         return {kind: "small", pick: tracks.find(isNear) ?? tracks[0] ?? small.find(isNear) ?? small[0]};
     }
 
-    //the bar: a place needs Jon when it has a flag, a flare or smoke, or he set it down
+    //the bar: a place needs Jon when it has a flag, a flare, smoke or open to-dos, or he set it down
     const needy = open.filter(s => flagOf.has(s.node.id) || hasSignal(s.node.id, "request")
-        || hasSignal(s.node.id, "trouble") || s.node.id === setDown);
+        || hasSignal(s.node.id, "trouble") || todosAt(s.node.id).length > 0 || s.node.id === setDown);
     if (needy.length === 0) {
         return {kind: "mindful", others: open};
     }

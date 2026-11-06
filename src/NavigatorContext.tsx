@@ -1,7 +1,7 @@
 import React from "react";
 import { MindMapGraphDataRecord } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
-import { emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, TrailStore, Visit, VisitKind } from "./Trail";
+import { ChecklistItem, emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, TrailStore, Visit, VisitKind } from "./Trail";
 import { readTether, standingAt, Tether, WeatherAnswer } from "./Navigator";
 
 export type Navigator = {
@@ -28,6 +28,10 @@ export type Navigator = {
     /* Jon answers "Which place does this thread serve?", or moves a thread */
     placeItem: (itemId: string, noteId: string) => Promise<void>,
     forgetItem: (itemId: string) => Promise<void>,
+    /* to-dos Claude threads left at a place, open first */
+    checklistAt: (noteId: string) => ChecklistItem[],
+    setChecklistDone: (id: string, done: boolean) => Promise<void>,
+    removeChecklistItem: (id: string) => Promise<void>,
     refresh: () => void
 };
 
@@ -217,10 +221,35 @@ export function NavigatorProvider({graph, children, trailStore}: {
         refresh();
     }, [store, refresh]);
 
+    const checklistAt = React.useCallback((noteId: string) =>
+        trail.checklist.filter(c => c.noteId === noteId).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt)),
+        [trail.checklist]);
+
+    //shown at once; the server copy follows, and a failure puts it back
+    const setChecklistDone = React.useCallback(async (id: string, done: boolean) => {
+        const doneAt = done ? new Date().toISOString() : undefined;
+        setTrail(t => ({...t, checklist: t.checklist.map(c => c.id === id ? {...c, doneAt, doneBy: done ? "jon" : undefined} : c)}));
+        try {
+            await store.setChecklistDone(id, done);
+        } finally {
+            refresh();
+        }
+    }, [store, refresh]);
+
+    const removeChecklistItem = React.useCallback(async (id: string) => {
+        setTrail(t => ({...t, checklist: t.checklist.filter(c => c.id !== id)}));
+        try {
+            await store.removeChecklistItem(id);
+        } finally {
+            refresh();
+        }
+    }, [store, refresh]);
+
     const value: Navigator = {
         mapId, loaded, trail, tether, now, weatherAnswer,
         arrive, tieOff, untie, answerWeather, flagOf, plantFlag, clearFlag,
-        signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem, refresh
+        signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem,
+        checklistAt, setChecklistDone, removeChecklistItem, refresh
     };
     return <NavigatorContext.Provider value={value}>{children}</NavigatorContext.Provider>;
 }
