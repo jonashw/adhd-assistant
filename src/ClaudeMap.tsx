@@ -3,9 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    InputAdornment, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
 } from "@mui/material";
-import { ArrowBack, Check, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
     ClaudeBadgeKind, ClaudeProject, ClaudeThread, badgeFor, badgeOrder, claudeBadges, claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
@@ -63,21 +63,25 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
     }
     const count = badges.filter(b => b === top).length;
     const text = top === "blocked" ? `${count} need${count === 1 ? "s" : ""} you`
-        : top === "done" ? "All done"
+        : top === "done" ? "All resolved"
         : count > 1 ? `${count} ${claudeBadges[top].label.toLowerCase()}` : claudeBadges[top].label;
     return {badge: top, text};
 }
 
 const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
 
-function graphOf(projects: ClaudeProject[]): {nodes: MapNode[], links: {source: string, target: string}[]} {
+/* Which threads get a node. A project's badge still counts every thread, hidden or not. */
+type ThreadFilter = (thread: ClaudeThread, project: ClaudeProject) => boolean;
+const everyThread: ThreadFilter = () => true;
+
+function graphOf(projects: ClaudeProject[], onMap: ThreadFilter = everyThread): {nodes: MapNode[], links: {source: string, target: string}[]} {
     const nodes: MapNode[] = [{id: "claude", kind: "root", label: "Claude"}];
     const links: {source: string, target: string}[] = [];
     for (const p of projects) {
         const summary = projectSummary(p);
         nodes.push({id: p.id, kind: "project", label: projectLabel(p), badge: summary.badge, badgeText: summary.text, url: p.url, project: p});
         links.push({source: "claude", target: p.id});
-        for (const t of p.threads) {
+        for (const t of p.threads.filter(t => onMap(t, p))) {
             const badge = badgeFor(t, p);
             nodes.push({id: t.id, kind: "thread", label: t.title, badge, url: t.url, project: p, thread: t});
             links.push({source: p.id, target: t.id});
@@ -278,6 +282,35 @@ const readOpenIn = (): OpenIn => {
     }
 };
 
+/* Done threads leave the map unless Jon asks for one back. Both choices are kept per device, like Open in. */
+const hideDoneKey = "claudeMap.hideDone";
+const shownDoneKey = "claudeMap.shownDone";
+
+const readHideDone = (): boolean => {
+    try {
+        return localStorage.getItem(hideDoneKey) !== "false";
+    } catch {
+        return true;
+    }
+};
+
+const readShownDone = (): Set<string> => {
+    try {
+        const ids = JSON.parse(localStorage.getItem(shownDoneKey) ?? "[]");
+        return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+    } catch {
+        return new Set();
+    }
+};
+
+const keep = (key: string, value: string) => {
+    try {
+        localStorage.setItem(key, value);
+    } catch {
+        // private window: the choice lasts until the page closes
+    }
+};
+
 type GraphData = {
     nodes: NodeObject<MapNode>[],
     links: {source: string, target: string}[],
@@ -291,10 +324,10 @@ const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: 
 /* Keeps the same node objects (and so their positions) across refreshes. A refresh that only changes
    states or titles updates the nodes in place and leaves the layout alone; new nodes start next to
    their parent, so only they and their neighbours move. */
-function useStableGraph(projects: ClaudeProject[]): GraphData {
+function useStableGraph(projects: ClaudeProject[], onMap: ThreadFilter): GraphData {
     const current = React.useRef<{data: GraphData, structure: string}>();
     return React.useMemo(() => {
-        const fresh = graphOf(projects);
+        const fresh = graphOf(projects, onMap);
         const structure = structureOf(fresh);
         const previous = current.current;
         const byId = new Map((previous?.data.nodes ?? []).map(n => [n.id, n]));
@@ -330,7 +363,7 @@ function useStableGraph(projects: ClaudeProject[]): GraphData {
         const data: GraphData = {nodes, links: fresh.links.map(l => ({...l})), pins};
         current.current = {data, structure};
         return data;
-    }, [projects]);
+    }, [projects, onMap]);
 }
 
 function useClaudeMap(demo: boolean) {
@@ -377,12 +410,26 @@ export function ClaudeMap() {
     const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
     const setOpenIn = (value: OpenIn) => {
         setOpenInState(value);
-        try {
-            localStorage.setItem(openInKey, value);
-        } catch {
-            // private window: the choice lasts until the page closes
-        }
+        keep(openInKey, value);
     };
+    const [hideDone, setHideDoneState] = React.useState(readHideDone);
+    const setHideDone = (value: boolean) => {
+        setHideDoneState(value);
+        keep(hideDoneKey, String(value));
+    };
+    /* done threads Jon brought back onto the map, one by one */
+    const [shownDone, setShownDoneState] = React.useState(readShownDone);
+    const setShownDone = (threadId: string, show: boolean) => setShownDoneState(previous => {
+        const next = new Set(previous);
+        if (show) {
+            next.add(threadId);
+        } else {
+            next.delete(threadId);
+        }
+        keep(shownDoneKey, JSON.stringify([...next]));
+        return next;
+    });
+    const [doneListOpen, setDoneListOpen] = React.useState(false);
     const [rect, sizeRef] = useElementSize();
     const graphRef = React.useRef<ForceGraphMethods<NodeObject<MapNode>>>();
     const lastClick = React.useRef<{id: string, at: number}>();
@@ -393,7 +440,16 @@ export function ClaudeMap() {
     const shown = React.useMemo(() => searching
         ? visible.map(p => ({...p, threads: p.threads.filter(t => matchesSearch(t, p, query))})).filter(p => p.threads.length > 0)
         : visible, [visible, query, searching]);
-    const graphData = useStableGraph(shown);
+    const isHiddenDone = React.useCallback<ThreadFilter>(
+        (t, p) => hideDone && badgeFor(t, p) === "done" && !shownDone.has(t.id), [hideDone, shownDone]);
+    // a search finds done threads too, so nothing is out of reach
+    const onMap = React.useCallback<ThreadFilter>((t, p) => searching || !isHiddenDone(t, p), [searching, isHiddenDone]);
+    const graphData = useStableGraph(shown, onMap);
+    /* the done threads left off the map, latest first */
+    const hiddenDone = React.useMemo(() => visible
+        .flatMap(p => p.threads.filter(t => isHiddenDone(t, p)).map(thread => ({thread, project: p})))
+        .sort((a, b) => (b.thread.lastActivityAt ?? b.thread.lastSeenAt).localeCompare(a.thread.lastActivityAt ?? a.thread.lastSeenAt)),
+        [visible, isHiddenDone]);
     const lastSynced = visible.map(p => p.lastSyncedAt).sort().at(-1);
     if (demo) {
         // lets the demo's layout be inspected, and a card opened, from the console
@@ -482,6 +538,11 @@ export function ClaudeMap() {
                         <ListItemIcon>{openIn === value ? <Check fontSize="small"/> : null}</ListItemIcon>
                         {openInLabels[value]}
                     </MenuItem>)}
+                    <ListSubheader sx={{lineHeight: "32px"}}>On the map</ListSubheader>
+                    <MenuItem onClick={() => setHideDone(!hideDone)}>
+                        <ListItemIcon>{hideDone ? <CheckBox fontSize="small"/> : <CheckBoxOutlineBlank fontSize="small"/>}</ListItemIcon>
+                        Hide resolved threads
+                    </MenuItem>
                 </Menu>
             </Toolbar>
         </AppBar>
@@ -571,6 +632,9 @@ export function ClaudeMap() {
                     const doubled = lastClick.current?.id === n.id && now - lastClick.current.at < 400;
                     lastClick.current = {id: n.id, at: now};
                     setSelectedId(n.kind === "root" ? undefined : n.id);
+                    if (n.kind !== "root") {
+                        setDoneListOpen(false);
+                    }
                     if (doubled) {
                         openNode(n.url, n.thread);
                     }
@@ -613,6 +677,54 @@ export function ClaudeMap() {
             </List>}
         </Box>
 
+        {view === "map" && showingGraph && !searching && hiddenDone.length > 0 && !doneListOpen && !selected && <Button
+            size="small"
+            variant="outlined"
+            startIcon={<VisibilityOff/>}
+            onClick={() => setDoneListOpen(true)}
+            sx={{
+                position: "fixed", left: 16, bottom: 16, bgcolor: "#fff", color: claudeStyle.ink, borderColor: claudeStyle.link,
+                "&:hover": {bgcolor: "#fff", borderColor: claudeStyle.ring}
+            }}
+        >
+            {hiddenDone.length} resolved thread{hiddenDone.length === 1 ? "" : "s"} hidden
+        </Button>}
+
+        {view === "map" && doneListOpen && <Paper
+            elevation={6}
+            sx={{
+                position: "fixed", left: 16, right: 16, bottom: 16, borderTop: `4px solid ${claudeBadges.done.color}`, maxWidth: 560, mx: "auto",
+                maxHeight: "60dvh", display: "flex", flexDirection: "column"
+            }}
+        >
+            <Stack direction="row" alignItems="center" gap={1} sx={{p: 2, pb: 1}}>
+                <Box sx={{flexGrow: 1, minWidth: 0}}>
+                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
+                        Resolved, off the map
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Latest first. Show one to put it back on the map.
+                    </Typography>
+                </Box>
+                <IconButton size="small" aria-label="Close" onClick={() => setDoneListOpen(false)}><Close fontSize="small"/></IconButton>
+            </Stack>
+            <List dense sx={{overflowY: "auto", pt: 0}}>
+                {hiddenDone.map(({thread: t, project: p}) => <ListItem
+                    key={t.id}
+                    secondaryAction={<Button size="small" startIcon={<Visibility/>} onClick={() => setShownDone(t.id, true)}>Show on map</Button>}
+                    sx={{pr: 18}}
+                >
+                    <ListItemText
+                        primary={t.title}
+                        secondary={[projectLabel(p), ago(t.lastActivityAt ?? t.lastSeenAt), t.card?.headline].filter(Boolean).join(" · ")}
+                        primaryTypographyProps={{noWrap: true}}
+                        secondaryTypographyProps={{noWrap: true}}
+                    />
+                </ListItem>)}
+                {hiddenDone.length === 0 && <Typography variant="body2" sx={{px: 2, pb: 2}}>Every resolved thread is on the map.</Typography>}
+            </List>
+        </Paper>}
+
         {view === "map" && selected && selected.kind !== "root" && <Paper
             elevation={6}
             sx={{
@@ -639,6 +751,17 @@ export function ClaudeMap() {
             <Stack direction="row" alignItems="center" gap={1} sx={{mt: 1}}>
                 {selected.badge && <BadgeChip kind={selected.badge} text={selected.badgeText}/>}
                 <Box sx={{flexGrow: 1}}/>
+                {hideDone && selected.kind === "thread" && selected.badge === "done" && shownDone.has(selected.id) && <Button
+                    size="small"
+                    startIcon={<VisibilityOff/>}
+                    sx={{color: claudeStyle.ink}}
+                    onClick={() => {
+                        setShownDone(selected.id, false);
+                        setSelectedId(undefined);
+                    }}
+                >
+                    Hide again
+                </Button>}
                 <Button
                     variant="contained"
                     size="small"
