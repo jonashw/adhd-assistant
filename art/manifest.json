@@ -1,0 +1,14 @@
+{
+  "you/face.svg": {
+    "viewBox": "-6 -6 12 12",
+    "required": ["face-calm", "face-blink", "eyes"]
+  },
+  "you/balloon.svg": {
+    "viewBox": "-10 -11.5 20 24",
+    "required": ["art", "balloon", "anchors", "anchor-face", "anchor-string"]
+  },
+  "you/body.svg": {
+    "viewBox": "0 0 40 96",
+    "required": ["body", "pose-tied", "pose-aloft", "pose-mindful", "anchors", "anchor-head-tied", "anchor-hand-string", "anchor-belt-knot"]
+  }
+}

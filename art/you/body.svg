@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Your body, in the three poses. Frame is 40 x 96 units, feet on y=92.
+     Show one pose layer at a time. The legs and jacket layer is shared by every pose.
+     anchors: hidden marks the app reads (where the head goes in each pose, the hand that holds the string). -->
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+     viewBox="0 0 40 96" width="200" height="480">
+  <g id="body" inkscape:groupmode="layer" inkscape:label="body">
+    <path id="legs" d="M14.5 80v12M21.5 80v12" stroke="#37474f" stroke-width="3" stroke-linecap="round"/>
+    <rect id="jacket" x="11.5" y="59" width="13" height="22" rx="3" fill="#2b5e94"/>
+  </g>
+  <g id="pose-tied" inkscape:groupmode="layer" inkscape:label="pose-tied">
+    <path id="arms" d="M12 62 L8 70 M24 62 L28 70" stroke="#2b5e94" stroke-width="3" stroke-linecap="round"/>
+    <rect id="work" x="6" y="68" width="24" height="8" rx="1.2" fill="#f7e1cc" stroke="#9a5216" stroke-width="0.8"/>
+  </g>
+  <g id="pose-aloft" inkscape:groupmode="layer" inkscape:label="pose-aloft" style="display:none">
+    <path id="arm-free" d="M12 62 L7 74" stroke="#2b5e94" stroke-width="3" stroke-linecap="round"/>
+    <path id="arm-string" d="M24 62 L31 51" stroke="#2b5e94" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g id="pose-mindful" inkscape:groupmode="layer" inkscape:label="pose-mindful" style="display:none">
+    <path id="arms-empty" d="M12 63 L7 76 M24 63 L29 76" stroke="#2b5e94" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <g id="anchors" inkscape:groupmode="layer" inkscape:label="anchors" style="display:none">
+    <circle id="anchor-head-tied" cx="18" cy="42.5" r="0.8" fill="#00bcd4"/>
+    <circle id="anchor-hand-string" cx="31" cy="50" r="0.8" fill="#00bcd4"/>
+    <circle id="anchor-belt-knot" cx="24.5" cy="62.5" r="0.8" fill="#00bcd4"/>
+  </g>
+</svg>

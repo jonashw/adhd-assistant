@@ -4,6 +4,8 @@ import { HttpError } from "./http";
 
 export const statuses = ["captured", "active", "waiting", "someday", "done", "dropped"] as const;
 export const linkTypes = ["PART_OF", "BLOCKED_BY", "ALSO_IN", "LABELLED"] as const;
+export const scenes = ["crew", "burrow"] as const;
+export const symbols = ["enso", "null", "om", "buddha", "yin-yang", "review"] as const;
 
 export type WireNode = {
     id: string,
@@ -17,10 +19,14 @@ export type WireNode = {
     /* its next step fits in 5 minutes */
     small?: boolean,
     /* Jon's own interest, 1 to 5 */
-    interest?: number
+    interest?: number,
+    /* HOME only: the scene the map's stage draws */
+    scene?: typeof scenes[number],
+    /* HOME only: the symbol HOME wears in the graph view */
+    symbol?: typeof symbols[number]
 };
 export type WireLink = {source: string, target: string, type: typeof linkTypes[number], label?: string};
-export type WireMap = {id: string, revision: number, nodes: WireNode[], links: WireLink[]};
+export type WireMap = {id: string, revision: number, title?: string, nodes: WireNode[], links: WireLink[]};
 
 const fail = (message: string): never => {
     throw new HttpError(422, message);
@@ -33,11 +39,17 @@ const optional = <T>(value: unknown, check: (v: unknown) => v is T): value is T 
     value === undefined || value === null || check(value);
 
 /* Checks a map against the model: one HOME, one parent for every other place, no loops in PART_OF or BLOCKED_BY */
-export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink[]} {
-    const body = input as {nodes?: unknown, links?: unknown};
+/* title: text to set, null to clear, undefined (left out) to keep what's stored, so an older app can't wipe it */
+export function validateMap(input: unknown): {title: string | null | undefined, nodes: WireNode[], links: WireLink[]} {
+    const body = input as {title?: unknown, nodes?: unknown, links?: unknown};
     if (!Array.isArray(body?.nodes) || !Array.isArray(body?.links)) {
         fail("A map needs nodes and links.");
     }
+    if (!optional(body.title, (v): v is string => typeof v === "string" && v.length <= 200)) {
+        fail("A map's title is text of at most 200 characters.");
+    }
+    const title = body.title === undefined ? undefined
+        : typeof body.title === "string" && body.title.trim() ? body.title.trim() : null;
     const rawNodes = body.nodes as Record<string, unknown>[];
     const rawLinks = body.links as Record<string, unknown>[];
     if (rawNodes.length > 5000 || rawLinks.length > 20000) {
@@ -54,7 +66,9 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             || !optional(n.origin, (v): v is string => isText(v, 100))
             || !optional(n.body, (v): v is string => typeof v === "string" && v.length <= 100_000)
             || !optional(n.small, (v): v is boolean => typeof v === "boolean")
-            || !optional(n.interest, (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5)) {
+            || !optional(n.interest, (v): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5)
+            || !optional(n.scene, (v): v is string => scenes.includes(v as typeof scenes[number]))
+            || !optional(n.symbol, (v): v is string => symbols.includes(v as typeof symbols[number]))) {
             fail(`Place "${n.label}" has a field the map can't store.`);
         }
         return {
@@ -67,7 +81,9 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
             origin: (n.origin ?? undefined) as string | undefined,
             body: (n.body ?? undefined) as string | undefined,
             small: n.small === true,
-            interest: (n.interest ?? undefined) as number | undefined
+            interest: (n.interest ?? undefined) as number | undefined,
+            scene: (n.scene ?? undefined) as WireNode["scene"],
+            symbol: (n.symbol ?? undefined) as WireNode["symbol"]
         };
     });
 
@@ -130,7 +146,7 @@ export function validateMap(input: unknown): {nodes: WireNode[], links: WireLink
     }
     assertNoLoop(links.filter(l => l.type === "BLOCKED_BY"), "Two places block each other.");
 
-    return {nodes, links};
+    return {title, nodes, links};
 }
 
 function assertNoLoop(links: WireLink[], message: string) {

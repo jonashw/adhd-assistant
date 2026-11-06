@@ -1,15 +1,21 @@
-import { handleAuth, requireUser } from "./auth";
+import { handleAuth, requireReader, requireUser } from "./auth";
 import { Env } from "./env";
 import { HttpError, json } from "./http";
-import { deleteMap, listMaps, saveMap } from "./maps";
+import { deleteMap, listMaps, listRevisions, saveMap } from "./maps";
 import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
-import { listClaudeMap, markArtifactOpened, setProjectHidden } from "./claude";
+import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden } from "./claude";
+import { getMonologue, listMonologues } from "./monologues";
+import { removeChecklistItem, setChecklistDone } from "./checklist";
+import { openLive, ring, ringsFor } from "./live";
+
+export { LiveHub } from "./live";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
-    const email = await requireUser(request, env);
+    // reads may use the viewer token; writes always need a signed-in session
+    const email = request.method === "GET" ? await requireReader(request, env) : await requireUser(request, env);
     // writes must come from this site's own pages
     if (request.method !== "GET" && request.headers.get("origin") !== url.origin) {
         throw new HttpError(403, "Cross-site request refused.");
@@ -18,20 +24,46 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (url.pathname === "/api/me" && request.method === "GET") {
         return json({email});
     }
+    if (url.pathname === "/api/live" && request.method === "GET") {
+        return openLive(request, env);
+    }
     if (url.pathname === "/api/maps" && request.method === "GET") {
         return json(await listMaps(env));
     }
+    if (url.pathname === "/api/maps/revisions" && request.method === "GET") {
+        return json(await listRevisions(env));
+    }
     if (url.pathname === "/api/claude-map" && request.method === "GET") {
         return json(await listClaudeMap(env));
+    }
+    if (url.pathname === "/api/claude-map/log" && request.method === "GET") {
+        return json(await listClaudeLog(env, url.searchParams.get("before")));
+    }
+    const syncMatch = /^\/api\/claude-map\/syncs\/([0-9a-f]{64})$/.exec(url.pathname);
+    if (syncMatch && request.method === "GET") {
+        return json(await getClaudeSnapshot(env, syncMatch[1]));
+    }
+    if (url.pathname === "/api/monologues" && request.method === "GET") {
+        return json(await listMonologues(env));
+    }
+    const monologueMatch = /^\/api\/monologues\/([^/]+)$/.exec(url.pathname);
+    if (monologueMatch && request.method === "GET") {
+        const monologue = await getMonologue(env, decodeURIComponent(monologueMatch[1]));
+        return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
     }
     const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);
     if (hideMatch && request.method === "POST") {
         await setProjectHidden(env, decodeURIComponent(hideMatch[1]), hideMatch[2] === "hide");
         return new Response(null, {status: 204});
     }
-    const openedMatch = /^\/api\/claude-map\/artifacts\/([^/]+)\/opened$/.exec(url.pathname);
+    const artifactOpenedMatch = /^\/api\/claude-map\/artifacts\/([^/]+)\/opened$/.exec(url.pathname);
+    if (artifactOpenedMatch && request.method === "POST") {
+        await markArtifactOpened(env, decodeURIComponent(artifactOpenedMatch[1]));
+        return new Response(null, {status: 204});
+    }
+    const openedMatch = /^\/api\/claude-map\/threads\/([^/]+)\/opened$/.exec(url.pathname);
     if (openedMatch && request.method === "POST") {
-        await markArtifactOpened(env, decodeURIComponent(openedMatch[1]));
+        await markThreadOpened(env, decodeURIComponent(openedMatch[1]));
         return new Response(null, {status: 204});
     }
     const mediaMatch = /^\/api\/media\/([^/]+)$/.exec(url.pathname);
@@ -60,6 +92,16 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
             return new Response(null, {status: 204});
         }
         return json(await addLink(env, place, await readJson()), 201);
+    }
+    const checklistMatch = /^\/api\/checklist\/([^/]+)\/(check|uncheck|remove)$/.exec(url.pathname);
+    if (checklistMatch && request.method === "POST") {
+        const id = decodeURIComponent(checklistMatch[1]);
+        if (checklistMatch[2] === "remove") {
+            await removeChecklistItem(env, id);
+        } else {
+            await setChecklistDone(env, id, checklistMatch[2] === "check");
+        }
+        return new Response(null, {status: 204});
     }
     const itemMatch = /^\/api\/items\/([^/]+)\/(place|forget)$/.exec(url.pathname);
     if (itemMatch && request.method === "POST") {
@@ -120,7 +162,14 @@ const app = {
                 return await handleAuth(request, env, url);
             }
             if (url.pathname.startsWith("/api/")) {
-                return await handleApi(request, env, url);
+                const response = await handleApi(request, env, url);
+                // every open tab hears what this write changed, and says it back so this tab can tell its neighbours
+                const rings = response.ok ? ringsFor(request.method, url.pathname) : [];
+                if (rings.length > 0) {
+                    await ring(env, rings, request.headers.get("x-live-tab") ?? undefined);
+                    response.headers.set("x-live-ring", JSON.stringify(rings));
+                }
+                return response;
             }
             return env.ASSETS.fetch(request);
         } catch (e) {

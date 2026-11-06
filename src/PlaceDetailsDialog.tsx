@@ -11,6 +11,7 @@ import { NoteEditor } from "./NoteEditor";
 import { NoteBody } from "./NoteBody";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { ServerApi } from "./ServerApi";
+import { ClaudeChecklist } from "./ClaudeChecklist";
 
 const kindNames: {[kind in LinkedItem["kind"]]: string} = {
     "claude.thread": "Claude thread",
@@ -144,6 +145,8 @@ export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
                             ? photo => ServerApi.uploadMedia(nav.mapId, node.id, photo).then(r => r.url)
                             : undefined}
                     />
+
+                    <ClaudeChecklist items={nav.checklistAt(node.id)}/>
 
                     <Box>
                         <Typography variant="overline">Flag</Typography>

@@ -3,7 +3,9 @@ import { Fidget, useFidget } from "./useFidget";
 
 /* The robot spider. It does all the string travel on YOUR string (it spins no web of its own):
    climbing with notes, tugging, and asking "Gusty up there?". Jon places it on his string; see Jon.tsx. */
-export type SpiderDoing = "idle" | "climb" | "tug" | "ask" | "curled";
+export type SpiderDoing = "idle" | "climb" | "tug" | "ask" | "curled"
+    /* scurrying along the ground behind you */
+    | "walk";
 
 const fidgets: Fidget[] = [
     {name: "is-blink", ms: 200, weight: 3},
@@ -30,10 +32,11 @@ const tuckedLegs = [
 
 export function Spider({size = 24, doing = "idle", x, y}: {size?: number, doing?: SpiderDoing, x?: number, y?: number}) {
     const curled = doing === "curled";
-    const fidget = useFidget(fidgets, [1500, 4500], !curled && doing !== "climb");
+    const fidget = useFidget(fidgets, [1500, 4500], !curled && doing !== "climb" && doing !== "walk");
     const label = doing === "tug" ? "Robot spider, tugging your string"
         : doing === "ask" ? "Robot spider, asking"
         : doing === "climb" ? "Robot spider, climbing your string"
+        : doing === "walk" ? "Robot spider, scurrying along"
         : curled ? "Robot spider, curled up"
         : "Robot spider";
     return (

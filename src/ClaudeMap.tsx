@@ -3,16 +3,21 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    Paper, Stack, Tab, Tabs, Toolbar, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
 } from "@mui/material";
-import { ArrowBack, Close, Description, OpenInNew, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, Description, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import {
     ArtifactFlag, ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, artifactFlag, artifactsOnMap,
-    badgeFor, badgeOrder, claudeBadges, claudeStaleHours
+    badgeFor, badgeOrder, claudeBadges, claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
+import { ClaudeThreadGlance, NewDot, PrChip } from "./ClaudeThreadGlance";
+import { matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
+import { safetyPollMs, useRing } from "./live";
 import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
+import { ClaudeEventLog } from "./ClaudeEventLog";
+import { LiveDot } from "./LiveDot";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -25,7 +30,6 @@ export const claudeStyle = {
     font: "'Source Serif 4', Georgia, 'Times New Roman', serif"
 };
 
-const refreshMs = 30_000;
 
 type MapNode = {
     id: string,
@@ -78,25 +82,26 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
     }
     const count = badges.filter(b => b === top).length;
     const text = top === "blocked" ? `${count} need${count === 1 ? "s" : ""} you`
-        : top === "done" ? "All done"
+        : top === "done" ? "All resolved"
         : count > 1 ? `${count} ${claudeBadges[top].label.toLowerCase()}` : claudeBadges[top].label;
     return {badge: top, text};
 }
 
-const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
+export const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
 
-function graphOf(projects: ClaudeProject[], hideDone: boolean): {nodes: MapNode[], links: {source: string, target: string}[]} {
+/* Which threads get a node. A project's badge still counts every thread, hidden or not. */
+type ThreadFilter = (thread: ClaudeThread, project: ClaudeProject) => boolean;
+const everyThread: ThreadFilter = () => true;
+
+function graphOf(projects: ClaudeProject[], onMap: ThreadFilter = everyThread): {nodes: MapNode[], links: {source: string, target: string}[]} {
     const nodes: MapNode[] = [{id: "claude", kind: "root", label: "Claude"}];
     const links: {source: string, target: string}[] = [];
     for (const p of projects) {
         const summary = projectSummary(p);
         nodes.push({id: p.id, kind: "project", label: projectLabel(p), badge: summary.badge, badgeText: summary.text, url: p.url, project: p});
         links.push({source: "claude", target: p.id});
-        for (const t of p.threads) {
+        for (const t of p.threads.filter(t => onMap(t, p))) {
             const badge = badgeFor(t, p);
-            if (hideDone && badge === "done") {
-                continue;
-            }
             nodes.push({id: t.id, kind: "thread", label: t.title, badge, url: t.url, project: p, thread: t});
             links.push({source: p.id, target: t.id});
         }
@@ -159,7 +164,7 @@ const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "proj
 function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, selectedId?: string) {
     const x = node.x ?? 0, y = node.y ?? 0;
     const r = radiusOf(node.kind);
-    const dimmed = node.badge === "done" && node.kind === "thread";
+    const dimmed = (node.badge === "done" || node.badge === "someday") && node.kind === "thread";
     ctx.save();
     ctx.globalAlpha = dimmed ? 0.55 : 1;
 
@@ -192,7 +197,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     ctx.fill();
     ctx.lineWidth = node.id === selectedId ? 2.2 : 1.2;
     ctx.strokeStyle = node.id === selectedId ? claudeStyle.ink : claudeStyle.ring;
-    if (node.badge === "stale" || node.badge === "gone") {
+    if (node.badge && quietBadges.includes(node.badge)) {
         ctx.setLineDash([1.5, 1.5]);
     }
     ctx.stroke();
@@ -204,6 +209,17 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
         ctx.arc(x, y, r * 0.45, 0, 2 * Math.PI);
         ctx.fillStyle = claudeBadges[node.badge].color;
         ctx.fill();
+    }
+
+    // something new since Jon last opened it from the map: a small dot on the ring
+    if (node.kind === "thread" && node.thread && isNewSince(node.thread)) {
+        ctx.beginPath();
+        ctx.arc(x + r * 0.75, y - r * 0.75, 1.7, 0, 2 * Math.PI);
+        ctx.fillStyle = claudeStyle.ring;
+        ctx.fill();
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.stroke();
     }
 
     // label: up to two short lines, so neighbours don't collide
@@ -265,7 +281,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
             ctx.beginPath();
             ctx.roundRect(x - w / 2, top, w, h, h / 2);
             ctx.fill();
-            if (node.badge === "stale" || node.badge === "gone") {
+            if (quietBadges.includes(node.badge)) {
                 ctx.setLineDash([0.8, 0.8]);
                 ctx.strokeStyle = "#9CA3AF";
                 ctx.lineWidth = 0.3;
@@ -287,18 +303,79 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
         label={text ?? badge.label}
         sx={{
             bgcolor: badge.color, color: badge.text, fontWeight: 600,
-            border: kind === "stale" || kind === "gone" ? "1px dashed #9CA3AF" : undefined
+            border: quietBadges.includes(kind) ? "1px dashed #9CA3AF" : undefined
         }}
     />;
 }
 
-/* One named tab for every jump, so repeated opens reuse it instead of piling up new ones */
-const open = (url?: string) => {
-    if (url) {
-        const tab = window.open(url, "adhd-assist-claude");
-        if (tab) {
-            tab.opener = null;
-        }
+/* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
+/* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
+   from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
+export type OpenIn = "new-tab" | "desktop";
+const openInKey = "claudeMap.openIn";
+const openInLabels: Record<OpenIn, string> = {
+    "new-tab": "A new browser tab each time",
+    "desktop": "The Claude desktop app"
+};
+
+/* claude.ai's links work in the desktop app as claude://claude.ai/<same path>. Its help page lists chats and
+   projects; Jon confirmed on 2026-11-05 that it lands on Claude Code project threads too. */
+const desktopUrl = (url: string) => url.replace(/^https:\/\/claude\.ai\//, "claude://claude.ai/");
+
+const open = (url: string | undefined, openIn: OpenIn) => {
+    if (!url) {
+        return;
+    }
+    if (openIn === "desktop") {
+        window.location.href = desktopUrl(url);
+        return;
+    }
+    const tab = window.open(url, "_blank");
+    if (tab) {
+        tab.opener = null;
+    }
+};
+
+/* A real link, so the URL shows on hover, can be copied, and cmd- or middle-click makes a tab of its own */
+export const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
+    ? {component: "a" as const, href: desktopUrl(url)}
+    : {component: "a" as const, href: url, target: "_blank", rel: "noopener noreferrer"};
+
+const readOpenIn = (): OpenIn => {
+    try {
+        const value = localStorage.getItem(openInKey);
+        return value === "desktop" ? value : "new-tab";
+    } catch {
+        return "new-tab";
+    }
+};
+
+/* Done threads leave the map unless Jon asks for one back. Both choices are kept per device, like Open in. */
+const hideDoneKey = "claudeMap.hideDone";
+const shownDoneKey = "claudeMap.shownDone";
+
+const readHideDone = (): boolean => {
+    try {
+        return localStorage.getItem(hideDoneKey) !== "false";
+    } catch {
+        return true;
+    }
+};
+
+const readShownDone = (): Set<string> => {
+    try {
+        const ids = JSON.parse(localStorage.getItem(shownDoneKey) ?? "[]");
+        return new Set(Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : []);
+    } catch {
+        return new Set();
+    }
+};
+
+export const keep = (key: string, value: string) => {
+    try {
+        localStorage.setItem(key, value);
+    } catch {
+        // private window: the choice lasts until the page closes
     }
 };
 
@@ -315,10 +392,10 @@ const structureOf = (g: {nodes: {id: string}[], links: {source: string, target: 
 /* Keeps the same node objects (and so their positions) across refreshes. A refresh that only changes
    states or titles updates the nodes in place and leaves the layout alone; new nodes start next to
    their parent, so only they and their neighbours move. */
-function useStableGraph(projects: ClaudeProject[], hideDone: boolean): GraphData {
+function useStableGraph(projects: ClaudeProject[], onMap: ThreadFilter): GraphData {
     const current = React.useRef<{data: GraphData, structure: string}>();
     return React.useMemo(() => {
-        const fresh = graphOf(projects, hideDone);
+        const fresh = graphOf(projects, onMap);
         const structure = structureOf(fresh);
         const previous = current.current;
         const byId = new Map((previous?.data.nodes ?? []).map(n => [n.id, n]));
@@ -354,28 +431,7 @@ function useStableGraph(projects: ClaudeProject[], hideDone: boolean): GraphData
         const data: GraphData = {nodes, links: fresh.links.map(l => ({...l})), pins};
         current.current = {data, structure};
         return data;
-    }, [projects, hideDone]);
-}
-
-/* A per-device preference, kept in this browser; falls back to the default when storage is off */
-function useRemembered(key: string, fallback: boolean): [boolean, (v: boolean) => void] {
-    const [value, setValue] = React.useState<boolean>(() => {
-        try {
-            const stored = window.localStorage.getItem(key);
-            return stored === null ? fallback : stored === "true";
-        } catch {
-            return fallback;
-        }
-    });
-    const set = (v: boolean) => {
-        setValue(v);
-        try {
-            window.localStorage.setItem(key, String(v));
-        } catch {
-            // private window: the choice lasts for this visit only
-        }
-    };
-    return [value, set];
+    }, [projects, onMap]);
 }
 
 function useClaudeMap(demo: boolean) {
@@ -395,15 +451,21 @@ function useClaudeMap(demo: boolean) {
             })
             .catch((e: Error) => setError(e.message));
     }, [demo]);
+    // the server rings whenever a thread syncs, so the map shows it at once
+    useRing("claude", undefined, load, !demo);
     React.useEffect(() => {
-        const refocus = () => load();
+        const visible = () => document.visibilityState === "visible";
+        const refocus = () => visible() && load();
         load();
-        // the demo refreshes faster, so changes are easy to watch
-        const timer = window.setInterval(() => load(true), demo ? 8000 : refreshMs);
+        // the demo moves on by itself, faster, so changes are easy to watch; the real map only takes a slow
+        // safety look while visible, in case a ring was lost
+        const timer = window.setInterval(() => demo ? load(true) : refocus(), demo ? 8000 : safetyPollMs);
         window.addEventListener("focus", refocus);
+        document.addEventListener("visibilitychange", refocus);
         return () => {
             window.clearInterval(timer);
             window.removeEventListener("focus", refocus);
+            document.removeEventListener("visibilitychange", refocus);
         };
     }, [load, demo]);
     return {projects, error, reload: load, setProjects};
@@ -414,24 +476,63 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
-    const [view, setView] = React.useState<"map" | "list">("map");
+    const [view, setView] = React.useState<"map" | "list" | "events">("map");
     const [showHidden, setShowHidden] = React.useState(false);
-    const [hideDone, setHideDone] = useRemembered("claudeMap.hideDone", false);
     const [selectedId, setSelectedId] = React.useState<string>();
+    const [query, setQuery] = React.useState("");
+    const [openIn, setOpenInState] = React.useState<OpenIn>(readOpenIn);
+    const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
+    const setOpenIn = (value: OpenIn) => {
+        setOpenInState(value);
+        keep(openInKey, value);
+    };
+    const [hideDone, setHideDoneState] = React.useState(readHideDone);
+    const setHideDone = (value: boolean) => {
+        setHideDoneState(value);
+        keep(hideDoneKey, String(value));
+    };
+    /* done threads Jon brought back onto the map, one by one */
+    const [shownDone, setShownDoneState] = React.useState(readShownDone);
+    const setShownDone = (threadId: string, show: boolean) => setShownDoneState(previous => {
+        const next = new Set(previous);
+        if (show) {
+            next.add(threadId);
+        } else {
+            next.delete(threadId);
+        }
+        keep(shownDoneKey, JSON.stringify([...next]));
+        return next;
+    });
+    const [doneListOpen, setDoneListOpen] = React.useState(false);
     const [rect, sizeRef] = useElementSize();
     const graphRef = React.useRef<ForceGraphMethods<NodeObject<MapNode>>>();
     const lastClick = React.useRef<{id: string, at: number}>();
 
     const visible = React.useMemo(() => (projects ?? []).filter(p => showHidden || !p.hidden), [projects, showHidden]);
-    const graphData = useStableGraph(visible, hideDone);
+    // a search keeps the matching threads and the projects they belong to, so they still hang off Claude
+    const searching = query.trim().length > 0;
+    const shown = React.useMemo(() => searching
+        ? visible.map(p => ({...p, threads: p.threads.filter(t => matchesSearch(t, p, query))})).filter(p => p.threads.length > 0)
+        : visible, [visible, query, searching]);
+    const isHiddenDone = React.useCallback<ThreadFilter>(
+        (t, p) => hideDone && badgeFor(t, p) === "done" && !shownDone.has(t.id), [hideDone, shownDone]);
+    // a search finds done threads too, so nothing is out of reach
+    const onMap = React.useCallback<ThreadFilter>((t, p) => searching || !isHiddenDone(t, p), [searching, isHiddenDone]);
+    const graphData = useStableGraph(shown, onMap);
+    /* the done threads left off the map, latest first */
+    const hiddenDone = React.useMemo(() => visible
+        .flatMap(p => p.threads.filter(t => isHiddenDone(t, p)).map(thread => ({thread, project: p})))
+        .sort((a, b) => (b.thread.lastActivityAt ?? b.thread.lastSeenAt).localeCompare(a.thread.lastActivityAt ?? a.thread.lastSeenAt)),
+        [visible, isHiddenDone]);
+    const lastSynced = visible.map(p => p.lastSyncedAt).sort().at(-1);
     if (demo) {
-        // lets the demo's layout be inspected from the console
-        (window as unknown as {claudeMapNodes: unknown}).claudeMapNodes = graphData.nodes;
+        // lets the demo's layout be inspected, and a card opened, from the console
+        Object.assign(window, {claudeMapNodes: graphData.nodes, claudeMapSelect: setSelectedId});
     }
     // forces are set once each time the graph mounts; a data refresh never restarts the whole layout.
     // (The graph's handle is a new object on every render, so it can't tell mounts apart; this can.)
     const fitted = React.useRef(false);
-    const showingGraph = view === "map" && rect.width > 0 && visible.length > 0;
+    const showingGraph = view === "map" && rect.width > 0 && shown.length > 0;
     React.useEffect(() => {
         const graph = graphRef.current;
         if (!showingGraph || !graph) {
@@ -442,12 +543,31 @@ export function ClaudeMap() {
         graph.d3Force("charge")?.strength(-160);
         graph.d3ReheatSimulation();
     }, [showingGraph]);
+    // after a search settles, bring what it found into view
+    React.useEffect(() => {
+        if (!showingGraph || !fitted.current) {
+            return;
+        }
+        const timer = window.setTimeout(() => graphRef.current?.zoomToFit(400, 60), 700);
+        return () => window.clearTimeout(timer);
+    }, [query, showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
 
-    /* Opening an artifact from the map clears its New or Updated flag */
-    const openNode = (url: string | undefined, artifact?: ClaudeArtifact) => {
-        open(url);
+    /* Jump to Claude; for a thread, what its card says now is no longer new */
+    const openNode = (url?: string, thread?: ClaudeThread, artifact?: ClaudeArtifact) => {
+        open(url, openIn);
+        markOpened(thread, artifact);
+    };
+    /* what its card says now is no longer new */
+    const markOpened = (thread?: ClaudeThread, artifact?: ClaudeArtifact) => {
+        if (thread) {
+            const openedAt = new Date().toISOString();
+            setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => t.id === thread.id ? {...t, openedAt} : t)})));
+            if (!demo) {
+                ServerApi.markClaudeThreadOpened(thread.id).catch(() => undefined);
+            }
+        }
         if (artifact) {
             const openedAt = new Date().toISOString();
             setProjects(ps => ps?.map(p => ({...p, artifacts: p.artifacts.map(a => a.id === artifact.id ? {...a, openedAt} : a)})));
@@ -471,18 +591,46 @@ export function ClaudeMap() {
                 <IconButton color="inherit" edge="start" aria-label="Back to your maps" onClick={() => navigate("/")}>
                     <ArrowBack/>
                 </IconButton>
-                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem"}}>
+                {/* three tabs leave no room for the title on a phone */}
+                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem", display: {xs: "none", sm: "block"}}}>
                     Claude map
                 </Typography>
+                <Box sx={{flexGrow: 1, display: {xs: "block", sm: "none"}}}/>
                 <Tabs
                     value={view}
                     onChange={(_, v) => setView(v)}
                     textColor="inherit"
                     TabIndicatorProps={{style: {backgroundColor: "#fff"}}}
+                    // three tabs fit a phone only without the default minimum width
+                    sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
                     <Tab value="map" label="Map"/>
                     <Tab value="list" label="List"/>
+                    <Tab value="events" label="Log"/>
                 </Tabs>
+                <LiveDot/>
+                <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
+                    <Settings/>
+                </IconButton>
+                <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={() => setMenuAnchor(null)}>
+                    <ListSubheader sx={{lineHeight: "32px"}}>Open in Claude goes to</ListSubheader>
+                    {(Object.keys(openInLabels) as OpenIn[]).map(value => <MenuItem
+                        key={value}
+                        selected={openIn === value}
+                        onClick={() => {
+                            setOpenIn(value);
+                            setMenuAnchor(null);
+                        }}
+                    >
+                        <ListItemIcon>{openIn === value ? <Check fontSize="small"/> : null}</ListItemIcon>
+                        {openInLabels[value]}
+                    </MenuItem>)}
+                    <ListSubheader sx={{lineHeight: "32px"}}>On the map</ListSubheader>
+                    <MenuItem onClick={() => setHideDone(!hideDone)}>
+                        <ListItemIcon>{hideDone ? <CheckBox fontSize="small"/> : <CheckBoxOutlineBlank fontSize="small"/>}</ListItemIcon>
+                        Hide resolved threads
+                    </MenuItem>
+                </Menu>
             </Toolbar>
         </AppBar>
 
@@ -495,6 +643,25 @@ export function ClaudeMap() {
                 sx={hideDone ? {bgcolor: claudeStyle.ring, color: "#fff"} : {borderColor: claudeStyle.ring, color: claudeStyle.ink}}
             />
         </Stack>
+        {(projects?.length ?? 0) > 0 && <Stack direction="row" alignItems="center" gap={1.5} sx={{px: 2, py: 1, bgcolor: "#fff", borderBottom: `1px solid ${claudeStyle.link}`}}>
+            <TextField
+                size="small"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="Search words, topics or a day (monday)"
+                sx={{flexGrow: 1}}
+                InputProps={{
+                    startAdornment: <InputAdornment position="start"><Search fontSize="small"/></InputAdornment>,
+                    endAdornment: query ? <InputAdornment position="end">
+                        <IconButton size="small" aria-label="Clear the search" onClick={() => setQuery("")}><Close fontSize="small"/></IconButton>
+                    </InputAdornment> : undefined
+                }}
+            />
+            {lastSynced && <Typography variant="caption" color="text.secondary" sx={{flexShrink: 0}} title={new Date(lastSynced).toLocaleString()}>
+                Synced {ago(lastSynced)}
+            </Typography>}
+        </Stack>}
+        {view !== "events" && searching && shown.length === 0 && <Typography variant="body2" sx={{px: 2, py: 1.5}}>No thread matches that.</Typography>}
 
         {error && <Alert severity="warning" sx={{borderRadius: 0}}>Couldn't refresh the Claude map. {error}</Alert>}
         {demo && <Alert severity="info" sx={{borderRadius: 0}}>Sample data. Nothing here is real.</Alert>}
@@ -529,7 +696,10 @@ export function ClaudeMap() {
                     ctx.fill();
                 }}
                 autoPauseRedraw={false}
-                cooldownTime={2500}
+                // settle by ticks, not by the clock: a background tab draws no frames, and a clock-based
+                // cooldown would end the moment Jon came back, leaving new threads on top of their project
+                cooldownTicks={120}
+                cooldownTime={Infinity}
                 onEngineTick={() => {
                     if (graphData.pins?.size) {
                         graphData.nodes.forEach(n => {
@@ -558,38 +728,48 @@ export function ClaudeMap() {
                     const doubled = lastClick.current?.id === n.id && now - lastClick.current.at < 400;
                     lastClick.current = {id: n.id, at: now};
                     setSelectedId(n.kind === "root" ? undefined : n.id);
+                    if (n.kind !== "root") {
+                        setDoneListOpen(false);
+                    }
                     if (doubled) {
-                        openNode(n.url, n.artifact);
+                        openNode(n.url, n.thread, n.artifact);
                     }
                 }}
                 onBackgroundClick={() => setSelectedId(undefined)}
             />}
 
+            {view === "events" && <ClaudeEventLog projects={projects ?? []} query={query} openIn={openIn} demo={demo}/>}
+
             {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
-                {visible.map(p => <React.Fragment key={p.id}>
+                {shown.map(p => <React.Fragment key={p.id}>
                     <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
                         <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
                             {projectLabel(p)}
                         </Typography>
                         <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
-                        <IconButton size="small" title="Open this project in Claude" onClick={() => open(p.url)}><OpenInNew fontSize="small"/></IconButton>
+                        <IconButton size="small" title="Open this project in Claude" {...linkProps(p.url, openIn)}><OpenInNew fontSize="small"/></IconButton>
                         <IconButton size="small" title={p.hidden ? "Show this project" : "Hide this project"} onClick={() => toggleHidden(p)}>
                             {p.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}
                         </IconButton>
                     </ListSubheader>
-                    {p.threads.filter(t => !(hideDone && badgeFor(t, p) === "done"))
+                    {p.threads.filter(t => onMap(t, p))
                         .sort((a, b) => byUrgency(badgeFor(a, p), badgeFor(b, p)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
-                        .map(t => <ListItemButton key={t.id} onClick={() => open(t.url)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
+                        .map(t => <ListItemButton key={t.id} {...linkProps(t.url, openIn)} onClick={() => markOpened(t)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
                             <BadgeChip kind={badgeFor(t, p)}/>
                             <ListItemText
                                 primary={t.title}
-                                secondary={t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`}
+                                secondary={[glanceLine(t), t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`]
+                                    .filter(Boolean).join(" · ")}
+                                secondaryTypographyProps={{noWrap: true}}
+                                sx={{minWidth: 0}}
                             />
+                            {t.prs?.filter(pr => pr.state === "open" || pr.state === "draft").map(pr => <PrChip key={`${pr.repo}#${pr.number}`} pr={pr}/>)}
+                            <NewDot thread={t}/>
                         </ListItemButton>)}
                     {p.artifacts.filter(a => a.inLatest).sort(byRecent).map(a => {
                         const flag = artifactFlag(a, p);
                         const pill = artifactPill(a, flag);
-                        return <ListItemButton key={a.id} onClick={() => openNode(a.url, a)} sx={{gap: 1.5}}>
+                        return <ListItemButton key={a.id} {...linkProps(a.url, openIn)} onClick={() => markOpened(undefined, a)} sx={{gap: 1.5}}>
                             <Description sx={{color: claudeStyle.ring}}/>
                             <ListItemText primary={a.title} secondary={flag ? undefined : pill.text}/>
                             {flag && <Chip size="small" label={pill.text} sx={{bgcolor: pill.bg, color: pill.fg, fontWeight: 600, border: pill.outline ? `1px solid ${pill.outline}` : undefined}}/>}
@@ -604,9 +784,60 @@ export function ClaudeMap() {
             </List>}
         </Box>
 
+        {view === "map" && showingGraph && !searching && hiddenDone.length > 0 && !doneListOpen && !selected && <Button
+            size="small"
+            variant="outlined"
+            startIcon={<VisibilityOff/>}
+            onClick={() => setDoneListOpen(true)}
+            sx={{
+                position: "fixed", left: 16, bottom: 16, bgcolor: "#fff", color: claudeStyle.ink, borderColor: claudeStyle.link,
+                "&:hover": {bgcolor: "#fff", borderColor: claudeStyle.ring}
+            }}
+        >
+            {hiddenDone.length} resolved thread{hiddenDone.length === 1 ? "" : "s"} hidden
+        </Button>}
+
+        {view === "map" && doneListOpen && <Paper
+            elevation={6}
+            sx={{
+                position: "fixed", left: 16, right: 16, bottom: 16, borderTop: `4px solid ${claudeBadges.done.color}`, maxWidth: 560, mx: "auto",
+                maxHeight: "60dvh", display: "flex", flexDirection: "column"
+            }}
+        >
+            <Stack direction="row" alignItems="center" gap={1} sx={{p: 2, pb: 1}}>
+                <Box sx={{flexGrow: 1, minWidth: 0}}>
+                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
+                        Resolved, off the map
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Latest first. Show one to put it back on the map.
+                    </Typography>
+                </Box>
+                <IconButton size="small" aria-label="Close" onClick={() => setDoneListOpen(false)}><Close fontSize="small"/></IconButton>
+            </Stack>
+            <List dense sx={{overflowY: "auto", pt: 0}}>
+                {hiddenDone.map(({thread: t, project: p}) => <ListItem
+                    key={t.id}
+                    secondaryAction={<Button size="small" startIcon={<Visibility/>} onClick={() => setShownDone(t.id, true)}>Show on map</Button>}
+                    sx={{pr: 18}}
+                >
+                    <ListItemText
+                        primary={t.title}
+                        secondary={[projectLabel(p), ago(t.lastActivityAt ?? t.lastSeenAt), t.card?.headline].filter(Boolean).join(" · ")}
+                        primaryTypographyProps={{noWrap: true}}
+                        secondaryTypographyProps={{noWrap: true}}
+                    />
+                </ListItem>)}
+                {hiddenDone.length === 0 && <Typography variant="body2" sx={{px: 2, pb: 2}}>Every resolved thread is on the map.</Typography>}
+            </List>
+        </Paper>}
+
         {view === "map" && selected && selected.kind !== "root" && <Paper
             elevation={6}
-            sx={{position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto"}}
+            sx={{
+                position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto",
+                maxHeight: "70dvh", overflowY: "auto"
+            }}
         >
             <Stack direction="row" alignItems="flex-start" gap={1}>
                 <Box sx={{flexGrow: 1, minWidth: 0}}>
@@ -619,28 +850,44 @@ export function ClaudeMap() {
                             ? (selected.pill?.text === "New" ? "new artifact" : `artifact · ${selected.pill?.text.toLowerCase()}`)
                             : selected.kind === "thread"
                             ? (selected.thread!.inLatest ? `last active ${ago(selected.thread!.lastActivityAt)}` : `not seen since ${ago(selected.thread!.lastSeenAt)}`)
+                                + ` · synced ${ago(selected.project!.lastSyncedAt)}`
                             : `${selected.project!.threads.length} threads · synced ${ago(selected.project!.lastSyncedAt)}`}
                     </Typography>
                 </Box>
                 <IconButton size="small" aria-label="Close" onClick={() => setSelectedId(undefined)}><Close fontSize="small"/></IconButton>
             </Stack>
+            {selected.kind === "thread" && selected.thread && <ClaudeThreadGlance thread={selected.thread}/>}
             <Stack direction="row" alignItems="center" gap={1} sx={{mt: 1}}>
                 {selected.badge && <BadgeChip kind={selected.badge} text={selected.badgeText}/>}
                 {selected.pill && <Chip size="small" label={selected.pill.text} sx={{bgcolor: selected.pill.bg, color: selected.pill.fg, fontWeight: 600}}/>}
                 <Box sx={{flexGrow: 1}}/>
+                {hideDone && selected.kind === "thread" && selected.badge === "done" && shownDone.has(selected.id) && <Button
+                    size="small"
+                    startIcon={<VisibilityOff/>}
+                    sx={{color: claudeStyle.ink}}
+                    onClick={() => {
+                        setShownDone(selected.id, false);
+                        setSelectedId(undefined);
+                    }}
+                >
+                    Hide again
+                </Button>}
                 <Button
                     variant="contained"
                     size="small"
                     endIcon={<OpenInNew/>}
                     sx={{bgcolor: claudeStyle.ring, "&:hover": {bgcolor: "#C4623F"}}}
-                    onClick={() => openNode(selected.url, selected.artifact)}
+                    {...linkProps(selected.url, openIn)}
+                    onClick={() => markOpened(selected.thread, selected.artifact)}
                 >
                     Open in Claude
                 </Button>
             </Stack>
-            {(selected.badge === "stale" || selected.badge === "gone") && <Typography variant="caption" display="block" sx={{mt: 1}}>
+            {selected.badge && quietBadges.includes(selected.badge) && <Typography variant="caption" display="block" sx={{mt: 1}}>
                 {selected.badge === "stale"
                     ? `No Claude in this project has synced for over ${claudeStaleHours} hours, so this may be out of date.`
+                    : selected.badge === "someday"
+                    ? `This has waited on you for over ${claudeSomedayDays} days. Pick it up, or resolve it in Claude to clear it.`
                     : "The project's latest sync didn't list this thread."}
             </Typography>}
         </Paper>}

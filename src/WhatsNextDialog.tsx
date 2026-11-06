@@ -1,6 +1,6 @@
 import React from "react";
 import {
-    Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, List, ListItemButton, ListItemText,
+    Alert, Autocomplete, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, List, ListItemButton, ListItemText,
     Stack, TextField, Typography, useMediaQuery, useTheme
 } from "@mui/material";
 import { MindMapGraphData } from "./MindMap";
@@ -10,6 +10,7 @@ import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { useNavigator } from "./NavigatorContext";
 import { currentWeather, Suggestion, targetPlaces, whatsNext } from "./Navigator";
 import { MindfulScene, Sloth, Squirrel } from "./Crew";
+import { ClaudeChecklist } from "./ClaudeChecklist";
 
 function SuggestionList({items, onGo, testId}: {items: Suggestion[], onGo: (id: string) => void, testId: string}) {
     return (
@@ -118,6 +119,12 @@ function ClaudeAsks({items, graph, onChange}: {items: LinkedItem[], graph: MindM
                         Which place does <strong>{item.title}</strong> serve?
                         {item.lastHeardAt && <Typography component="span" variant="caption" color="text.secondary"> {age(item.lastHeardAt, nav.now)}</Typography>}
                     </Typography>
+                    {(() => {
+                        const waiting = nav.trail.checklist.filter(c => !c.noteId && c.thread.id === item.id && !c.doneAt).length;
+                        return waiting > 0 && <Typography variant="caption" color="text.secondary" data-testid="waiting-todos">
+                            It left you {waiting} to-do{waiting === 1 ? "" : "s"}. They move to the place you give it.
+                        </Typography>;
+                    })()}
                     {item.suggestion && item.suggestion.mapId === nav.mapId && onChange
                         && graph.nodes.some(n => n.id === item.suggestion!.underNoteId)
                         && <ChartSuggestion item={item} suggestion={item.suggestion} graph={graph} onChart={chart(item, item.suggestion)}/>}
@@ -135,6 +142,29 @@ function ClaudeAsks({items, graph, onChange}: {items: LinkedItem[], graph: MindM
                         <Button size="small" onClick={() => run(nav.forgetItem(item.id))}>Not on the map</Button>
                     </Stack>
                 </Stack>
+            ))}
+        </Box>
+    );
+}
+
+/* Every place with to-dos Claude left open, so they can be checked off right here. One checked a moment ago stays,
+   struck through, so a slip of the thumb can be undone. */
+function TodosFromClaude({graph, onGo}: {graph: MindMapGraphData, onGo: (id: string) => void}) {
+    const nav = useNavigator();
+    const recent = new Date(nav.now.getTime() - 10 * 60_000).toISOString();
+    const shown = nav.trail.checklist.filter(c => c.noteId && (!c.doneAt || c.doneAt > recent));
+    const places = graph.nodes.filter(n => shown.some(c => c.noteId === n.id && !c.doneAt));
+    if (places.length === 0) {
+        return null;
+    }
+    return (
+        <Box data-testid="todos-from-claude" sx={{mb: 2}}>
+            <Typography variant="overline">To do for you, from Claude</Typography>
+            {places.map(place => (
+                <Box key={place.id} sx={{mb: 1}}>
+                    <Link component="button" variant="subtitle2" onClick={() => onGo(place.id)}>{place.label}</Link>
+                    <ClaudeChecklist title="" items={shown.filter(c => c.noteId === place.id)}/>
+                </Box>
             ))}
         </Box>
     );
@@ -162,7 +192,8 @@ export function WhatsNextDialog({open, graph, onChange, onClose, onGo}: {
         tether: nav.tether,
         weather,
         now: nav.now,
-        items: nav.trail.items
+        items: nav.trail.items,
+        checklist: nav.trail.checklist
     }), [graph, nav.trail, nav.tether, weather, nav.now]);
 
     React.useEffect(() => {
@@ -179,6 +210,7 @@ export function WhatsNextDialog({open, graph, onChange, onClose, onGo}: {
             <DialogTitle>What's next</DialogTitle>
             <DialogContent>
                 {!standing && nav.trail.unplaced.length > 0 && <ClaudeAsks items={nav.trail.unplaced} graph={graph} onChange={onChange}/>}
+                {!standing && weather !== "gusty" && <TodosFromClaude graph={graph} onGo={onGo}/>}
                 {standing ? <Mindful/>
                 : result.kind === "mindful" ? <Mindful/>
                 : result.kind === "small" ? (

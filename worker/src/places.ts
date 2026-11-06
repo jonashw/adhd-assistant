@@ -35,7 +35,8 @@ function pathOf(map: WireMap, noteId: string): string[] {
     return path;
 }
 
-const homeLabel = (map: WireMap) => map.nodes.find(n => n.type === "HOME")?.label ?? map.id;
+/* a map goes by its title when it has one, so Claude sees the same name as the list */
+const homeLabel = (map: WireMap) => map.title ?? map.nodes.find(n => n.type === "HOME")?.label ?? map.id;
 
 export type FoundPlace = {place: string, map: string, path: string, status: string, canTarget: boolean};
 
@@ -109,6 +110,9 @@ export async function readPlace(env: Env, key: string) {
             state: i.kind === "claude.thread" ? (isSilent(i, now) ? "check in?" : i.state) : undefined,
             lastHeard: i.lastHeardAt ? age(i.lastHeardAt, now) : undefined
         })),
+        checklist: trail.checklist.filter(c => c.noteId === noteId).map(c => ({
+            id: c.id, text: c.text, group: c.group, link: c.link, done: c.doneAt !== undefined, added_by: c.thread.title
+        })),
         lastVisited: trail.lastArrivedAt[noteId] ? age(trail.lastArrivedAt[noteId], now) : "never"
     };
 }
@@ -125,7 +129,7 @@ export async function whatsNextEverywhere(env: Env) {
         const graph = asGraph(map);
         const result = whatsNext({
             graph, signals: trail.signals, lastArrivedAt: trail.lastArrivedAt,
-            tether: readTether(trail.recent, home.id), now, items: trail.items
+            tether: readTether(trail.recent, home.id), now, items: trail.items, checklist: trail.checklist
         });
         const describe = (s: {node: {id: string, label: string}, reason: string}) =>
             ({place: placeKey(map.id, s.node.id), path: pathOf(map, s.node.id).join(" › "), reason: s.reason});

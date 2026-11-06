@@ -5,7 +5,9 @@ import { WireLink, WireMap, WireNode, validateMap } from "./model";
 type NoteRow = {
     map_id: string, id: string, type: WireNode["type"], label: string, body: string | null,
     status: WireNode["status"] | null, done_at: string | null, hidden: number,
-    parent_id: string | null, origin_id: string | null, small: number, interest: number | null
+    parent_id: string | null, origin_id: string | null, small: number, interest: number | null,
+    scene: WireNode["scene"] | null,
+    symbol: WireNode["symbol"] | null
 };
 type LinkRow = {map_id: string, from_id: string, to_id: string, type: WireLink["type"], label: string | null};
 
@@ -19,6 +21,8 @@ function toNode(row: NoteRow): WireNode {
     if (row.body) node.body = row.body;
     if (row.small) node.small = true;
     if (row.interest) node.interest = row.interest;
+    if (row.scene) node.scene = row.scene;
+    if (row.symbol) node.symbol = row.symbol;
     return node;
 }
 
@@ -37,21 +41,28 @@ export async function listMaps(env: Env, onlyId?: string): Promise<WireMap[]> {
     const where = onlyId ? " WHERE map_id = ?" : "";
     const bind = (sql: string) => onlyId ? env.DB.prepare(sql).bind(onlyId) : env.DB.prepare(sql);
     const [maps, notes, links] = await env.DB.batch([
-        bind(`SELECT id, revision FROM maps${onlyId ? " WHERE id = ?" : ""} ORDER BY created_at`),
+        bind(`SELECT id, revision, title FROM maps${onlyId ? " WHERE id = ?" : ""} ORDER BY created_at`),
         bind(`SELECT * FROM notes${where} ORDER BY position`),
         bind(`SELECT * FROM links${where}`)
     ]);
     const noteRows = notes.results as NoteRow[];
     const linkRows = links.results as LinkRow[];
-    return (maps.results as {id: string, revision: number}[]).map(m => {
+    return (maps.results as {id: string, revision: number, title: string | null}[]).map(m => {
         const mapNotes = noteRows.filter(n => n.map_id === m.id);
         return {
             id: m.id,
             revision: m.revision,
+            ...(m.title ? {title: m.title} : {}),
             nodes: mapNotes.map(toNode),
             links: toLinks(mapNotes, linkRows.filter(l => l.map_id === m.id))
         };
     });
+}
+
+/* Each map's id and revision only: how an open tab tells cheaply which maps changed somewhere else */
+export async function listRevisions(env: Env): Promise<{id: string, revision: number}[]> {
+    const rows = await env.DB.prepare("SELECT id, revision FROM maps ORDER BY created_at").all<{id: string, revision: number}>();
+    return rows.results;
 }
 
 /* Saves a whole map. The caller sends the revision it last saw; a newer one on the server means another device saved first. */
@@ -59,7 +70,7 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
     if (!/^[\w-]{1,100}$/.test(id)) {
         throw new HttpError(400, "That map id isn't valid.");
     }
-    const {nodes, links} = validateMap(input);
+    const {title, nodes, links} = validateMap(input);
     const sentRevision = (input as {revision?: unknown}).revision ?? null;
     const current = await env.DB.prepare("SELECT revision FROM maps WHERE id = ?").bind(id).first<{revision: number}>();
     if ((current?.revision ?? null) !== sentRevision) {
@@ -74,26 +85,29 @@ export async function saveMap(env: Env, id: string, input: unknown): Promise<{re
     const parentOf = new Map(links.filter(l => l.type === "PART_OF").map(l => [l.source, l.target]));
     const statements = [
         current
-            ? env.DB.prepare("UPDATE maps SET revision = ?, updated_at = ? WHERE id = ?").bind(revision, now, id)
-            : env.DB.prepare("INSERT INTO maps (id, revision, created_at, updated_at) VALUES (?, ?, ?, ?)").bind(id, revision, now, now),
+            ? env.DB.prepare("UPDATE maps SET revision = ?, title = CASE WHEN ? THEN ? ELSE title END, updated_at = ? WHERE id = ?")
+                .bind(revision, title === undefined ? 0 : 1, title ?? null, now, id)
+            : env.DB.prepare("INSERT INTO maps (id, revision, title, created_at, updated_at) VALUES (?, ?, ?, ?, ?)").bind(id, revision, title ?? null, now, now),
         env.DB.prepare("DELETE FROM notes WHERE map_id = ? AND id NOT IN (SELECT value FROM json_each(?))")
             .bind(id, JSON.stringify(nodes.map(n => n.id))),
         env.DB.prepare("DELETE FROM links WHERE map_id = ?").bind(id),
         // linked items and signals at places that are gone let go of them
         env.DB.prepare("DELETE FROM item_places WHERE map_id = ? AND note_id NOT IN (SELECT value FROM json_each(?))")
             .bind(id, JSON.stringify(nodes.map(n => n.id))),
+        env.DB.prepare("DELETE FROM checklist_items WHERE map_id = ? AND note_id IS NOT NULL AND note_id NOT IN (SELECT value FROM json_each(?))")
+            .bind(id, JSON.stringify(nodes.map(n => n.id))),
         env.DB.prepare("UPDATE signals SET cleared_at = ? WHERE map_id = ? AND cleared_at IS NULL AND note_id NOT IN (SELECT value FROM json_each(?))")
             .bind(now, id, JSON.stringify(nodes.map(n => n.id))),
         // origin_id and created_at are written once and never updated
         ...nodes.map((n, position) => env.DB.prepare(
-            `INSERT INTO notes (map_id, id, type, label, body, status, done_at, hidden, parent_id, origin_id, small, interest, position, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO notes (map_id, id, type, label, body, status, done_at, hidden, parent_id, origin_id, small, interest, scene, symbol, position, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT (map_id, id) DO UPDATE SET
                 type = excluded.type, label = excluded.label, body = excluded.body, status = excluded.status,
                 done_at = excluded.done_at, hidden = excluded.hidden, parent_id = excluded.parent_id,
-                small = excluded.small, interest = excluded.interest, position = excluded.position, updated_at = excluded.updated_at`
+                small = excluded.small, interest = excluded.interest, scene = excluded.scene, symbol = excluded.symbol, position = excluded.position, updated_at = excluded.updated_at`
         ).bind(id, n.id, n.type, n.label, n.body ?? null, n.status ?? null, n.doneAt ?? null, n.hidden ? 1 : 0,
-            parentOf.get(n.id) ?? null, n.origin ?? null, n.small ? 1 : 0, n.interest ?? null, position, now, now)),
+            parentOf.get(n.id) ?? null, n.origin ?? null, n.small ? 1 : 0, n.interest ?? null, n.scene ?? null, n.symbol ?? null, position, now, now)),
         ...links.filter(l => l.type !== "PART_OF").map(l => env.DB.prepare(
             "INSERT INTO links (map_id, from_id, to_id, type, label) VALUES (?, ?, ?, ?, ?)"
         ).bind(id, l.source, l.target, l.type, l.label ?? null))

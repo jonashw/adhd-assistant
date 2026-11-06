@@ -1,4 +1,4 @@
-import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
+import { Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography } from '@mui/material';
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from './MindMap';
 import { useNavigator } from './NavigatorContext';
 import { formatDue } from './Navigator';
@@ -34,14 +34,31 @@ function asHierarchy(graph: MindMapGraphData, node: DirectedGraphNode<MindMapGra
     return { id, label, note: note || undefined, muted, children };
 }
 
-function HierarchicalNodeList({root}:{root:HierarchicalNode}){
+/* each place's name; the ones on the way from HOME to the selected place are bold, and any of them can be picked */
+function HierarchicalNodeList({root, onPath, selectedId, onSelect}:{
+    root: HierarchicalNode,
+    onPath: Set<string>,
+    selectedId?: string,
+    onSelect?: (id: string) => void
+}){
+    const name = (n: HierarchicalNode) => {
+        const style = {
+            fontWeight: onPath.has(n.id) ? 700 : undefined,
+            background: n.id === selectedId ? 'rgba(25,118,210,0.12)' : undefined,
+            borderRadius: 4, padding: '0 4px', margin: '0 -4px'
+        };
+        return onSelect
+            ? <span role="button" tabIndex={0} style={{...style, cursor: 'pointer'}} onClick={() => onSelect(n.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(n.id); } }}>{n.label}</span>
+            : <span style={style}>{n.label}</span>;
+    };
     function HierarchicalNodeChildList(children: HierarchicalNode[]){
         return children.length === 0 
         ? <></> 
         : <ul>
             {children.map(n => (
                 <li key={n.id} style={n.muted ? {color: 'GrayText'} : undefined}>
-                    {n.label}
+                    {name(n)}
                     {n.note && <small> ({n.note})</small>}
                     {HierarchicalNodeChildList(n.children)}
                 </li>
@@ -49,7 +66,7 @@ function HierarchicalNodeList({root}:{root:HierarchicalNode}){
         </ul>
     }
     return <div>
-        {root.label}
+        {name(root)}
         {HierarchicalNodeChildList(root.children)}
     </div>;
 }
@@ -57,13 +74,21 @@ function HierarchicalNodeList({root}:{root:HierarchicalNode}){
 export function MindMapOutlineModal({
     open,
     graph,
+    selectedId,
+    onSelect,
     onClose
 }:{
     open: boolean;
     graph: MindMapGraphData;
+    /* the place picked out on the map: the outline shows the way to it from HOME */
+    selectedId?: string;
+    onSelect?: (id: string) => void;
     onClose: () => void;
 }) {
     const home = graph.nodes.find(n => n.type === "HOME");
+    const path = home && selectedId ? (MindMap.shortestPathBetween(graph, selectedId, home.id) ?? []) : [];
+    const onPath = new Set(path.map(p => p.node.id));
+    const trail = [...path].reverse();
     const nav = useNavigator();
     const flagText: FlagText = id => {
         const flag = nav.flagOf(id);
@@ -86,8 +111,14 @@ export function MindMapOutlineModal({
         >
             <DialogTitle>Mind Map Outline</DialogTitle>
             <DialogContent>
+                {trail.length > 1 && <Breadcrumbs separator="›" aria-label="The way from HOME" sx={{mb: 1.5}}>
+                    {trail.map((segment, i) => i === trail.length - 1
+                        ? <Typography key={segment.node.id} color="text.primary" fontWeight={700}>{segment.node.label}</Typography>
+                        : <Link key={segment.node.id} component="button" underline="hover" color="inherit"
+                            onClick={() => onSelect?.(segment.node.id)}>{segment.node.label}</Link>)}
+                </Breadcrumbs>}
                 {home !== undefined 
-                ? <HierarchicalNodeList root={asHierarchy(graph, home, flagText)}/>
+                ? <HierarchicalNodeList root={asHierarchy(graph, home, flagText)} onPath={onPath} selectedId={selectedId} onSelect={onSelect}/>
                 : <div>No HOME found</div>}
             </DialogContent>
             <DialogActions>

@@ -27,5 +27,11 @@
       "id": "0900b85451b94762a3c3ee967c01e686"
     }
   ],
+  // The doorbell every open tab listens to, so changes show at once (worker/src/live.ts). SQLite-backed, which the
+  // free plan allows; Workers Builds applies the migration with the next deploy.
+  "durable_objects": {
+    "bindings": [{ "name": "LIVE", "class_name": "LiveHub" }]
+  },
+  "migrations": [{ "tag": "v1-live-hub", "new_sqlite_classes": ["LiveHub"] }],
   "observability": { "enabled": true }
 }

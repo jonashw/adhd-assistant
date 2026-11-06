@@ -177,7 +177,13 @@ export async function placeItem(env: Env, itemId: string, place: PlaceRef): Prom
     }
     await checkTarget(env, place);
     await setPrimary(env, itemId, place);
-    await env.DB.prepare("DELETE FROM place_suggestions WHERE item_id = ?").bind(itemId).run();
+    await env.DB.batch([
+        env.DB.prepare("DELETE FROM place_suggestions WHERE item_id = ?").bind(itemId),
+        // to-dos the thread left on its suggested place move here; one already here by the same words stays once
+        env.DB.prepare("UPDATE OR IGNORE checklist_items SET map_id = ?, note_id = ? WHERE thread_item_id = ? AND note_id IS NULL")
+            .bind(place.mapId, place.noteId, itemId),
+        env.DB.prepare("DELETE FROM checklist_items WHERE thread_item_id = ? AND note_id IS NULL").bind(itemId)
+    ]);
     await raiseFor(env, itemId);
     return (await getItem(env, itemId))!;
 }
@@ -217,6 +223,9 @@ export async function suggestPlace(env: Env, threadId: string, under: PlaceRef, 
          ON CONFLICT (item_id) DO UPDATE SET map_id = excluded.map_id, under_note_id = excluded.under_note_id,
             path = excluded.path, created_at = excluded.created_at`
     ).bind(threadId, under.mapId, under.noteId, JSON.stringify(names), new Date().toISOString()).run();
+    // to-dos already waiting on an earlier suggestion follow it to this one's map
+    await env.DB.prepare("UPDATE checklist_items SET map_id = ? WHERE thread_item_id = ? AND note_id IS NULL")
+        .bind(under.mapId, threadId).run();
     return {mapId: under.mapId, underNoteId: under.noteId, path: names};
 }
 
@@ -291,7 +300,11 @@ export async function itemsFor(env: Env, mapId: string): Promise<{items: LinkedI
     };
 }
 
-/* Jon says a thread doesn't belong on the map: it and its signals go */
+/* Jon says a thread doesn't belong on the map: it, its signals and the to-dos still waiting for its place go.
+   To-dos it left at real places stay, still naming the thread. */
 export async function forgetItem(env: Env, itemId: string): Promise<void> {
-    await env.DB.prepare("DELETE FROM linked_items WHERE id = ?").bind(itemId).run();
+    await env.DB.batch([
+        env.DB.prepare("DELETE FROM checklist_items WHERE thread_item_id = ? AND note_id IS NULL").bind(itemId),
+        env.DB.prepare("DELETE FROM linked_items WHERE id = ?").bind(itemId)
+    ]);
 }

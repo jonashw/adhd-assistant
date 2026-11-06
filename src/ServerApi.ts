@@ -1,5 +1,6 @@
 import { MindMapGraphDataRecord } from "./MindMap";
-import { ClaudeProject } from "./ClaudeMapTypes";
+import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
+import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 
 /* A map as the server holds it: the app's graph plus the revision last saved */
 export type ServerMap = MindMapGraphDataRecord & {revision: number};
@@ -25,8 +26,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(path, {
         ...init,
         credentials: "same-origin",
-        headers: {"content-type": "application/json", ...init?.headers}
+        headers: {"content-type": "application/json", [liveTabHeader]: liveTabId, ...init?.headers}
     });
+    if (response.ok) {
+        announceFromResponse(response);
+    }
     if (response.status === 204) {
         return undefined as T;
     }
@@ -59,11 +63,13 @@ export const ServerApi = {
         return {mode: "local"};
     },
     listMaps: () => request<ServerMap[]>("/api/maps"),
+    /* Just each map's id and revision, to tell cheaply which maps changed somewhere else */
+    mapRevisions: () => request<{id: string, revision: number}[]>("/api/maps/revisions"),
     getMap: (id: string) => request<ServerMap>(`/api/maps/${encodeURIComponent(id)}`),
     saveMap: (graph: MindMapGraphDataRecord, revision: number | null) =>
         request<{revision: number}>(`/api/maps/${encodeURIComponent(graph.id)}`, {
             method: "PUT",
-            body: JSON.stringify({revision, nodes: graph.nodes, links: graph.links})
+            body: JSON.stringify({revision, title: graph.title ?? null, nodes: graph.nodes, links: graph.links})
         }),
     deleteMap: (id: string) => request<void>(`/api/maps/${encodeURIComponent(id)}`, {method: "DELETE"}),
     /* A photo for a place's note; answers the URL the note points at */
@@ -84,8 +90,13 @@ export const ServerApi = {
     claudeMap: () => request<ClaudeProject[]>("/api/claude-map"),
     markClaudeArtifactOpened: (id: string) =>
         request<void>(`/api/claude-map/artifacts/${encodeURIComponent(id)}/opened`, {method: "POST"}),
+    claudeLog: (before?: string) =>
+        request<ClaudeLogEntry[]>(`/api/claude-map/log${before ? `?before=${encodeURIComponent(before)}` : ""}`),
+    claudeSync: (hash: string) => request<unknown>(`/api/claude-map/syncs/${encodeURIComponent(hash)}`),
     setClaudeProjectHidden: (id: string, hidden: boolean) =>
         request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    markClaudeThreadOpened: (id: string) =>
+        request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
     listConnections: () => request<Connection[]>("/api/connections"),
     revokeConnection: (id: string) => request<void>(`/api/connections/${encodeURIComponent(id)}/revoke`, {method: "POST"})

@@ -3,7 +3,11 @@ import { CrewSvg, Eye, ShutEye } from "./CrewSvg";
 import { Fidget, useFidget, usePrefersReducedMotion } from "./useFidget";
 
 /* The robot golden retriever. It trails Jon a beat behind, settles at his feet on arrival, and curls up when he's Mindful. */
-export type DogDoing = "idle" | "trail" | "settle" | "curled";
+export type DogDoing = "idle" | "trail" | "settle" | "curled"
+    /* up on its hind legs, both front paws pulling down on your arm in time with the spider's tug */
+    | "pull"
+    /* getting up from a nap: a stretch and a shake, ready to go */
+    | "rouse";
 
 const fidgets: Fidget[] = [
     {name: "is-blink", ms: 220, weight: 3},
@@ -32,8 +36,11 @@ export function Dog({size = 24, doing = "idle"}: {size?: number, doing?: DogDoin
         setSettled(doing === "curled" || doing === "settle");
     }, [doing, reduced]);
     const curled = settled;
-    const fidget = useFidget(curled ? sleepFidgets : fidgets, curled ? [5000, 12000] : [1800, 5000], doing !== "trail");
-    const label = curled ? "Robot dog, curled up" : "Robot dog";
+    const fidget = useFidget(curled ? sleepFidgets : fidgets, curled ? [5000, 12000] : [1800, 5000], doing === "idle" || curled);
+    const label = curled ? "Robot dog, curled up"
+        : doing === "pull" ? "Robot dog, pulling on your arm"
+        : doing === "rouse" ? "Robot dog, getting up"
+        : "Robot dog";
     return (
         <CrewSvg width={64} height={48} size={size} label={label}
             classes={["crew-dog", `doing-${curled ? "curled" : doing}`, fidget]}>

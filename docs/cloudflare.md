@@ -66,7 +66,7 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`.
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, and the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`.
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
@@ -82,7 +82,8 @@ view. Try it without a server at `/claude?demo`.
 Artifacts show too, as page-shaped nodes on their project (Claude lists artifacts per project, not per thread,
 so they stay put when the thread that made one is done or hidden). "New" means it appeared after the project
 joined the map and hasn't been opened from the map; "Updated Xm ago" is highlighted when it changed since it was
-last opened. **Hide done threads** (off by default) remembers its setting on each device.
+last opened. **Hide done threads** (on by default) remembers its setting on each device; resolved threads
+can be brought back individually with **Show on map**.
 
 **Opting a project in.** Threads do the syncing: project coordinators don't get the connector, so they can't.
 This repo's `CLAUDE.md` opts in every project that has the repo attached. For any other project, paste this
@@ -103,6 +104,55 @@ read Working after it finishes, until another thread in the project syncs or the
 thread up to date. Snapshots land in the `claude_snapshots` inbox before they are applied, and an older
 snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
 deleted. Decision record: "AA: Mirror Claude threads on the map".
+
+**Glance cards.** Each thread also sends its own card with `sync_project` as `this_thread`: a one-line headline of
+its latest reply, what it asks of Jon (question, decision, go-ahead or review), its checklist counted ("3 of 5",
+the step in progress), its latest artifact, and a topic line with a few keywords. Any thread passes on the
+project's PRs (`prs`, from the platform's PR list) with each matched to the thread that opened it, so the card shows
+the PR number, state and checks. A card replaces the last one whole; a repeat keeps its time. "New" means the card
+changed since Jon last opened that thread from the map. Every topic a thread has had stays searchable from the
+list view, along with day words like "monday". To save tokens, a sync may leave `threads` out when no title or state
+changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
+thread cards on the Claude map: design proposal" (Jon chose Glance).
+
+**A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
+thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
+sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
+thread until a later list from the platform says otherwise.
+
+## Live updates
+
+Every open tab keeps a WebSocket to one Durable Object, `LiveHub` (`worker/src/live.ts`), at `/api/live`. After
+each write, from the app or from the connector, the Worker rings the hub with what changed (`maps`, `trail`,
+`claude` or `monologues`, plus the map id where there is one), and each tab refetches just that piece from the
+usual endpoints. The ring carries no data. A tab skips the ring for its own writes (the `x-live-tab` header).
+
+- Nothing to set up: the binding and its migration are in `wrangler.jsonc`, and Workers Builds applies them on
+  deploy. The class is SQLite-backed, which the free plan allows.
+- The sockets hibernate, so the hub sleeps between rings; a tab's "ping" every 25 seconds is answered "pong"
+  without waking it.
+- If the socket drops, the tab shows a grey dot, retries with backoff, and refetches everything once it is back.
+  Tabs also refetch when they come to the front, and take a safety look every 5 minutes while visible.
+- A failed ring never fails the write.
+
+## Read-only viewer token (for Claude's browser)
+
+Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
+A request carrying `Authorization: Bearer <VIEWER_TOKEN>` can read anything (every `GET` under `/api/`) and
+nothing else: every write, the connector's consent page and sign-out still need a Google session.
+
+1. Make a long random value (at least 32 characters; shorter values are refused):
+   ```sh
+   openssl rand -base64 32
+   ```
+2. Store it as a Worker secret: `npx wrangler secret put VIEWER_TOKEN`, or in the Cloudflare dashboard under
+   the Worker's Settings, Variables and Secrets, as a Secret named `VIEWER_TOKEN`.
+3. Give it to Claude as a **network secret**, not an environment variable: in the Claude cloud environment's
+   settings, add it under Network secrets for the host `adhd-assist.2jonwilson.workers.dev` (and allow that
+   domain). The environment's proxy then adds the header to requests for that host only. Claude's sessions,
+   shell and browser never see the value, and it is never sent to any other host.
+
+To revoke it, delete the secret or set a new value. Leaving `VIEWER_TOKEN` unset turns the feature off.
 
 ## Local development
 

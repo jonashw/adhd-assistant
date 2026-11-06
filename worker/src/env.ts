@@ -1,5 +1,9 @@
+import type { LiveHub } from "./live";
+
 export interface Env {
     DB: D1Database;
+    /* the doorbell every open tab listens to (worker/src/live.ts) */
+    LIVE: DurableObjectNamespace<LiveHub>;
     ASSETS: Fetcher;
     /* grants and tokens for the Claude connector, kept by Cloudflare's OAuth library */
     OAUTH_KV: KVNamespace;
@@ -8,6 +12,8 @@ export interface Env {
     GOOGLE_CLIENT_SECRET: string;
     /* The one Google account allowed in */
     ALLOWED_EMAIL: string;
+    /* Optional: a long random value that lets a helper read (never write) with an Authorization: Bearer header */
+    VIEWER_TOKEN?: string;
     /* "1" only in .dev.vars: enables /auth/dev-login on localhost */
     DEV_LOGIN?: string;
 }

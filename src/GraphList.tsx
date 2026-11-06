@@ -1,7 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { GraphRepositoryContext } from './GraphRepositoryContext';
 import {
     AppBar,
+    Box,
+    Link,
     Button,
     CircularProgress,
     Container,
@@ -20,21 +22,45 @@ import {
     SpeedDialAction,
     SpeedDialIcon,
     Stack,
+    TextField,
     Toolbar,
     Typography
 } from "@mui/material";
 import React from 'react';
 import ScanningModal from "./ScanningModal";
 import { extractGraphFromImage } from "./extractGraphFromImage";
-import { CameraAlt, Delete, Download, UploadFile } from '@mui/icons-material';
-import { MindMap, MindMapGraphData } from './MindMap';
+import { CameraAlt, Delete, Download, Edit, UploadFile } from '@mui/icons-material';
+import { MindMap, MindMapGraphData, MindMapGraphDataRecord } from './MindMap';
 import { exportGraph, readGraphFile } from './GraphFile';
 import { ServerApi } from './ServerApi';
-import { sampleGraphs } from './sampleGraphs';
 import { ConnectedAppsDialog } from './ConnectedAppsDialog';
 import { ClaudeMapEntry } from './ClaudeMapEntry';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
+
+const previewLength = 60;
+
+/* One short line per map: how many places, then the open ones by name until about 60 characters, ending in an ellipsis when cut */
+function graphSummary(graph: MindMapGraphData): string {
+    const places = graph.nodes.filter(n => n.type !== 'HOME');
+    const count = `${places.length} ${places.length === 1 ? 'place' : 'places'}`;
+    const open = places.filter(n => !n.hidden && n.status !== 'done' && n.status !== 'dropped').map(n => n.label.trim());
+    let preview = '';
+    for (const label of open) {
+        const next = preview ? `${preview}, ${label}` : label;
+        if (next.length > previewLength) {
+            const room = previewLength - (preview ? preview.length + 2 : 0);
+            //a label that won't fit is cut at a word if a useful piece of it fits, otherwise left out
+            const cut = label.slice(0, room).replace(/\s+\S*$/, '');
+            preview = cut.length >= 8 ? (preview ? `${preview}, ${cut}` : cut) : preview || label.slice(0, previewLength);
+            return `${count} · ${preview}…`;
+        }
+        preview = next;
+    }
+    return preview ? `${count} · ${preview}` : count;
+}
+
+const graphName = (g: MindMapGraphDataRecord, i: number) => g.title || `Graph #${i + 1}`;
 
 export function GraphList() {
     const navigate = useNavigate();
@@ -48,6 +74,15 @@ export function GraphList() {
     const [busyExtracting,setBusyExtracting] = React.useState(false);
     const [scanningModalVisible, setScanningModalVisible] = React.useState<boolean>(false);
     const [idOfGraphToDelete,setIdOfGraphToDelete] = React.useState<string>();
+    const [titling, setTitling] = React.useState<{graph: MindMapGraphDataRecord, index: number, title: string}>();
+    function saveTitle(){
+        if(!titling){
+            return;
+        }
+        const title = titling.title.trim();
+        GraphContext.saveGraph({...titling.graph, title: title || undefined});
+        setTitling(undefined);
+    }
     const [speedDialOpen, setSpeedDialOpen] = React.useState(false);
     const [connectedAppsOpen, setConnectedAppsOpen] = React.useState(false);
     const importInputRef = React.useRef<HTMLInputElement>(null);
@@ -114,14 +149,22 @@ export function GraphList() {
                             key={g.id} 
                             sx={{
                                 justifyContent: 'space-between',
-                                cursor:'pointer'
+                                cursor:'pointer',
+                                //room for the three buttons, so the text never runs under them
+                                pr: '152px'
                             }}
                             onClick={() => navigate(`/graph/${g.id}`)}
                             secondaryAction={
-                                <Stack direction="row" gap={1}>
+                                <Stack direction="row" gap={0.5}>
+                                    <IconButton title="Name this mind map" aria-label="rename" onClick={e => {
+                                        e.stopPropagation();
+                                        setTitling({graph: g, index: i, title: g.title ?? ''});
+                                    }}>
+                                        <Edit />
+                                    </IconButton>
                                     <IconButton title="Export this mind map as a JSON file" aria-label="export" onClick={e => {
                                         e.stopPropagation();
-                                        exportGraph(g, `adhd-assist-graph-${i + 1}-${new Date().toISOString().slice(0, 10)}`);
+                                        exportGraph(g, `adhd-assist-${g.title || `graph-${i + 1}`}-${new Date().toISOString().slice(0, 10)}`);
                                     }}>
                                         <Download />
                                     </IconButton>
@@ -138,9 +181,11 @@ export function GraphList() {
                             <ListItemIcon>
                                 <GraphIcon/>
                             </ListItemIcon>
-                            <ListItemText 
-                                primary={`Graph #${i + 1}`}
-                                secondary={`${g.nodes.length} nodes: ${g.nodes.map(n => n.label).join(', ')}`}
+                            <ListItemText
+                                primary={graphName(g, i)}
+                                secondary={graphSummary(g)}
+                                primaryTypographyProps={{noWrap: true}}
+                                secondaryTypographyProps={{sx: {display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}}
                             />
                         </ListItem>
                     )}
@@ -225,12 +270,11 @@ export function GraphList() {
                         />
                         <SpeedDialAction
                             icon={<GraphIcon size={24} />}
-                            tooltipTitle={"Sample"}
+                            tooltipTitle={"Starter maps"}
                             tooltipOpen
                             onClick={() => {
-                                handleNewGraph({
-                                    ...sampleGraphs[0]
-                                });
+                                setSpeedDialOpen(false);
+                                navigate('/templates');
                             }}
                         />
                 </SpeedDial>
@@ -238,6 +282,12 @@ export function GraphList() {
  
             </Stack>
         </Paper>
+
+        <Box component="footer" sx={{px: 2, pt: 2, pb: 12, color: 'text.secondary', typography: 'body2'}}>
+            <Link component={RouterLink} to="/crew" underline="hover" color="inherit">Meet the crew</Link>
+            {' · '}
+            <Link component={RouterLink} to="/templates" underline="hover" color="inherit">Starter maps</Link>
+        </Box>
 
         <input
             ref={importInputRef}
@@ -252,6 +302,32 @@ export function GraphList() {
                 }
             }}
         />
+
+        <Dialog open={titling !== undefined} onClose={() => setTitling(undefined)} fullWidth maxWidth="sm">
+            <DialogTitle>Name this mind map</DialogTitle>
+            <DialogContent>
+                <TextField
+                    autoFocus
+                    fullWidth
+                    margin="dense"
+                    label="Title"
+                    placeholder={titling ? `Graph #${titling.index + 1}` : ''}
+                    helperText="Leave it empty to go back to the number."
+                    value={titling?.title ?? ''}
+                    inputProps={{maxLength: 200}}
+                    onChange={e => setTitling(t => t && {...t, title: e.target.value})}
+                    onKeyDown={e => {
+                        if(e.key === 'Enter'){
+                            saveTitle();
+                        }
+                    }}
+                />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={() => setTitling(undefined)}>Cancel</Button>
+                <Button variant="contained" onClick={saveTitle}>Save</Button>
+            </DialogActions>
+        </Dialog>
 
         <Dialog
             open={idOfGraphToDelete !== undefined}
