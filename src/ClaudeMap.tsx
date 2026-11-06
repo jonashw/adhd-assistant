@@ -63,7 +63,7 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
     }
     const count = badges.filter(b => b === top).length;
     const text = top === "blocked" ? `${count} need${count === 1 ? "s" : ""} you`
-        : top === "done" ? "All done"
+        : top === "done" ? "All resolved"
         : count > 1 ? `${count} ${claudeBadges[top].label.toLowerCase()}` : claudeBadges[top].label;
     return {badge: top, text};
 }
@@ -541,7 +541,7 @@ export function ClaudeMap() {
                     <ListSubheader sx={{lineHeight: "32px"}}>On the map</ListSubheader>
                     <MenuItem onClick={() => setHideDone(!hideDone)}>
                         <ListItemIcon>{hideDone ? <CheckBox fontSize="small"/> : <CheckBoxOutlineBlank fontSize="small"/>}</ListItemIcon>
-                        Hide done threads
+                        Hide resolved threads
                     </MenuItem>
                 </Menu>
             </Toolbar>
@@ -687,7 +687,7 @@ export function ClaudeMap() {
                 "&:hover": {bgcolor: "#fff", borderColor: claudeStyle.ring}
             }}
         >
-            {hiddenDone.length} done thread{hiddenDone.length === 1 ? "" : "s"} hidden
+            {hiddenDone.length} resolved thread{hiddenDone.length === 1 ? "" : "s"} hidden
         </Button>}
 
         {view === "map" && doneListOpen && <Paper
@@ -700,7 +700,7 @@ export function ClaudeMap() {
             <Stack direction="row" alignItems="center" gap={1} sx={{p: 2, pb: 1}}>
                 <Box sx={{flexGrow: 1, minWidth: 0}}>
                     <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
-                        Done, off the map
+                        Resolved, off the map
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
                         Latest first. Show one to put it back on the map.
@@ -721,7 +721,7 @@ export function ClaudeMap() {
                         secondaryTypographyProps={{noWrap: true}}
                     />
                 </ListItem>)}
-                {hiddenDone.length === 0 && <Typography variant="body2" sx={{px: 2, pb: 2}}>Every done thread is on the map.</Typography>}
+                {hiddenDone.length === 0 && <Typography variant="body2" sx={{px: 2, pb: 2}}>Every resolved thread is on the map.</Typography>}
             </List>
         </Paper>}
 

@@ -97,7 +97,7 @@ export const claudeBadges: Record<ClaudeBadgeKind, {label: string, color: string
     working: {label: "Working", color: "#2563EB", text: "#FFFFFF"},
     failed: {label: "Stuck", color: "#DC2626", text: "#FFFFFF"},
     stopped: {label: "Stopped", color: "#64748B", text: "#FFFFFF"},
-    done: {label: "Done", color: "#9CA3AF", text: "#FFFFFF"},
+    done: {label: "Resolved", color: "#9CA3AF", text: "#FFFFFF"},
     stale: {label: "Not heard lately", color: "#E5E7EB", text: "#374151"},
     gone: {label: "Not seen lately", color: "#E5E7EB", text: "#374151"},
     someday: {label: "Someday?", color: "#FDE9C4", text: "#7C4A03"}
