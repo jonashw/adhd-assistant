@@ -14,6 +14,7 @@ import { matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
 import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
+import { ClaudeEventLog } from "./ClaudeEventLog";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -68,7 +69,7 @@ function projectSummary(project: ClaudeProject): {badge: ClaudeBadgeKind, text: 
     return {badge: top, text};
 }
 
-const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
+export const projectLabel = (p: ClaudeProject) => p.shortName ?? p.name;
 
 /* Which threads get a node. A project's badge still counts every thread, hidden or not. */
 type ThreadFilter = (thread: ClaudeThread, project: ClaudeProject) => boolean;
@@ -243,7 +244,7 @@ export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) 
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
 /* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
    from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
-type OpenIn = "new-tab" | "desktop";
+export type OpenIn = "new-tab" | "desktop";
 const openInKey = "claudeMap.openIn";
 const openInLabels: Record<OpenIn, string> = {
     "new-tab": "A new browser tab each time",
@@ -269,7 +270,7 @@ const open = (url: string | undefined, openIn: OpenIn) => {
 };
 
 /* A real link, so the URL shows on hover, can be copied, and cmd- or middle-click makes a tab of its own */
-const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
+export const linkProps = (url: string | undefined, openIn: OpenIn) => !url ? {} : openIn === "desktop"
     ? {component: "a" as const, href: desktopUrl(url)}
     : {component: "a" as const, href: url, target: "_blank", rel: "noopener noreferrer"};
 
@@ -303,7 +304,7 @@ const readShownDone = (): Set<string> => {
     }
 };
 
-const keep = (key: string, value: string) => {
+export const keep = (key: string, value: string) => {
     try {
         localStorage.setItem(key, value);
     } catch {
@@ -402,7 +403,7 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
-    const [view, setView] = React.useState<"map" | "list">("map");
+    const [view, setView] = React.useState<"map" | "list" | "events">("map");
     const [showHidden, setShowHidden] = React.useState(false);
     const [selectedId, setSelectedId] = React.useState<string>();
     const [query, setQuery] = React.useState("");
@@ -510,17 +511,22 @@ export function ClaudeMap() {
                 <IconButton color="inherit" edge="start" aria-label="Back to your maps" onClick={() => navigate("/")}>
                     <ArrowBack/>
                 </IconButton>
-                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem"}}>
+                {/* three tabs leave no room for the title on a phone */}
+                <Typography sx={{flexGrow: 1, fontFamily: claudeStyle.font, fontWeight: 600, fontSize: "1.25rem", display: {xs: "none", sm: "block"}}}>
                     Claude map
                 </Typography>
+                <Box sx={{flexGrow: 1, display: {xs: "block", sm: "none"}}}/>
                 <Tabs
                     value={view}
                     onChange={(_, v) => setView(v)}
                     textColor="inherit"
                     TabIndicatorProps={{style: {backgroundColor: "#fff"}}}
+                    // three tabs fit a phone only without the default minimum width
+                    sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
                     <Tab value="map" label="Map"/>
                     <Tab value="list" label="List"/>
+                    <Tab value="events" label="Log"/>
                 </Tabs>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
@@ -565,7 +571,7 @@ export function ClaudeMap() {
                 Synced {ago(lastSynced)}
             </Typography>}
         </Stack>}
-        {searching && shown.length === 0 && <Typography variant="body2" sx={{px: 2, py: 1.5}}>No thread matches that.</Typography>}
+        {view !== "events" && searching && shown.length === 0 && <Typography variant="body2" sx={{px: 2, py: 1.5}}>No thread matches that.</Typography>}
 
         {error && <Alert severity="warning" sx={{borderRadius: 0}}>Couldn't refresh the Claude map. {error}</Alert>}
         {demo && <Alert severity="info" sx={{borderRadius: 0}}>Sample data. Nothing here is real.</Alert>}
@@ -641,6 +647,8 @@ export function ClaudeMap() {
                 }}
                 onBackgroundClick={() => setSelectedId(undefined)}
             />}
+
+            {view === "events" && <ClaudeEventLog projects={projects ?? []} query={query} openIn={openIn} demo={demo}/>}
 
             {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
                 {shown.map(p => <React.Fragment key={p.id}>

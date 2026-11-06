@@ -25,11 +25,13 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
-  - threads: send the whole list the first time, and whenever any thread's title or state differs from your last sync. Otherwise leave threads out; that means "unchanged" and saves writing the list.
+  - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
+  - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
   - this_thread: your own thread id and card (headline, ask, progress, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
   - this_thread.state: in your last sync of a turn, the state you leave your own thread in: "done" if you resolve it this turn, "blocked" if you end waiting on Jon, "review_ready" if you hand him finished work. Claude's own list still shows you as working until your turn ends, so without this your badge stays a turn behind.
   - prs: the project's PR list (list_prs) when it changed since your last sync. Set each PR's thread_id to the thread whose session id ends the same way.
-  - If nothing changed at all, skip the call.
+  - short_name: only if the project instructions give one; leave it out otherwise, and the map shows the project's name.
+  - If nothing changed at all, skip the call. A changed project name counts as a change.
 - Monologues: when Jon sends you dictation (spoken words, often several topics in a row) or asks you to log what he said, call log_monologue with his words exactly as he sent them, unedited, plus this thread's link or thread_id. The app turns it into a map he can replay. Don't log your own words or anything he pasted from elsewhere.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
@@ -95,8 +97,8 @@ function buildServer(env: Env): McpServer {
         description: "Mirror this Claude project, its threads, its PRs and this thread's own glance card onto Jon's Claude map. Threads come exactly as the platform lists them (list_threads): send the whole list, or leave it out when nothing in it changed since your last sync. A thread left out of a list is marked \"not seen lately\", never deleted. Safe to repeat.",
         inputSchema: {
             project_id: z.string().min(1).max(100).describe("The project's id, like \"chan_...\""),
-            project_name: z.string().min(1).max(200).describe("The project's name as Jon sees it"),
-            short_name: z.string().min(1).max(40).optional().describe("A short label for the map, if the project instructions give one"),
+            project_name: z.string().min(1).max(200).describe("The project's name as Jon sees it now (from the newest message, since he can rename it)"),
+            short_name: z.string().min(1).max(40).optional().describe("A short label for the map, only if the project instructions give one; left out, the map shows project_name"),
             threads: z.array(z.object({
                 thread_id: z.string().min(1).max(100).describe("The thread's id, like \"cmsg_...\""),
                 title: z.string().min(1).max(300),

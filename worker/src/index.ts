@@ -6,7 +6,7 @@ import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
-import { listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
+import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
 import { getMonologue, listMonologues } from "./monologues";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
@@ -25,6 +25,13 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
     if (url.pathname === "/api/claude-map" && request.method === "GET") {
         return json(await listClaudeMap(env));
+    }
+    if (url.pathname === "/api/claude-map/log" && request.method === "GET") {
+        return json(await listClaudeLog(env, url.searchParams.get("before")));
+    }
+    const syncMatch = /^\/api\/claude-map\/syncs\/([0-9a-f]{64})$/.exec(url.pathname);
+    if (syncMatch && request.method === "GET") {
+        return json(await getClaudeSnapshot(env, syncMatch[1]));
     }
     if (url.pathname === "/api/monologues" && request.method === "GET") {
         return json(await listMonologues(env));

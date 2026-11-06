@@ -135,3 +135,41 @@ export function glanceLine(thread: ClaudeThread): string | undefined {
     const ask = standingAsk(thread);
     return ask ? `${askLabels[ask.kind]}: ${ask.text}` : thread.card?.headline;
 }
+
+/* The event log: what changed in Claude, as the syncs saw it, and the syncs themselves for debugging.
+   Times are when the map heard of it, which can trail the change itself until a thread in the project syncs. */
+export const claudeEventKinds = [
+    "project_new", "project_renamed", "short_name", "thread_new", "thread_renamed", "thread_state",
+    "thread_unlisted", "ask", "reply", "pr_new", "pr_state", "pr_ci"
+] as const;
+export type ClaudeEventKind = typeof claudeEventKinds[number];
+export type ClaudeEvent = {
+    type: "event",
+    id: number,
+    at: string,
+    kind: ClaudeEventKind,
+    projectId: string,
+    threadId?: string,
+    /* the PR, for pr_* events, as "owner/name#12" */
+    pr?: string,
+    from?: string,
+    to?: string,
+    /* the sync that brought it, and the thread that sent that sync */
+    sync: string,
+    by?: string
+};
+export type ClaudeSync = {
+    type: "sync",
+    hash: string,
+    at: string,
+    projectId: string,
+    projectName?: string,
+    by?: string,
+    /* how many threads it listed; absent means "unchanged" */
+    threads?: number,
+    prs?: number,
+    selfState?: ClaudeThreadState,
+    card: boolean,
+    applied: boolean
+};
+export type ClaudeLogEntry = ClaudeEvent | ClaudeSync;
