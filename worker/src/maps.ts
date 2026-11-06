@@ -58,6 +58,12 @@ export async function listMaps(env: Env, onlyId?: string): Promise<WireMap[]> {
     });
 }
 
+/* Each map's id and revision only: how an open tab tells cheaply which maps changed somewhere else */
+export async function listRevisions(env: Env): Promise<{id: string, revision: number}[]> {
+    const rows = await env.DB.prepare("SELECT id, revision FROM maps ORDER BY created_at").all<{id: string, revision: number}>();
+    return rows.results;
+}
+
 /* Saves a whole map. The caller sends the revision it last saw; a newer one on the server means another device saved first. */
 export async function saveMap(env: Env, id: string, input: unknown): Promise<{revision: number}> {
     if (!/^[\w-]{1,100}$/.test(id)) {

@@ -1,6 +1,7 @@
-import { AppBar, Button, ButtonGroup, Divider, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Toolbar} from "@mui/material";
+import { AppBar, Box, Button, ButtonGroup, Divider, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Toolbar} from "@mui/material";
 import { UndoController } from "./undo/useUndo";
 import { UndoRedoToolbar } from "./undo/UndoRedoToolbar";
+import { LiveDot } from "./LiveDot";
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode, nodeStatuses } from "./MindMap";
 import React from "react";
 import { NodeNameEditorModal } from "./NodeNameEditorModal";
@@ -130,9 +131,12 @@ export function MindMapEditorToolbar({
 
             <AppBar position="static" sx={{ px: 1 }} enableColorOnDark>
                 <Toolbar sx={{ gap: 1, p: 0, justifyContent: 'space-between', '& .MuiButton-root': { minWidth: 40, px: 1 } }}>
-                    <IconButton color="inherit" edge="start" title="Back to your maps" aria-label="Back to your maps" onClick={() => onBack ? onBack() : navigate("/")}>
-                        <ArrowBack/>
-                    </IconButton>
+                    <Box sx={{display: "flex", alignItems: "center"}}>
+                        <IconButton color="inherit" edge="start" title="Back to your maps" aria-label="Back to your maps" onClick={() => onBack ? onBack() : navigate("/")}>
+                            <ArrowBack/>
+                        </IconButton>
+                        <LiveDot/>
+                    </Box>
                     <UndoRedoToolbar controller={undoController} />
                     <Button 
                         variant="contained"

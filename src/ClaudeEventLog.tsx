@@ -7,12 +7,12 @@ import { BugReport } from "@mui/icons-material";
 import { ClaudeEvent, ClaudeLogEntry, ClaudeProject, ClaudeSync, ClaudeThreadState, askLabels, claudeAskKinds, claudeBadges, claudeThreadUrl } from "./ClaudeMapTypes";
 import { OpenIn, claudeStyle, keep, linkProps, projectLabel } from "./ClaudeMap";
 import { ServerApi } from "./ServerApi";
+import { safetyPollMs, useRing } from "./live";
 
 /* The Claude event log: what changed in Claude, newest first, as the syncs saw it. With "Syncs" on, every sync
    shows too, and tapping one shows exactly what Claude sent, so it doubles as a debugging tool.
    A change is timed by the sync that brought it, which can trail the change itself. */
 
-const refreshMs = 30_000;
 const showSyncsKey = "claudeMap.showSyncs";
 
 const readShowSyncs = () => {
@@ -87,18 +87,29 @@ export function ClaudeEventLog({projects, query, openIn, demo}: Props) {
         keep(showSyncsKey, String(value));
     };
 
+    //the real log has its own ring, so it needn't reload each time the projects do; the demo is drawn from them
+    const demoProjects = demo ? projects : undefined;
     const load = React.useCallback(() => {
-        (demo ? Promise.resolve(demoLog(projects)) : ServerApi.claudeLog())
+        (demoProjects ? Promise.resolve(demoLog(demoProjects)) : ServerApi.claudeLog())
             .then(e => {
                 setEntries(e);
                 setError(undefined);
             })
             .catch((e: Error) => setError(e.message));
-    }, [demo, projects]);
+    }, [demoProjects]);
+    useRing("claude", undefined, load, !demo);
     React.useEffect(() => {
+        const visible = () => document.visibilityState === "visible";
+        const refocus = () => visible() && load();
         load();
-        const timer = window.setInterval(load, refreshMs);
-        return () => window.clearInterval(timer);
+        const timer = window.setInterval(refocus, safetyPollMs);
+        window.addEventListener("focus", refocus);
+        document.addEventListener("visibilitychange", refocus);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener("focus", refocus);
+            document.removeEventListener("visibilitychange", refocus);
+        };
     }, [load]);
 
     const loadOlder = () => {

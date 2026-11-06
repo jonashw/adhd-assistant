@@ -1,7 +1,7 @@
 import { handleAuth, requireReader, requireUser } from "./auth";
 import { Env } from "./env";
 import { HttpError, json } from "./http";
-import { deleteMap, listMaps, saveMap } from "./maps";
+import { deleteMap, listMaps, listRevisions, saveMap } from "./maps";
 import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
@@ -9,6 +9,9 @@ import { getMedia, uploadMedia } from "./media";
 import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markThreadOpened, setProjectHidden } from "./claude";
 import { getMonologue, listMonologues } from "./monologues";
 import { removeChecklistItem, setChecklistDone } from "./checklist";
+import { openLive, ring, ringsFor } from "./live";
+
+export { LiveHub } from "./live";
 
 async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
     // reads may use the viewer token; writes always need a signed-in session
@@ -21,8 +24,14 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (url.pathname === "/api/me" && request.method === "GET") {
         return json({email});
     }
+    if (url.pathname === "/api/live" && request.method === "GET") {
+        return openLive(request, env);
+    }
     if (url.pathname === "/api/maps" && request.method === "GET") {
         return json(await listMaps(env));
+    }
+    if (url.pathname === "/api/maps/revisions" && request.method === "GET") {
+        return json(await listRevisions(env));
     }
     if (url.pathname === "/api/claude-map" && request.method === "GET") {
         return json(await listClaudeMap(env));
@@ -148,7 +157,14 @@ const app = {
                 return await handleAuth(request, env, url);
             }
             if (url.pathname.startsWith("/api/")) {
-                return await handleApi(request, env, url);
+                const response = await handleApi(request, env, url);
+                // every open tab hears what this write changed, and says it back so this tab can tell its neighbours
+                const rings = response.ok ? ringsFor(request.method, url.pathname) : [];
+                if (rings.length > 0) {
+                    await ring(env, rings, request.headers.get("x-live-tab") ?? undefined);
+                    response.headers.set("x-live-ring", JSON.stringify(rings));
+                }
+                return response;
             }
             return env.ASSETS.fetch(request);
         } catch (e) {

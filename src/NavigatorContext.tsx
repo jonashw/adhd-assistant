@@ -3,6 +3,7 @@ import { MindMapGraphDataRecord } from "./MindMap";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { ChecklistItem, emptyTrail, LinkedItem, localTrailStore, serverTrailStore, Signal, TrailData, TrailStore, Visit, VisitKind } from "./Trail";
 import { readTether, standingAt, Tether, WeatherAnswer } from "./Navigator";
+import { safetyPollMs, useRing } from "./live";
 
 export type Navigator = {
     mapId: string,
@@ -92,13 +93,15 @@ export function NavigatorProvider({graph, children, trailStore}: {
         };
     }, [refresh]);
 
-    //signals from Claude arrive on their own: look again every 30 seconds while the app is visible, and on return
+    //signals from Claude arrive on their own: the server rings when this map's trail changes, and the app looks
+    //again on return to the tab, plus a slow safety look in case a ring was lost
+    useRing("trail", mapId, refresh, store === serverTrailStore);
     React.useEffect(() => {
         if (store !== serverTrailStore) {
             return;
         }
         const visible = () => document.visibilityState === "visible";
-        const timer = setInterval(() => visible() && refresh(), 30_000);
+        const timer = setInterval(() => visible() && refresh(), safetyPollMs);
         const onReturn = () => visible() && refresh();
         document.addEventListener("visibilitychange", onReturn);
         window.addEventListener("focus", onReturn);

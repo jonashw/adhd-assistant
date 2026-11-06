@@ -12,9 +12,11 @@ import {
 import { ClaudeThreadGlance, NewDot, PrChip } from "./ClaudeThreadGlance";
 import { matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
+import { safetyPollMs, useRing } from "./live";
 import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
+import { LiveDot } from "./LiveDot";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -27,7 +29,6 @@ export const claudeStyle = {
     font: "'Source Serif 4', Georgia, 'Times New Roman', serif"
 };
 
-const refreshMs = 30_000;
 
 type MapNode = {
     id: string,
@@ -384,15 +385,21 @@ function useClaudeMap(demo: boolean) {
             })
             .catch((e: Error) => setError(e.message));
     }, [demo]);
+    // the server rings whenever a thread syncs, so the map shows it at once
+    useRing("claude", undefined, load, !demo);
     React.useEffect(() => {
-        const refocus = () => load();
+        const visible = () => document.visibilityState === "visible";
+        const refocus = () => visible() && load();
         load();
-        // the demo refreshes faster, so changes are easy to watch
-        const timer = window.setInterval(() => load(true), demo ? 8000 : refreshMs);
+        // the demo moves on by itself, faster, so changes are easy to watch; the real map only takes a slow
+        // safety look while visible, in case a ring was lost
+        const timer = window.setInterval(() => demo ? load(true) : refocus(), demo ? 8000 : safetyPollMs);
         window.addEventListener("focus", refocus);
+        document.addEventListener("visibilitychange", refocus);
         return () => {
             window.clearInterval(timer);
             window.removeEventListener("focus", refocus);
+            document.removeEventListener("visibilitychange", refocus);
         };
     }, [load, demo]);
     return {projects, error, reload: load, setProjects};
@@ -528,6 +535,7 @@ export function ClaudeMap() {
                     <Tab value="list" label="List"/>
                     <Tab value="events" label="Log"/>
                 </Tabs>
+                <LiveDot/>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
                 </IconButton>

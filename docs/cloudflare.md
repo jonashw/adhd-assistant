@@ -114,6 +114,21 @@ thread's last sync of a turn always lists itself as working. To keep its badge f
 sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
 thread until a later list from the platform says otherwise.
 
+## Live updates
+
+Every open tab keeps a WebSocket to one Durable Object, `LiveHub` (`worker/src/live.ts`), at `/api/live`. After
+each write, from the app or from the connector, the Worker rings the hub with what changed (`maps`, `trail`,
+`claude` or `monologues`, plus the map id where there is one), and each tab refetches just that piece from the
+usual endpoints. The ring carries no data. A tab skips the ring for its own writes (the `x-live-tab` header).
+
+- Nothing to set up: the binding and its migration are in `wrangler.jsonc`, and Workers Builds applies them on
+  deploy. The class is SQLite-backed, which the free plan allows.
+- The sockets hibernate, so the hub sleeps between rings; a tab's "ping" every 25 seconds is answered "pong"
+  without waking it.
+- If the socket drops, the tab shows a grey dot, retries with backoff, and refetches everything once it is back.
+  Tabs also refetch when they come to the front, and take a safety look every 5 minutes while visible.
+- A failed ring never fails the write.
+
 ## Read-only viewer token (for Claude's browser)
 
 Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
