@@ -31,9 +31,10 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
   - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
-  - this_thread: your own thread id and card (headline, ask, progress, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
+  - this_thread: your own thread id and card (headline, ask, progress, artifact, artifacts, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
   - this_thread.state: in your last sync of a turn, the state you leave your own thread in: "done" if you resolve it this turn, "blocked" if you end waiting on Jon, "review_ready" if you hand him finished work. Claude's own list still shows you as working until your turn ends, so without this your badge stays a turn behind.
   - prs: the project's PR list (list_prs) when it changed since your last sync. Set each PR's thread_id to the thread whose session id ends the same way.
+  - artifacts: the project's artifacts (list_project_artifacts) when they changed since your last sync. Separately, put every artifact or doc you made or updated in this thread in your card's artifacts, and the latest one in artifact too: Claude's list doesn't say which thread made what, so this is how the map knows.
   - short_name: only if the project instructions give one; leave it out otherwise, and the map shows the project's name.
   - If nothing changed at all, skip the call. A changed project name counts as a change.
 - Monologues: when Jon sends you dictation (spoken words, often several topics in a row) or asks you to log what he said, call log_monologue with his words exactly as he sent them, unedited, plus this thread's link or thread_id. The app turns it into a map he can replay. Don't log your own words or anything he pasted from elsewhere.`;
@@ -108,7 +109,7 @@ function buildServer(env: Env): McpServer {
 
     server.registerTool("sync_project", {
         title: "Sync a project",
-        description: "Mirror this Claude project, its threads, its PRs and this thread's own glance card onto Jon's Claude map. Threads come exactly as the platform lists them (list_threads): send the whole list, or leave it out when nothing in it changed since your last sync. A thread left out of a list is marked \"not seen lately\", never deleted. Safe to repeat.",
+        description: "Mirror this Claude project, its threads, its PRs, its artifacts and this thread's own glance card onto Jon's Claude map. Threads come exactly as the platform lists them (list_threads): send the whole list, or leave it out when nothing in it changed since your last sync. A thread left out of a list is marked \"not seen lately\", never deleted. Safe to repeat.",
         inputSchema: {
             project_id: z.string().min(1).max(100).describe("The project's id, like \"chan_...\""),
             project_name: z.string().min(1).max(200).describe("The project's name as Jon sees it now (from the newest message, since he can rename it)"),
@@ -137,6 +138,11 @@ function buildServer(env: Env): McpServer {
                         title: z.string().min(1).max(200),
                         url: z.string().max(2000)
                     }).optional().describe("The artifact or doc this thread last made or updated"),
+                    artifacts: z.array(z.object({
+                        title: z.string().min(1).max(200),
+                        url: z.string().max(2000),
+                        updated_at: z.string().max(40).optional()
+                    })).max(50).optional().describe("Every artifact or doc this thread made or updated, newest first"),
                     topic: z.string().max(160).optional().describe("What this thread is about, in Jon's words, so he can find it later"),
                     keywords: z.array(z.string().min(1).max(40)).max(5).optional().describe("A few words Jon might search for")
                 }),
@@ -150,7 +156,13 @@ function buildServer(env: Env): McpServer {
                 ci: z.enum(claudeCiStates).optional().describe("The checks' overall result"),
                 url: z.string().max(2000),
                 thread_id: z.string().min(1).max(100).optional().describe("The thread that opened it: the one whose session id ends the same way")
-            })).max(100).optional().describe("The project's PRs as list_prs gives them, when they changed since your last sync")
+            })).max(100).optional().describe("The project's PRs as list_prs gives them, when they changed since your last sync"),
+            artifacts: z.array(z.object({
+                artifact_id: z.string().max(100).optional(),
+                title: z.string().min(1).max(300),
+                url: z.string().max(2000).describe("Its claude.ai link"),
+                updated_at: z.string().max(40).optional()
+            })).max(200).optional().describe("The project's artifacts as list_project_artifacts gives them, when they changed since your last sync; added to what the map has, never a replacement")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(() => syncProject(env, args), claude));

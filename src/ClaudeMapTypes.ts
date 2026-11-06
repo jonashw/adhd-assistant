@@ -20,6 +20,8 @@ export type ClaudeThread = {
     card?: ClaudeCard,
     /* PRs it opened, newest first */
     prs?: ClaudePr[],
+    /* ids of the project's artifacts it made or updated, newest first (see ClaudeProject.artifacts) */
+    artifactIds?: number[],
     /* when Jon last opened it from the map */
     openedAt?: string,
     /* topics and keywords it had before, for search */
@@ -73,8 +75,48 @@ export type ClaudeProject = {
     hidden: boolean,
     firstSeenAt: string,
     lastSyncedAt: string,
-    threads: ClaudeThread[]
+    /* artifacts first seen before this aren't news (when the map started counting them, or the project joined) */
+    artifactsSince?: string,
+    threads: ClaudeThread[],
+    /* everything the project's threads published, newest first */
+    artifacts?: ClaudeArtifact[]
 };
+
+/* An artifact or doc a project's threads published. Claude lists these per project with no thread, so
+   threads say which are theirs (threadIds); one nobody claimed, or whose threads are off the map, sits on the project. */
+export type ClaudeArtifact = {
+    id: number,
+    title: string,
+    url: string,
+    /* the platform's last update, when a sync passed it on */
+    updatedAt?: string,
+    firstSeenAt: string,
+    /* when Jon last opened it from the map */
+    openedAt?: string,
+    /* the threads that made or updated it, latest first */
+    threadIds: string[]
+};
+
+/* "new": turned up after the map started counting and Jon hasn't opened it.
+   "updated": changed since Jon last opened it. Otherwise nothing to flag. */
+export type ArtifactFlag = "new" | "updated" | undefined;
+export function artifactFlag(artifact: ClaudeArtifact, project: ClaudeProject): ArtifactFlag {
+    // a few minutes of grace: whatever the first syncs bring was already there
+    const since = new Date(Date.parse(project.artifactsSince ?? project.firstSeenAt) + 5 * 60000).toISOString();
+    const changed = artifact.updatedAt ?? artifact.firstSeenAt;
+    if (!artifact.openedAt && artifact.firstSeenAt > since && changed > since) {
+        return "new";
+    }
+    return artifact.updatedAt && artifact.updatedAt > (artifact.openedAt ?? since) ? "updated" : undefined;
+}
+
+/* Newest change first */
+export const byLatestChange = (a: ClaudeArtifact, b: ClaudeArtifact) =>
+    (b.updatedAt ?? b.firstSeenAt).localeCompare(a.updatedAt ?? a.firstSeenAt);
+
+/* A thread's own artifacts, newest first */
+export const artifactsOf = (thread: ClaudeThread, project: ClaudeProject): ClaudeArtifact[] =>
+    (thread.artifactIds ?? []).map(id => project.artifacts?.find(a => a.id === id)).filter((a): a is ClaudeArtifact => !!a);
 
 /* After this long with no snapshot, a project's working threads read "Not heard lately" */
 export const claudeStaleHours = 4;
@@ -140,7 +182,7 @@ export function glanceLine(thread: ClaudeThread): string | undefined {
    Times are when the map heard of it, which can trail the change itself until a thread in the project syncs. */
 export const claudeEventKinds = [
     "project_new", "project_renamed", "short_name", "thread_new", "thread_renamed", "thread_state",
-    "thread_unlisted", "ask", "reply", "pr_new", "pr_state", "pr_ci"
+    "thread_unlisted", "ask", "reply", "pr_new", "pr_state", "pr_ci", "artifact_new", "artifact_updated"
 ] as const;
 export type ClaudeEventKind = typeof claudeEventKinds[number];
 export type ClaudeEvent = {
@@ -168,6 +210,7 @@ export type ClaudeSync = {
     /* how many threads it listed; absent means "unchanged" */
     threads?: number,
     prs?: number,
+    artifacts?: number,
     selfState?: ClaudeThreadState,
     card: boolean,
     applied: boolean

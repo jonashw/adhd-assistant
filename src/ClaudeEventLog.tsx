@@ -52,18 +52,21 @@ function describeEvent(e: ClaudeEvent): string {
         case "pr_new": return `PR ${prNumber(e.pr)} opened: ${e.to}`;
         case "pr_state": return `PR ${prNumber(e.pr)}: ${e.from} → ${e.to}`;
         case "pr_ci": return `PR ${prNumber(e.pr)} checks: ${e.to}`;
+        case "artifact_new": return `New artifact: ${e.to}`;
+        case "artifact_updated": return `Artifact updated: ${e.to}`;
     }
 }
 
 const kindLabels: Record<ClaudeEvent["kind"], string> = {
     project_new: "Project", project_renamed: "Rename", short_name: "Label", thread_new: "New",
     thread_renamed: "Rename", thread_state: "State", thread_unlisted: "Unlisted", ask: "Ask", reply: "Reply",
-    pr_new: "PR", pr_state: "PR", pr_ci: "Checks"
+    pr_new: "PR", pr_state: "PR", pr_ci: "Checks", artifact_new: "Artifact", artifact_updated: "Artifact"
 };
 
 function describeSync(s: ClaudeSync): string {
     const parts = [s.threads === undefined ? "list unchanged" : `${s.threads} threads`];
     if (s.prs !== undefined) parts.push(`${s.prs} PRs`);
+    if (s.artifacts !== undefined) parts.push(`${s.artifacts} artifacts`);
     if (s.card) parts.push("card");
     if (s.selfState) parts.push(`says it's ${stateLabel(s.selfState)}`);
     if (!s.applied) parts.push("NOT APPLIED");

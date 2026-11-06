@@ -109,6 +109,18 @@ list view, along with day words like "monday". To save tokens, a sync may leave 
 changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
 thread cards on the Claude map: design proposal" (Jon chose Glance).
 
+**Artifacts.** Every artifact and doc shows, not just each thread's latest. Claude lists artifacts per project
+(`list_project_artifacts`) without saying which thread made them, so two things feed the map: any thread passes on
+the project's list as `artifacts`, and each thread names the ones it made or updated in its card (`artifacts`, plus
+`artifact` for the latest). Both only add to what the map has, since Claude's list is cut short. On the map an
+artifact is a page with a folded corner hanging off the latest thread that made it; once that thread is resolved and
+hidden (or if no thread claimed it) it moves up to its project, so it never drops off. A thread shows its 3 newest, a
+project 6, and New or Updated ones always show. "New" means it turned up after the map started counting artifacts
+(2026-11-06, or when the project joined) and Jon hasn't opened it from the map; "Updated" means it changed since he
+last opened it. The thread card lists all of a thread's artifacts, the list view lists all of a project's under its
+threads, the Log shows new and updated ones, and the gear menu's **Show artifacts** takes them off the map on that
+device. Artifacts open in a browser tab even in desktop mode, since the claude:// links are only confirmed for threads.
+
 **A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
 thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
 sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
