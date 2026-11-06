@@ -521,10 +521,12 @@ export function ClaudeMap() {
                     onChange={(_, v) => setView(v)}
                     textColor="inherit"
                     TabIndicatorProps={{style: {backgroundColor: "#fff"}}}
+                    // three tabs fit a phone only without the default minimum width
+                    sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
                     <Tab value="map" label="Map"/>
                     <Tab value="list" label="List"/>
-                    <Tab value="events" label="Events"/>
+                    <Tab value="events" label="Log"/>
                 </Tabs>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
