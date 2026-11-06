@@ -1,7 +1,9 @@
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { GraphRepositoryContext } from './GraphRepositoryContext';
 import {
     AppBar,
+    Box,
+    Link,
     Button,
     CircularProgress,
     Container,
@@ -30,8 +32,8 @@ import { CameraAlt, Delete, Download, UploadFile } from '@mui/icons-material';
 import { MindMap, MindMapGraphData } from './MindMap';
 import { exportGraph, readGraphFile } from './GraphFile';
 import { ServerApi } from './ServerApi';
-import { sampleGraphs } from './sampleGraphs';
 import { ConnectedAppsDialog } from './ConnectedAppsDialog';
+import { ClaudeMapEntry } from './ClaudeMapEntry';
 
 function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
 
@@ -102,6 +104,8 @@ export function GraphList() {
             }}
         />}
 
+
+        {GraphContext.status?.mode === "server" && <ClaudeMapEntry/>}
 
         <Paper elevation={0}>
             {GraphContext.graphs.length 
@@ -222,12 +226,11 @@ export function GraphList() {
                         />
                         <SpeedDialAction
                             icon={<GraphIcon size={24} />}
-                            tooltipTitle={"Sample"}
+                            tooltipTitle={"Starter maps"}
                             tooltipOpen
                             onClick={() => {
-                                handleNewGraph({
-                                    ...sampleGraphs[0]
-                                });
+                                setSpeedDialOpen(false);
+                                navigate('/templates');
                             }}
                         />
                 </SpeedDial>
@@ -235,6 +238,12 @@ export function GraphList() {
  
             </Stack>
         </Paper>
+
+        <Box component="footer" sx={{px: 2, pt: 2, pb: 12, color: 'text.secondary', typography: 'body2'}}>
+            <Link component={RouterLink} to="/crew" underline="hover" color="inherit">Meet the crew</Link>
+            {' · '}
+            <Link component={RouterLink} to="/templates" underline="hover" color="inherit">Starter maps</Link>
+        </Box>
 
         <input
             ref={importInputRef}

@@ -1,5 +1,9 @@
-import { Box, Stack, Typography } from "@mui/material";
-import { CrewAtRest, Dog, Jon, MindfulScene, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
+import { ArrowBack } from "@mui/icons-material";
+import { CrewAtRest, Dog, Jon, MindfulScene, RabbitBurrow, RabbitBurrowLoop, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
+import { burrowDemoGraph } from "./crew/burrowDemo";
 import { Mindful } from "./WhatsNextDialog";
 import { CrewDemo } from "./CrewDemo";
 
@@ -14,10 +18,35 @@ function Tile({title, children}: {title: string, children: React.ReactNode}) {
     );
 }
 
+/* Drive the rabbit by hand: tap a chamber to send it there, or pick up a piece of work */
+function RabbitControls() {
+    const [at, setAt] = React.useState("HOME");
+    const [carrying, setCarrying] = React.useState(false);
+    const label = burrowDemoGraph.nodes.find(n => n.id === at)?.label;
+    return (
+        <Stack alignItems="center" gap={1} sx={{p: 2, border: 1, borderColor: "divider", borderRadius: 2}}>
+            <RabbitBurrow size={240} graph={burrowDemoGraph} at={at} carrying={carrying} onPick={setAt}/>
+            <Stack direction="row" gap={1} flexWrap="wrap" justifyContent="center">
+                <Button size="small" variant="outlined" onClick={() => setAt("HOME")} disabled={at === "HOME"}>All the way home</Button>
+                <Button size="small" variant={carrying ? "contained" : "outlined"} onClick={() => setCarrying(c => !c)}>
+                    {carrying ? "Set the work down" : "Pick up a piece of work"}
+                </Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+                Tap a chamber to send the rabbit there. Now: {at === "HOME" ? "at the surface by HOME" : label}{carrying ? ", carrying work" : ""}
+            </Typography>
+        </Stack>
+    );
+}
+
 export function CrewPreview() {
+    const navigate = useNavigate();
     return (
         <Box sx={{p: 2, maxWidth: 900, mx: "auto"}}>
-            <Typography variant="h5" gutterBottom>The robot crew</Typography>
+            <Stack direction="row" alignItems="center" gap={1}>
+                <IconButton edge="start" aria-label="Back to your maps" title="Back to your maps" onClick={() => navigate("/")}><ArrowBack/></IconButton>
+                <Typography variant="h5">The robot crew</Typography>
+            </Stack>
             <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
                 Each one fidgets on its own clock. With reduced motion on, they all hold still.
             </Typography>
@@ -51,7 +80,19 @@ export function CrewPreview() {
                     </Stack>
                 </Tile>
             </Stack>
-            <Typography variant="h6" sx={{mt: 3}}>The stage: you and the crew in the corner</Typography>
+            <Typography variant="h6" sx={{mt: 3}}>The rabbit, for the rabbit-hole map</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
+                The burrow is the map: HOME is the surface, each place a chamber under its parent. The string is tied at HOME and follows the rabbit down and back up, along the breadcrumbs.
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={2} alignItems="flex-start">
+                <RabbitControls/>
+                <Tile title="Resting at the surface"><RabbitBurrow size={110} graph={burrowDemoGraph} labels={false}/></Tile>
+                <Tile title="Four holes down"><RabbitBurrow size={110} graph={burrowDemoGraph} at="bikes" labels={false}/></Tile>
+                <Tile title="Carrying a piece of work"><RabbitBurrow size={110} graph={burrowDemoGraph} at="wrench" carrying labels={false}/></Tile>
+                <Tile title="On a loop, as on the page"><RabbitBurrowLoop size={110}/></Tile>
+                <Tile title="Small, as in the table"><RabbitBurrowLoop size={32}/></Tile>
+            </Stack>
+            <Typography variant="h6" sx={{mt: 3}}>The stage, as the day demo draws it</Typography>
             <Stack gap={1} sx={{maxWidth: 360}}>
                 {([
                     ["Tied off", false, 0, false],

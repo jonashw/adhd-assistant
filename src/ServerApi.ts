@@ -1,4 +1,5 @@
 import { MindMapGraphDataRecord } from "./MindMap";
+import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
 
 /* A map as the server holds it: the app's graph plus the revision last saved */
 export type ServerMap = MindMapGraphDataRecord & {revision: number};
@@ -79,6 +80,15 @@ export const ServerApi = {
         }
         return body;
     },
+    /* The Claude map: projects and threads, as Claude last synced them */
+    claudeMap: () => request<ClaudeProject[]>("/api/claude-map"),
+    claudeLog: (before?: string) =>
+        request<ClaudeLogEntry[]>(`/api/claude-map/log${before ? `?before=${encodeURIComponent(before)}` : ""}`),
+    claudeSync: (hash: string) => request<unknown>(`/api/claude-map/syncs/${encodeURIComponent(hash)}`),
+    setClaudeProjectHidden: (id: string, hidden: boolean) =>
+        request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    markClaudeThreadOpened: (id: string) =>
+        request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
     listConnections: () => request<Connection[]>("/api/connections"),
     revokeConnection: (id: string) => request<void>(`/api/connections/${encodeURIComponent(id)}/revoke`, {method: "POST"})

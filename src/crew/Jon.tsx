@@ -154,7 +154,7 @@ const balloonFace = (() => {
 })();
 const faceMarkup = Object.values(art.face.layers).join("");
 
-function Head({x, y, r}: {x: number, y: number, r: number}) {
+export function Head({x, y, r}: {x: number, y: number, r: number}) {
     //the balloon's art is drawn with its centre at 0,0 and a radius of 10
     return (
         <g className="part jon-head">

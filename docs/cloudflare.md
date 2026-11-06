@@ -66,11 +66,72 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`.
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`.
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
 instructions can repeat that if threads forget.
+
+## The Claude map
+
+A separate map, kept by Claude, at `/claude`: one region per opted-in Claude project, one node per thread,
+each with a badge (Needs you, Ready to review, Working, Stuck, Stopped, Done). Double-click a node, or tap it
+and press **Open in Claude**, to jump to that thread. Jon only reads it, and can hide a project from the list
+view. Try it without a server at `/claude?demo`.
+
+**Opting a project in.** Threads do the syncing: project coordinators don't get the connector, so they can't.
+This repo's `CLAUDE.md` opts in every project that has the repo attached. For any other project, paste this
+into its project instructions (or into Settings → Your Claude → Instructions to cover every project):
+
+> ADHD Assist Claude map: if you are a thread in a Claude project and have both a list_threads tool and the
+> ADHD Assist sync_project tool, call sync_project when you start work, whenever you call check_in or
+> report_state, and as the last step of every turn, with the project's id and name and every one of its
+> threads as list_threads gives them (id, title, state, created and last-activity times). If either tool is
+> missing, skip this silently.
+
+**What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
+so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours
+its open threads read "Not heard lately". A thread's last sync comes just before its turn ends, so it may still
+read Working after it finishes, until another thread in the project syncs or the 4 hours pass.
+
+**How it stays right.** Every snapshot carries the whole project, so any one Claude remembering brings every
+thread up to date. Snapshots land in the `claude_snapshots` inbox before they are applied, and an older
+snapshot never overwrites a newer state. A thread a snapshot leaves out is marked "Not seen lately", never
+deleted. Decision record: "AA: Mirror Claude threads on the map".
+
+**Glance cards.** Each thread also sends its own card with `sync_project` as `this_thread`: a one-line headline of
+its latest reply, what it asks of Jon (question, decision, go-ahead or review), its checklist counted ("3 of 5",
+the step in progress), its latest artifact, and a topic line with a few keywords. Any thread passes on the
+project's PRs (`prs`, from the platform's PR list) with each matched to the thread that opened it, so the card shows
+the PR number, state and checks. A card replaces the last one whole; a repeat keeps its time. "New" means the card
+changed since Jon last opened that thread from the map. Every topic a thread has had stays searchable from the
+list view, along with day words like "monday". To save tokens, a sync may leave `threads` out when no title or state
+changed since the thread's last sync; the map then counts the last list as current. Decision record: "Richer
+thread cards on the Claude map: design proposal" (Jon chose Glance).
+
+**A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
+thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
+sync sets `this_thread.state` to the state the thread ends its turn in. It counts as the newest word on that
+thread until a later list from the platform says otherwise.
+
+## Read-only viewer token (for Claude's browser)
+
+Claude's cloud sessions can't sign in with Google, so the app takes an optional read-only token.
+A request carrying `Authorization: Bearer <VIEWER_TOKEN>` can read anything (every `GET` under `/api/`) and
+nothing else: every write, the connector's consent page and sign-out still need a Google session.
+
+1. Make a long random value (at least 32 characters; shorter values are refused):
+   ```sh
+   openssl rand -base64 32
+   ```
+2. Store it as a Worker secret: `npx wrangler secret put VIEWER_TOKEN`, or in the Cloudflare dashboard under
+   the Worker's Settings, Variables and Secrets, as a Secret named `VIEWER_TOKEN`.
+3. Give it to Claude as a **network secret**, not an environment variable: in the Claude cloud environment's
+   settings, add it under Network secrets for the host `adhd-assist.2jonwilson.workers.dev` (and allow that
+   domain). The environment's proxy then adds the header to requests for that host only. Claude's sessions,
+   shell and browser never see the value, and it is never sent to any other host.
+
+To revoke it, delete the secret or set a new value. Leaving `VIEWER_TOKEN` unset turns the feature off.
 
 ## Local development
 

@@ -16,10 +16,10 @@ const limbs = [
 ];
 
 /* bar: draw the branch it hangs from; leave it off when something else (the enso) is the branch */
-export function Sloth({size = 24, bar = true}: {size?: number, bar?: boolean}) {
+export function Sloth({size = 24, bar = true, x, y}: {size?: number, bar?: boolean, x?: number, y?: number}) {
     const fidget = useFidget(fidgets, [4000, 11000]);
     return (
-        <CrewSvg width={64} height={48} size={size} label="Robot sloth, hanging at HOME" classes={["crew-sloth", fidget]}>
+        <CrewSvg width={64} height={48} size={size} x={x} y={y} label="Robot sloth, hanging at HOME" classes={["crew-sloth", fidget]}>
             {bar && <line x1={2} y1={5} x2={62} y2={5} className="sloth-bar"/>}
             <g className="part sloth-swing">
                 {limbs.map(l => (

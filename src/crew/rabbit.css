@@ -1,0 +1,66 @@
+/* The robot rabbit and its burrow (Rabbit.tsx) */
+.crew-rabbit .burrow-band-1 { fill: #b48c61; }
+.crew-rabbit .burrow-band-2 { fill: #977049; }
+.crew-rabbit .burrow-band-3 { fill: #775636; }
+.crew-rabbit .burrow-band-4 { fill: #644729; }
+.crew-rabbit .burrow-band-5 { fill: #523a22; }
+.crew-rabbit .burrow-grass { fill: #7aa35a; }
+.crew-rabbit .burrow-tunnel { fill: #2e2016; }
+.crew-rabbit .burrow-sky { fill: #dcefff; }
+.crew-rabbit .burrow-shaft { stroke: #2e2016; stroke-width: 6; stroke-linecap: butt; }
+.crew-rabbit .burrow-shaft.is-filled { stroke: #8a6a4b; stroke-dasharray: 2 2; stroke-width: 6; }
+/* done or tucked away: backfilled with loose earth */
+.crew-rabbit .burrow-chamber.is-filled .burrow-tunnel { fill: #8a6a4b; stroke: #6b4f35; stroke-width: 0.6; stroke-dasharray: 2 1.5; }
+.crew-rabbit .burrow-chamber.is-someday { opacity: 0.5; }
+.crew-rabbit .burrow-chamber.is-pickable { cursor: pointer; }
+.crew-rabbit .burrow-chamber.is-pickable:hover .burrow-tunnel { stroke: #ffd27a; stroke-width: 0.8; }
+.crew-rabbit .burrow-label { font: 600 4.6px system-ui, sans-serif; fill: #f4e6d4; paint-order: stroke; stroke: #3b2a1c; stroke-width: 1.2px; }
+.crew-rabbit .burrow-lantern-cord { stroke: #9aa3ad; stroke-width: 0.4; }
+.crew-rabbit .burrow-lantern-case { fill: none; stroke: #c9a24a; stroke-width: 0.5; }
+.crew-rabbit .burrow-lantern-light { fill: #ffe29a; }
+.crew-rabbit .burrow-glow { animation: burrow-flicker 2.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes burrow-flicker { 0%, 100% { opacity: 1; transform: scale(1); } 30% { opacity: 0.82; transform: scale(0.96); } 55% { opacity: 0.95; transform: scale(1.03); } 80% { opacity: 0.86; } }
+.crew-rabbit .thing-frame { fill: #f4efe6; stroke: #a07c4f; stroke-width: 0.5; }
+.crew-rabbit .thing-picture { fill: #6fa36b; }
+.crew-rabbit .thing-board { fill: #e8d9b8; stroke: #8a6435; stroke-width: 0.45; }
+.crew-rabbit .thing-tick { fill: none; stroke: #3d8b3d; stroke-width: 0.45; }
+.crew-rabbit .thing-page { fill: #f7f1e3; stroke: #b9a98a; stroke-width: 0.35; }
+.crew-rabbit .thing-lines { stroke: #8f8f8f; stroke-width: 0.3; }
+.crew-rabbit .burrow-hole { fill: #2b1d12; }
+.crew-rabbit .burrow-spoil { fill: #a07a52; }
+.crew-rabbit .burrow-boulder { fill: #8d877d; stroke: #5f5a52; stroke-width: 0.5; }
+.crew-rabbit .burrow-boulder-shine { fill: none; stroke: #b9b3a8; stroke-width: 0.6; stroke-linecap: round; }
+.crew-rabbit .burrow-bolt { fill: #d5dade; stroke: #6b7177; stroke-width: 0.25; }
+.crew-rabbit .burrow-hanger { fill: none; stroke: #b9c0c6; stroke-width: 0.5; }
+.crew-rabbit .burrow-carabiner { fill: none; stroke: #e0a030; stroke-width: 0.55; }
+.crew-rabbit .burrow-string { stroke: #e2574c; stroke-width: 1.2; stroke-dasharray: 2.6 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.crew-rabbit .rabbit-metal { fill: #dfe3e8; stroke: #8a929c; stroke-width: 0.45; }
+.crew-rabbit .rabbit-metal-dark { fill: #9aa3ad; }
+.crew-rabbit .rabbit-ear-inner { fill: #f2b8c6; }
+.crew-rabbit .rabbit-visor { fill: #2e3440; }
+.crew-rabbit .rabbit-nose { fill: #e57a93; }
+.crew-rabbit .rabbit-tail { fill: #fff; stroke: #c9ced4; stroke-width: 0.4; }
+.crew-rabbit .rabbit-box { fill: #c99a5b; stroke: #8a6435; stroke-width: 0.5; }
+.crew-rabbit .rabbit-box-tape { stroke: #8a6435; stroke-width: 0.6; }
+
+.crew-rabbit .part { transform-box: fill-box; }
+.crew-rabbit .rabbit-eye-shut { display: none; }
+.crew-rabbit.is-blink .rabbit-eye-open { display: none; }
+.crew-rabbit.is-blink .rabbit-eye-shut { display: inline; }
+.crew-rabbit .rabbit-ears { transform-origin: 50% 100%; }
+.crew-rabbit.is-ear .rabbit-ear-near { transform-origin: 50% 100%; animation: rabbit-ear 0.7s ease-in-out; }
+.crew-rabbit.is-nose .rabbit-nose { transform-origin: center; animation: rabbit-nose 0.3s ease-in-out 3; }
+.crew-rabbit.is-thump .rabbit-foot { transform-origin: 0% 50%; animation: rabbit-thump 0.25s ease-in-out 2; }
+/* moving: ears laid back */
+.crew-rabbit.is-moving .rabbit-ears { transform: rotate(-28deg); transform-origin: 0% 100%; }
+
+@keyframes rabbit-ear { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(-22deg); } 70% { transform: rotate(8deg); } }
+@keyframes rabbit-nose { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.5); } }
+@keyframes rabbit-thump { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .crew-rabbit * { animation: none !important; }
+}
+
+.crew-rabbit .burrow-chamber.is-selected .burrow-tunnel { stroke: #4dd0e1; stroke-width: 1.2; }

@@ -116,3 +116,32 @@ export const localTrailStore: TrailStore = {
     placeItem: needsServer,
     forgetItem: needsServer
 };
+
+/* A trail that lives only in memory: for previewing a starter map without saving anything */
+export function memoryTrailStore(): TrailStore {
+    let visits: Visit[] = [];
+    let signals: Signal[] = [];
+    return {
+        async load() {
+            return {recent: visits, lastArrivedAt: {}, signals, items: [], unplaced: []};
+        },
+        async addVisit(_mapId, noteId, kind) {
+            const visit: Visit = {id: visits.length + 1, noteId, kind, at: new Date().toISOString()};
+            visits = [...visits, visit];
+            return visit;
+        },
+        async plantFlag(_mapId, noteId, label, dueAt) {
+            const signal: Signal = {id: crypto.randomUUID(), noteId, kind: "deadline", source: "jon", label, dueAt, raisedAt: new Date().toISOString()};
+            signals = [...signals, signal];
+            return signal;
+        },
+        async clearSignal(_mapId, signalId) {
+            signals = signals.filter(s => s.id !== signalId);
+        },
+        linksSupported: false,
+        addLink: needsServer,
+        removeLink: needsServer,
+        placeItem: needsServer,
+        forgetItem: needsServer
+    };
+}

@@ -1,16 +1,47 @@
 import React from "react";
 import ForceGraph2D, { ForceGraphMethods, LinkObject, NodeObject } from "react-force-graph-2d";
 import { useElementSize } from "./useContainerWidth";
-import { Breadcrumbs, Button, Paper, Snackbar } from "@mui/material";
+import { Fab, Button, Paper, Snackbar, Stack} from "@mui/material";
 import { fillTextInsideCircle } from "./fillTextInsideCircle";
 import { useUndo } from "./undo/useUndo";
-import { MindMap, MindMapGraphData, MindMapGraphNode, PathSegment} from "./MindMap";
+import { MindMap, MindMapGraphData, MindMapGraphNode} from "./MindMap";
+import { Transcript, useSpeechRecognition } from "./useSpeechRecognition";
+import { ListenFab } from "./ListenFab";
 import { MultiModalPrompt } from "./MultiModalPrompt";
 import { GraphNodeClickMode, MindMapEditorToolbar } from "./MindMapEditorToolbar";
 import { loadImgElement } from "./loadImgElement";
 import { useNavigator } from "./NavigatorContext";
 import { standingAt } from "./Navigator";
 import { YouStrip } from "./YouStrip";
+import { RabbitBurrow } from "./Crew";
+import { BalloonTrail } from "./crew/BalloonTrail";
+import { HomeSymbol, MapScene, homeSymbols } from "./MindMap";
+
+/* the symbols HOME can wear in the graph, the old ones from the app's first days */
+const symbolImage: Record<HomeSymbol, string> = {
+    enso: '/Enso.svg', null: '/null.svg', om: '/om.png', buddha: '/buddha.png', 'yin-yang': '/yin-yang.png', review: '/review.svg'
+};
+const symbolName: Record<HomeSymbol, string> = {
+    enso: 'Enso', null: 'NULL', om: 'Om', buddha: 'Buddha', 'yin-yang': 'Yin and yang', review: 'Weekly review'
+};
+import { AccountTree, ArrowDropDown } from "@mui/icons-material";
+import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps, Typography } from "@mui/material";
+
+/* One picture at a time: the map as a graph, as the rabbit's holes, or as Balloon-head's day. Saved with the map. */
+type MapView = "graph" | MapScene;
+const views: {view: MapView, name: string, about: string}[] = [
+    {view: "graph", name: "Graph", about: "Every place and link at once"},
+    {view: "burrow", name: "Rabbit holes", about: "Tunnels under HOME; the string is your breadcrumbs home"},
+    {view: "crew", name: "Balloon-head", about: "Walk today's waypoints; your head floats up as you focus"}
+];
+
+const BalloonIcon = (props: SvgIconProps) =>
+    <SvgIcon {...props}><ellipse cx={12} cy={9} rx={6} ry={7}/><path d="M12 16 L10.6 18 h2.8 Z M12 18 q-2 2 0 4" fill="none" stroke="currentColor" strokeWidth={1.4}/></SvgIcon>;
+const RabbitIcon = (props: SvgIconProps) =>
+    <SvgIcon {...props}><path d="M8.5 2.5c1.4 0 2 3 2.2 6.2.4-.1.8-.2 1.3-.2s.9.1 1.3.2c.2-3.2.8-6.2 2.2-6.2 1.6 0 1.2 4.4.2 7.4 1.3 1 2.3 2.6 2.3 4.6 0 3.6-2.7 6.5-6 6.5s-6-2.9-6-6.5c0-2 1-3.6 2.3-4.6-1-3-1.4-7.4.2-7.4z"/></SvgIcon>;
+const viewIcon = (view: MapView) =>
+    view === "graph" ? <AccountTree fontSize="small"/> : view === "burrow" ? <RabbitIcon fontSize="small"/> : <BalloonIcon fontSize="small"/>;
+
 type GraphRefType = 
     ForceGraphMethods<
     NodeObject<MindMapGraphNode>,
@@ -19,26 +50,32 @@ type GraphRefType =
 export default function MindMapGraph({
     value,
     onChange,
+    onBack,
+    banner,
 }:{
     value: MindMapGraphData,
     onChange: (value: MindMapGraphData) => void,
+    /* where the back arrow goes; the map list unless given */
+    onBack?: () => void,
+    /* shown above the toolbar, e.g. while previewing a starter map */
+    banner?: React.ReactNode,
 }){
     //const {availableHeight,ontainerRef} = useContainerHeight();
     const [nodeClickMode,setNodeClickMode] = React.useState<GraphNodeClickMode>("select");
     const [headerSize,headerRef] = useElementSize();
-    const [footerSize,footerRef] = useElementSize();
-    const breadCrumbsRef = React.useRef<HTMLDivElement>(null);
+    const [actionsSlot, setActionsSlot] = React.useState<HTMLDivElement | null>(null);
+    const [nextSlot, setNextSlot] = React.useState<HTMLDivElement | null>(null);
     const [homeImage,setHomeImage] = React.useState<HTMLImageElement>();
     //the breadcrumb bar keeps a fixed height (it scrolls sideways) so the canvas never resizes when the path grows
-    const breadCrumbsHeight = 40;
-    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight + footerSize.height), [
-        headerSize, footerSize
+    //the path home now lives in the outline, not in a bar over the map
+    const breadCrumbsHeight = 0;
+    const height = React.useMemo(() => window.innerHeight - (headerSize.height + breadCrumbsHeight), [
+        headerSize
     ]);
     const [revealHidden, setRevealHidden] = React.useState(false);
     const [removedNode, setRemovedNode] = React.useState<MindMapGraphNode>();
     const width = window.innerWidth;
 
-    const [pathHome,setPathHome] = React.useState<PathSegment[]>()
     const [graph,setGraph,undoController] = useUndo(value,onChange);
     const change = React.useCallback((updatedGraph: MindMapGraphData) => {
         //the undo history passes the change on to onChange, so it is saved once
@@ -50,6 +87,48 @@ export default function MindMapGraph({
     const [rabbitHoleModalVisible, setRabbitHoleModalVisible] = React.useState<boolean>(false);
 
     const nav = useNavigator();
+    //the main view: the force graph, or the rabbit's burrow drawn from the same map
+    const view: MapView = home?.scene ?? "graph";
+    const [viewMenu, setViewMenu] = React.useState<HTMLElement | null>(null);
+    const pickSymbol = (next: HomeSymbol) => {
+        setViewMenu(null);
+        change({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, symbol: next === "enso" ? undefined : next} : n), links: graph.links});
+    };
+    const pickView = (next: MapView) => {
+        setViewMenu(null);
+        change({nodes: graph.nodes.map(n => n.type === "HOME" ? {...n, scene: next === "graph" ? undefined : next} : n), links: graph.links});
+    };
+    //on a narrow screen the burrow scrolls sideways: keep where the rabbit stands in view
+    const burrowView = React.useRef<HTMLDivElement>(null);
+    //room kept at the foot of the map for the calls to action: one row of them, or two on a phone
+    const bedrock = width < 600 ? 140 : 88;
+    const rabbitAt = standingAt(nav.tether);
+    React.useEffect(() => {
+        const view = burrowView.current;
+        const chamber = view?.querySelector(`[data-place="${CSS.escape(rabbitAt)}"]`);
+        if (!view || !chamber || view.scrollWidth <= view.clientWidth) {
+            return;
+        }
+        const box = chamber.getBoundingClientRect();
+        const frame = view.getBoundingClientRect();
+        view.scrollTo({left: view.scrollLeft + box.left + box.width / 2 - frame.left - frame.width / 2, behavior: "smooth"});
+    }, [rabbitAt, view]);
+    const placeClicked = (id: string) => {
+        const node = graph.nodes.find(n => n.id === id);
+        if (!node || (selectedNode?.type === 'HOME' && node.type === 'HOME')) {
+            return;
+        }
+        if (nodeClickMode === "re-parent") {
+            if (!selectedNodeId) {
+                alert('cannot perform re-parenting without a selected node');
+            } else {
+                change(MindMap.reparent(graph, selectedNodeId, node.id));
+                setNodeClickMode('select');
+            }
+            return;
+        }
+        selectNodeId(node.id);
+    };
     //once the trail has loaded, open the map where Jon stands; after that, every place he opens is a visit
     const syncedWithTrail = React.useRef(false);
     React.useEffect(() => {
@@ -118,26 +197,68 @@ export default function MindMapGraph({
         setRabbitHoleModalVisible(false);
     }
 
-    React.useEffect(() => {
-        if(!value || !selectedNodeId || !home){
-            setPathHome(undefined);
+    const onSpeech = React.useCallback((result: Transcript) => {
+        if(!result.isFinal){
             return;
         }
-        const shortestPathHome = MindMap.shortestPathBetween(value, selectedNodeId, home.id);
-        setPathHome(shortestPathHome);
-    },[value, selectedNodeId, setPathHome]);
-
-    React.useEffect(() => {
-        //keep the selected node, at the end of the path, in view
-        const bar = breadCrumbsRef.current;
-        if(bar){
-            bar.scrollLeft = bar.scrollWidth;
+        if(result.value === "remove"){
+            if(selectedNode){
+                if(selectedNode.type === "HOME"){
+                    alert('sorry, you may not remove HOME');
+                } else {
+                    console.log('removed node',selectedNode);
+                    change(MindMap.remove(value, selectedNode));
+                    setRemovedNode(selectedNode);
+                    const home = value.nodes.find(n => n.type === "HOME");
+                    selectNodeId(home?.id);
+                }
+            } else {
+                alert ('no node selected');
+            }
         }
-    },[pathHome]);
+        if(result.value === "undo"){
+            undoController.undo();
+        }
+        if(result.value === "redo"){
+            undoController.redo();
+        }
+        if(result.value.indexOf('deeper') === 0){
+            const label = result.value.replace(/^deeper/,'').trim();
+            if(!selectedNodeId){
+                alert('cannot go deeper without a selected node');
+                return;
+            }
+            if(label.length === 0){
+                alert('label not long enough');
+                return;
+            }
+            const [updatedValue, newNode] = MindMap.rabbitHole(graph, selectedNodeId, label);
+            console.log('deeper by voice',newNode);
+            change(updatedValue);
+            selectNodeId(newNode.id);
+        }
+    }, [ graph, selectedNode]);
+
+    const { listeningStatus, startListening, stopListening, transcript} =
+        useSpeechRecognition({
+            onRecognize: onSpeech,
+            interimResults: false,
+            maxAlternatives: 1,
+            continuous: true
+        });
 
     React.useEffect(() => {
-        loadImgElement('/Enso.svg').then(setHomeImage);
-    },[]);
+        if(!transcript){
+            return;
+        }
+    },[transcript]);
+
+
+    //the symbol HOME wears in the graph, chosen per map
+    const symbol: HomeSymbol = home?.symbol ?? 'enso';
+    React.useEffect(() => {
+        loadImgElement(symbolImage[symbol]).then(setHomeImage);
+    },[symbol]);
 
     React.useEffect(() => {
         graphRef.current?.d3ReheatSimulation();
@@ -179,7 +300,9 @@ export default function MindMapGraph({
     return (
         <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
             <div ref={headerRef}>
+                {banner}
                 <MindMapEditorToolbar 
+                    onBack={onBack}
                     value={value}
                     nodeClickMode={nodeClickMode}
                     setNodeClickMode={setNodeClickMode}
@@ -196,31 +319,11 @@ export default function MindMapGraph({
                     undoController={undoController}
                     onChange={change}
                 />
-            </div>
-
-            <div
-                ref={breadCrumbsRef}
-                style={{height: breadCrumbsHeight, flexShrink: 0, overflowX: 'auto', overflowY: 'hidden', whiteSpace: 'nowrap'}}
-            >
-                {pathHome && pathHome.length > 1 && (
-                    <Breadcrumbs
-                        separator="&larr;"
-                        aria-label="breadcrumb"
-                        sx={{'& .MuiBreadcrumbs-ol': {flexWrap: 'nowrap', height: breadCrumbsHeight}, '& .MuiBreadcrumbs-li': {flexShrink: 0}}}
-                    >
-                        {/* arrows: 🠄 🠈 🠘 🠚 🠙 🠛 🠜 🠞 🠝 🠟 */}
-                        {[...pathHome].reverse().map((segment) => (
-                            <Button key={segment.node.id} variant="text" onClick={() => {
-                                selectNodeId(segment.node.id);
-                            }}>
-                                {segment.node.label}
-                            </Button>
-                        ))}
-                    </Breadcrumbs>
-                )}
+                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId} actionsSlot={actionsSlot} nextSlot={nextSlot}/>
             </div>
 
             <Snackbar
+                sx={{bottom: {xs: 136, sm: 88}}}
                 open={removedNode !== undefined}
                 autoHideDuration={8000}
                 onClose={(_, reason) => {
@@ -254,36 +357,56 @@ export default function MindMapGraph({
                 }}
             />}
 
-            <Paper elevation={0}>
+            <Paper elevation={0} sx={{position: 'relative'}}>
+                <Button size="small" variant="outlined" onClick={e => setViewMenu(e.currentTarget)}
+                    startIcon={viewIcon(view)} endIcon={<ArrowDropDown/>} aria-haspopup="menu" aria-label={`View: ${views.find(v => v.view === view)?.name}. Change the view`}
+                    sx={{position: 'absolute', top: 8, left: 8, zIndex: 2, bgcolor: 'background.paper', '&:hover': {bgcolor: 'background.paper'}}}>
+                    {views.find(v => v.view === view)?.name}
+                </Button>
+                <Menu anchorEl={viewMenu} open={viewMenu !== null} onClose={() => setViewMenu(null)}>
+                    {views.map(v =>
+                        <MenuItem key={v.view} selected={v.view === view} onClick={() => pickView(v.view)}>
+                            <ListItemIcon>{viewIcon(v.view)}</ListItemIcon>
+                            <ListItemText primary={v.name} secondary={v.about}/>
+                        </MenuItem>)}
+                    {/* the graph's HOME can wear any of the old symbols */}
+                    {view === "graph" && <Box sx={{px: 2, pt: 1, pb: 0.5, borderTop: 1, borderColor: 'divider', mt: 0.5}}>
+                        <Typography variant="overline" color="text.secondary">HOME symbol</Typography>
+                        <Stack direction="row" gap={0.5} role="radiogroup" aria-label="HOME symbol">
+                            {homeSymbols.map(sym =>
+                                <IconButton key={sym} role="radio" aria-checked={sym === symbol} aria-label={symbolName[sym]} title={symbolName[sym]}
+                                    onClick={() => pickSymbol(sym)}
+                                    sx={{border: 2, borderColor: sym === symbol ? 'primary.main' : 'transparent', borderRadius: 2, p: 0.5}}>
+                                    <img src={symbolImage[sym]} alt="" width={32} height={32} style={{objectFit: 'contain'}}/>
+                                </IconButton>)}
+                        </Stack>
+                    </Box>}
+                </Menu>
                 <div>
-                    {homeImage && <ForceGraph2D
-                        onNodeClick={node => {
-                            if (selectedNode?.type === 'HOME' && node.type === 'HOME') {
-                                //homeImages.next();
-                            } else {
-                                switch(nodeClickMode){
-                                    case "select": {
-                                        selectNodeId(node.id);
-                                        break;
-                                    }
-                                    case "re-parent": {
-                                        if(!selectedNodeId){
-                                            alert('cannot perform re-parenting without a selected node');
-                                        } else {
-
-                                            console.log('reparented node',selectedNodeId);
-                                            change(MindMap.reparent(graph,selectedNodeId,node.id));
-                                            setNodeClickMode('select');
-                                        }
-                                        break;
-                                    }
-                                    default: {
-                                        alert(`unexpected click mode: ${nodeClickMode}`)
-                                    }
-
-                                }
-                            }
+                    {view === "burrow" && <div
+                        style={{
+                            height, width, overflow: 'auto', display: 'flex', alignItems: 'safe flex-end', justifyContent: 'safe center',
+                            //sky above, and bedrock below where the buttons float so they don't cover the deepest chambers
+                            boxSizing: 'border-box', paddingBottom: bedrock,
+                            background: `linear-gradient(to bottom, #dcefff calc(100% - ${bedrock}px), #523a22 calc(100% - ${bedrock}px))`
                         }}
+                        data-testid="burrow-view"
+                        ref={burrowView}
+                        onClick={e => { if (e.target === e.currentTarget) selectNodeId(undefined); }}
+                    >
+                        <RabbitBurrow fit={{width: width - 4, height: height - bedrock - 4, minScale: 2.4}} graph={graph} at={rabbitAt} selected={selectedNodeId}
+                            carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
+                    </div>}
+                    {view === "crew" && <div
+                        style={{height, width, overflow: 'hidden'}}
+                        data-testid="balloon-view"
+                        onClick={() => selectNodeId(undefined)}
+                    >
+                        <BalloonTrail width={width} height={height} floor={bedrock - 34} graph={graph} at={rabbitAt} selected={selectedNodeId}
+                            carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
+                    </div>}
+                    {view === "graph" && homeImage && <ForceGraph2D
+                        onNodeClick={node => placeClicked(node.id)}
                         onBackgroundClick={() => {
                             selectNodeId(undefined);
                         }}
@@ -424,12 +547,29 @@ export default function MindMapGraph({
                         dagLevelDistance={25}
                         dagMode={"radialin"}
                     /> }
+                    {/* the calls to action, all along the foot of the map: yours on the left, finding your way on the right */}
+                    <Stack direction="row" flexWrap="wrap-reverse" gap={1} alignItems="flex-end"
+                        sx={{position: 'fixed', left: '1em', right: '1em', bottom: '1em', pointerEvents: 'none',
+                            '& .MuiFab-root, & .MuiBadge-root': {pointerEvents: 'auto'}}}
+                    >
+                        <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" ref={setActionsSlot} data-testid="you-actions"/>
+                    <Stack direction={"row-reverse"} gap={1} alignItems={"center"} sx={{ml: 'auto'}}>
+                        <Fab
+                            variant="extended"
+                            color={"info"}
+                            disabled={!selectedNode}
+                            onClick={guideUserDeeper}
+                        >
+                            {/* in the scout's words: aloft you float higher toward a new sighting; tied off you dig in under the work */}
+                            {view === "burrow" ? "Down a hole" : nav.tether.state === "aloft" ? "Float higher" : "Dig in"}
+                        </Fab>
+
+                        <ListenFab status={listeningStatus} start={startListening} stop={stopListening} compact />
+                        <Stack direction="row" alignItems="center" ref={setNextSlot}/>
+                    </Stack>
+                    </Stack>
                 </div>
             </Paper>
-            <div ref={footerRef} style={{marginTop: 'auto'}}>
-                <YouStrip graph={value} onChange={change} selectNodeId={selectNodeId}
-                    deeper={{disabled: !selectedNode, onClick: guideUserDeeper}}/>
-            </div>
         </div>
     );
 }

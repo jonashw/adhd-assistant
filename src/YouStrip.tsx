@@ -1,40 +1,54 @@
 import React from "react";
-import { Alert, Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Snackbar, Stack, Typography } from "@mui/material";
-import { MindMapGraphData } from "./MindMap";
+import { createPortal } from "react-dom";
+import { Badge, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Fab, Stack, Typography } from "@mui/material";
+import { Close } from "@mui/icons-material";
+import { MapScene, MindMapGraphData } from "./MindMap";
 import { useNavigator } from "./NavigatorContext";
 import { minutesAloft, reelInStep, shouldAskWeather, shouldTug, standingAt, stringOut, tunables } from "./Navigator";
-import { Dog, Jon, YouStage } from "./Crew";
+import { Jon, RabbitBurrow } from "./Crew";
 import { WhatsNextDialog } from "./WhatsNextDialog";
 
-/* height of the stage in the companion row; the row itself grows to fit its buttons */
-export const youStageHeight = 100;
+export const youStripHeight = 36;
 
-function useLabelOf(graph: MindMapGraphData) {
-    return (id: string) => {
-        const node = graph.nodes.find(n => n.id === id);
-        return node ? (node.type === "HOME" ? "HOME" : node.label) : "a place that's gone";
-    };
-}
+const pulse = {
+    "@keyframes ctaPulse": {"0%, 100%": {transform: "scale(1)"}, "50%": {transform: "scale(1.06)"}},
+    animation: "ctaPulse 1.6s ease-in-out infinite",
+    "@media (prefers-reduced-motion: reduce)": {animation: "none"}
+};
 
-/* The companion row along the bottom of the map: you and the crew in the corner, where you stand in words,
-   and what you can do next. Also the kit's notes (the tug, the weather check). */
-export function YouStrip({graph, onChange, selectNodeId, deeper}: {
+/* The You strip: where Jon stands, whether he is tied off or aloft, and the kit's notes (the tug, the weather check) */
+export function YouStrip({graph, onChange, selectNodeId, actionsSlot, nextSlot}: {
     graph: MindMapGraphData,
+    /* where the strip's buttons go: the row of calls to action at the foot of the map */
+    actionsSlot?: HTMLElement | null,
+    /* and where What's next goes, with the buttons for finding your way */
+    nextSlot?: HTMLElement | null,
     onChange?: (graph: MindMapGraphData) => void,
-    selectNodeId: (id: string) => void,
-    /* go deeper from the selected place: aloft that's "Float higher" (let out string toward a new sighting),
-       tied off it's "Dig in" (a new place under the one you're working) */
-    deeper?: {disabled: boolean, onClick: () => void}
+    selectNodeId: (id: string) => void
 }) {
     const nav = useNavigator();
     const {tether, now} = nav;
-    const labelOf = useLabelOf(graph);
+    //Balloon-head's picture calls HOME base camp
+    const homeName = graph.nodes.find(n => n.type === "HOME")?.scene === "crew" ? "Base camp" : "HOME";
+    const labelOf = (id: string) => {
+        const node = graph.nodes.find(n => n.id === id);
+        return node ? (node.type === "HOME" ? homeName : node.label) : "a place that's gone";
+    };
     const here = standingAt(tether);
     const back = reelInStep(tether);
     const [whatsNextOpen, setWhatsNextOpen] = React.useState(false);
     const [offerTieOff, setOfferTieOff] = React.useState<string>();
     const [tugSnoozedUntil, setTugSnoozedUntil] = React.useState(0);
     const [weatherSnoozedUntil, setWeatherSnoozedUntil] = React.useState(0);
+
+    //the offer to tie off lasts a little while, then the button settles back
+    React.useEffect(() => {
+        if (offerTieOff === undefined) {
+            return;
+        }
+        const timer = window.setTimeout(() => setOfferTieOff(undefined), 12000);
+        return () => window.clearTimeout(timer);
+    }, [offerTieOff]);
 
     const reelIn = () => {
         if (back) {
@@ -46,90 +60,102 @@ export function YouStrip({graph, onChange, selectNodeId, deeper}: {
     };
 
     const tugging = nav.loaded && shouldTug(tether, nav.weatherAnswer, now) && now.getTime() >= tugSnoozedUntil;
-    //head in the clouds: far enough or long enough up that the spider would tug, snoozed or not
-    const inClouds = nav.loaded && shouldTug(tether, nav.weatherAnswer, now);
     const askWeather = nav.loaded && shouldAskWeather(tether, nav.weatherAnswer, now) && now.getTime() >= weatherSnoozedUntil;
     const homeId = graph.nodes.find(n => n.type === "HOME")?.id;
+    //rabbit-hole maps draw the rabbit's burrow: the map as tunnels, the rabbit where you stand, holding the work when tied off
+    const scene: MapScene = graph.nodes.find(n => n.type === "HOME")?.scene ?? "crew";
+    const burrow = scene === "burrow";
+    //the same actions, in each scene's own words
+    const words = burrow
+        ? {untie: "Put it down", reelIn: "Back up a hole", tieOff: "Pick it up here", tiedAt: "Digging in at", setDown: "Left the work at",
+            aloft: `Exploring, ${stringOut(tether)} hole${stringOut(tether) === 1 ? "" : "s"} out, ${minutesAloft(tether, now)} min`,
+            gusty: "Lots of new holes?"}
+        : {untie: "Untie", reelIn: "Reel in", tieOff: "Tie off", tiedAt: "Tied off at", setDown: "Set down",
+            aloft: `Aloft ${minutesAloft(tether, now)} min, string out ${stringOut(tether)}`,
+            gusty: "Gusty up there?"};
     const recentNew = tether.state === "aloft"
         ? tether.newSteps.filter(at => Date.parse(at) >= now.getTime() - tunables.gustMinutes * 60_000).length
         : 0;
+
+    //the tug and the offer to tie off land on the buttons that answer them, not in notes over the map
+    const offering = offerTieOff !== undefined && here === offerTieOff && tether.state === "aloft";
+    const tugNote = tether.state === "aloft" && tether.setDown !== homeId
+        ? `${burrow ? "The work you left" : "Set down at your feet"}: ${labelOf(tether.setDown)}`
+        : `${homeName === "HOME" ? "Home" : homeName} is ${stringOut(tether)} ${burrow ? "hole(s) up" : "step(s) back"}.`;
+    const actions = (
+        <>
+            {tether.state === "tied"
+                ? <Fab variant="extended" size="medium" onClick={nav.untie}>{words.untie}</Fab>
+                : <>
+                    {back && <Badge color="warning" badgeContent={stringOut(tether)} invisible={!tugging} overlap="rectangular" data-testid={tugging ? "tug" : undefined}>
+                        <Fab variant="extended" size="medium" color={tugging ? "warning" : "default"} onClick={reelIn}
+                            title={tugging ? tugNote : undefined} aria-label={tugging ? `${words.reelIn}. ${tugNote}` : words.reelIn}
+                            sx={tugging ? pulse : undefined}>
+                            {words.reelIn}
+                        </Fab>
+                    </Badge>}
+                    {tugging && <Fab size="small" onClick={() => setTugSnoozedUntil(now.getTime() + 15 * 60_000)}
+                        title="Not yet" aria-label="Not yet: snooze the tug for 15 minutes"><Close fontSize="small"/></Fab>}
+                    {offering && <Box role="status" sx={{bgcolor: "background.paper", borderRadius: 5, px: 1.5, py: 0.75, boxShadow: 2,
+                        typography: "body2", maxWidth: 200, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+                        You're at <b>{labelOf(here)}</b>
+                    </Box>}
+                    <Fab variant="extended" size="medium" color={offering ? "success" : "default"} sx={offering ? pulse : undefined}
+                        onClick={() => {
+                            nav.tieOff(here);
+                            setOfferTieOff(undefined);
+                        }}>
+                        {words.tieOff}
+                    </Fab>
+                </>}
+        </>
+    );
+    const next = (
+        <>
+            <Badge
+                badgeContent={nav.trail.unplaced.length}
+                color="warning"
+                data-testid="claude-asks-badge"
+                title={nav.trail.unplaced.length > 0 ? `${nav.trail.unplaced.length} Claude thread(s) asking which place they serve` : undefined}
+                sx={{flexShrink: 0, "& .MuiBadge-badge": {fontWeight: 700}}}
+            >
+                <Fab variant="extended" size="medium" color="primary" onClick={() => setWhatsNextOpen(true)}>What's next</Fab>
+            </Badge>
+        </>
+    );
 
     return (
         <>
             <Stack
                 direction="row"
-                alignItems="flex-end"
-                gap={1}
+                alignItems="center"
+                gap={0.5}
                 sx={{
-                    px: 1.5, pt: 1, pb: 1.5, flexShrink: 0,
-                    borderTop: 1, borderColor: "divider", bgcolor: "background.paper"
+                    height: youStripHeight, py: 0, px: 1, flexShrink: 0, overflow: "hidden",
+                    borderBottom: 1, borderColor: "divider", bgcolor: "background.paper",
+                    "& .MuiButton-root": {flexShrink: 0, minWidth: 0, px: 1}
                 }}
                 data-testid="you-strip"
             >
-                {/* left: you and the crew, close at hand */}
-                <Box sx={{flexShrink: 0}}>
-                    <YouStage height={youStageHeight} aloft={tether.state === "aloft"} stringOut={stringOut(tether)} inClouds={inClouds}/>
-                </Box>
-                {/* centre: where you stand, in words */}
-                <Box sx={{flex: "1 1 auto", minWidth: 0, textAlign: "center", alignSelf: "center", lineHeight: 1.25}} data-testid="you-label">
+                <Box sx={{flex: "1 1 auto", minWidth: 0, lineHeight: 1.3, ml: 0.5}}>
                     {tether.state === "tied"
-                        ? <Typography variant="body2">Tied off at <b>{labelOf(tether.at)}</b></Typography>
-                        : <>
-                            <Typography variant="body2">Aloft {minutesAloft(tether, now)} min, string out {stringOut(tether)}</Typography>
-                            <Typography variant="caption" color="text.secondary" component="div">
-                                Set down: {labelOf(tether.setDown)}
-                            </Typography>
-                        </>}
+                        ? <Typography variant="body2" noWrap>{words.tiedAt} <b>{labelOf(tether.at)}</b></Typography>
+                        : <Typography variant="body2" noWrap>
+                            {words.aloft}
+                            <Box component="span" sx={{color: "text.secondary"}}> · {words.setDown}: {labelOf(tether.setDown)}</Box>
+                        </Typography>}
                 </Box>
-                {/* right: what you can do */}
-                <Stack gap={0.75} alignItems="stretch" sx={{
-                    flexShrink: 0,
-                    "& .MuiButton-root": {borderRadius: 99, minWidth: 0, px: 1.75, whiteSpace: "nowrap", boxShadow: 2}
-                }}>
-                    {tether.state === "tied"
-                        ? <Button size="small" variant="outlined" sx={{bgcolor: "background.paper"}} onClick={nav.untie}>Untie</Button>
-                        : <>
-                            {back && <Button size="small" variant="outlined" sx={{bgcolor: "background.paper"}} onClick={reelIn}>Reel in</Button>}
-                            <Button size="small" variant="outlined" sx={{bgcolor: "background.paper"}} onClick={() => nav.tieOff(here)}>Tie off</Button>
-                        </>}
-                    <Badge
-                        badgeContent={nav.trail.unplaced.length}
-                        color="warning"
-                        data-testid="claude-asks-badge"
-                        title={nav.trail.unplaced.length > 0 ? `${nav.trail.unplaced.length} Claude thread(s) asking which place they serve` : undefined}
-                        sx={{"& .MuiBadge-badge": {fontWeight: 700, top: 3, right: 5}}}
-                    >
-                        <Button size="small" variant="contained" fullWidth onClick={() => setWhatsNextOpen(true)}>
-                            What's next
-                        </Button>
-                    </Badge>
-                    {deeper && <Button size="small" variant="contained" color="info" disabled={deeper.disabled} onClick={deeper.onClick}>
-                        {tether.state === "aloft" ? "Float higher" : "Dig in"}
-                    </Button>}
-                </Stack>
             </Stack>
 
-            {tugging && <Alert
-                icon={<Jon size={52} doing="aloft" stringOut={stringOut(tether)} spider="tug"/>}
-                severity="info"
-                //floats above the map, so the canvas never jumps when the tug comes and goes
-                sx={{position: "fixed", left: 8, right: 8, bottom: 160, zIndex: 1200, boxShadow: 3}}
-                data-testid="tug"
-                action={<Stack direction="row">
-                    {back && <Button color="inherit" size="small" onClick={reelIn}>Reel in</Button>}
-                    <Button color="inherit" size="small" onClick={() => setTugSnoozedUntil(now.getTime() + 15 * 60_000)}>Not yet</Button>
-                </Stack>}
-            >
-                {tether.state === "aloft" && tether.setDown !== homeId
-                    ? <>Set down at your feet: <b>{labelOf(tether.setDown)}</b></>
-                    : <>Home is {stringOut(tether)} step(s) back.</>}
-            </Alert>}
+
 
             <Dialog open={askWeather} data-testid="weather-check">
-                <DialogTitle>Gusty up there?</DialogTitle>
+                <DialogTitle>{words.gusty}</DialogTitle>
                 <DialogContent>
                     <Box sx={{display: "flex", justifyContent: "center", mb: 1}}>
-                        <Jon size={120} doing="aloft" stringOut={stringOut(tether)} spider="ask"/>
+                        {burrow
+                            ? <RabbitBurrow size={140} graph={graph} at={here} labels={false}/>
+                            : <Jon size={120} doing="aloft" stringOut={stringOut(tether)} spider="ask"/>}
                     </Box>
                     <Typography>
                         You've stepped to {recentNew} new places in the last {tunables.gustMinutes} minutes.
@@ -158,21 +184,8 @@ export function YouStrip({graph, onChange, selectNodeId, deeper}: {
                 }}
             />
 
-            <Snackbar
-                open={offerTieOff !== undefined && here === offerTieOff && tether.state === "aloft"}
-                autoHideDuration={12000}
-                onClose={(_, reason) => reason !== "clickaway" && setOfferTieOff(undefined)}
-                message={<Stack direction="row" gap={1} alignItems="center">
-                    <Dog size={28} doing="settle"/>
-                    <span>You're at {offerTieOff && labelOf(offerTieOff)}.</span>
-                </Stack>}
-                action={<Button color="info" size="small" onClick={() => {
-                    if (offerTieOff) {
-                        nav.tieOff(offerTieOff);
-                    }
-                    setOfferTieOff(undefined);
-                }}>Tie off and work</Button>}
-            />
+            {actionsSlot && createPortal(actions, actionsSlot)}
+            {nextSlot && createPortal(next, nextSlot)}
         </>
     );
 }
