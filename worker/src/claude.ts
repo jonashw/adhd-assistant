@@ -1,7 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import {
-    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo,
+    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
@@ -355,7 +355,9 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         env.DB.prepare("SELECT * FROM claude_artifacts ORDER BY COALESCE(updated_at, first_seen_at) DESC, id DESC"),
         env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC"),
         // to-dos threads left for Jon; a thread's link says which Claude thread it is
-        env.DB.prepare("SELECT id, text, link, added_at, thread_url FROM checklist_items WHERE done_at IS NULL AND thread_url IS NOT NULL ORDER BY added_at DESC")
+        env.DB.prepare(`SELECT id, text, link, added_at, thread_url, worth, why, size, delay_class, due_on, needs, done_when, waits_on,
+                interest_guess, interest_reason, interest_answer
+         FROM checklist_items WHERE done_at IS NULL AND thread_url IS NOT NULL ORDER BY added_at DESC`)
     ]);
     const todosBy = groupBy(todos.results as TodoRow[], r => claudeThreadIdOf(r.thread_url) ?? "");
     const threadRows = threads.results as ThreadRow[];
@@ -408,7 +410,21 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
     });
 }
 
-type TodoRow = {id: string, text: string, link: string | null, added_at: string, thread_url: string};
+type TodoRow = {
+    id: string, text: string, link: string | null, added_at: string, thread_url: string,
+    worth: 1 | 2 | 3 | null, why: string | null, size: TodoSize | null, delay_class: DelayClass | null, due_on: string | null,
+    needs: string | null, done_when: string | null, waits_on: string | null,
+    interest_guess: InterestGuess | null, interest_reason: string | null, interest_answer: InterestAnswer | null
+};
+
+const stringsOf = (json: string | null): string[] | undefined => {
+    try {
+        const list = json ? JSON.parse(json) : undefined;
+        return Array.isArray(list) ? list.filter((s): s is string => typeof s === "string") : undefined;
+    } catch {
+        return undefined;
+    }
+};
 
 /* The Claude thread a checked-in thread's link points at: claude.ai/code/project/<project>?thread=<id> */
 export function claudeThreadIdOf(url: string): string | undefined {
@@ -422,6 +438,20 @@ export function claudeThreadIdOf(url: string): string | undefined {
 function todoOf(r: TodoRow): ClaudeTodo {
     const todo: ClaudeTodo = {id: r.id, text: r.text, addedAt: r.added_at};
     if (r.link) todo.link = r.link;
+    if (r.worth) todo.worth = r.worth;
+    if (r.why) todo.why = r.why;
+    if (r.size) todo.size = r.size;
+    if (r.delay_class) todo.delayClass = r.delay_class;
+    if (r.due_on) todo.dueOn = r.due_on;
+    const needs = stringsOf(r.needs), doneWhen = stringsOf(r.done_when), waitsOn = stringsOf(r.waits_on);
+    if (needs) todo.needs = needs;
+    if (doneWhen) todo.doneWhen = doneWhen;
+    if (waitsOn) todo.waitsOn = waitsOn;
+    if (r.interest_guess) {
+        todo.interest = {guess: r.interest_guess};
+        if (r.interest_reason) todo.interest.reason = r.interest_reason;
+        if (r.interest_answer) todo.interest.answer = r.interest_answer;
+    }
     return todo;
 }
 

@@ -58,8 +58,16 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             }, 2000, [pr(9, "Perennial planting plan", "merged")], 1500),
             thread("demo_garden", "demo_g5", "Choose a compost bin", "blocked", 60 * 24 * 10),
             {...thread("demo_garden", "demo_g7", "Set up the drip timer", "working", 20), todos: [
-                {id: "demo_todo1", text: "Turn the outdoor tap's water back on", addedAt: at(25)},
-                {id: "demo_todo2", text: "Add the timer's Wi-Fi password in its app", link: "https://example.com/timer", addedAt: at(90)}
+                {id: "demo_todo1", text: "Turn the outdoor tap's water back on", addedAt: at(25), worth: 2, size: "minutes",
+                    why: "The drip line test can't run dry", doneWhen: ["Water comes out of the tap"],
+                    interest: {guess: "drawn", reason: "a quick hands-on win"}},
+                {id: "demo_todo2", text: "Add the timer's Wi-Fi password in its app", link: "https://example.com/timer", addedAt: at(90),
+                    worth: 2, size: "minutes", needs: ["The Wi-Fi password, on the router's sticker"], interest: {guess: "neutral"}},
+                {id: "demo_todo3", text: "Watch the first drip run and check every bed gets wet", addedAt: at(20), worth: 3, size: "half_hour",
+                    waitsOn: ["demo_todo1", "demo_todo2"], interest: {guess: "drawn", reason: "outside, watching it work"}},
+                {id: "demo_todo4", text: "Send the HOA the shed permit form", addedAt: at(200), worth: 3, size: "half_hour",
+                    delayClass: "fixed_date", dueOn: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
+                    interest: {guess: "reluctant", reason: "forms"}}
             ]},
             thread("demo_garden", "demo_g6", "Measure the patio", "done", 60 * 5),
             thread("demo_garden", "demo_g7", "Find a hedge trimmer", "done", 60 * 26),

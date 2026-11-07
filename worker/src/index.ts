@@ -8,7 +8,7 @@ import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
 import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden } from "./claude";
 import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
-import { removeChecklistItem, setChecklistDone } from "./checklist";
+import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
 
 export { LiveHub } from "./live";
@@ -97,6 +97,12 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
             return new Response(null, {status: 204});
         }
         return json(await addLink(env, place, await readJson()), 201);
+    }
+    const interestMatch = /^\/api\/checklist\/([^/]+)\/interest\/(up|down|clear)$/.exec(url.pathname);
+    if (interestMatch && request.method === "POST") {
+        const answer = interestMatch[2];
+        await setChecklistInterest(env, decodeURIComponent(interestMatch[1]), answer === "clear" ? undefined : answer as "up" | "down");
+        return new Response(null, {status: 204});
     }
     const checklistMatch = /^\/api\/checklist\/([^/]+)\/(check|uncheck|remove)$/.exec(url.pathname);
     if (checklistMatch && request.method === "POST") {
