@@ -71,6 +71,9 @@ export type ClaudeTodo = {
     /* other to-dos (ids) that must be done first */
     waitsOn?: string[],
     interest?: {guess: InterestGuess, reason?: string, answer?: InterestAnswer},
+    /* the spot it needs (src/spots.ts): Claude's guess until Jon corrects it */
+    where?: string,
+    whereBy?: "claude" | "jon",
     addedAt: string
 };
 
@@ -82,7 +85,8 @@ export type ClaudeAskKind = typeof claudeAskKinds[number];
 export type ClaudeCard = {
     /* its latest reply in a line */
     headline?: string,
-    ask?: {kind: ClaudeAskKind, text: string},
+    /* where: the spot Jon needs to be at to answer (src/spots.ts), Claude's guess until Jon corrects it */
+    ask?: {kind: ClaudeAskKind, text: string, where?: string, whereBy?: "claude" | "jon"},
     progress?: {done: number, total: number, now?: string},
     artifact?: {title: string, url: string},
     topic?: string,

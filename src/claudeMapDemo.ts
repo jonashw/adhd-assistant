@@ -46,7 +46,7 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             }, 1),
             glance(thread("demo_garden", "demo_g3", "Draft the shed layout", "review_ready", 30), {
                 headline: "Layout drawn: workbench on the north wall, bikes by the door",
-                ask: {kind: "approval", text: "OK to merge the layout and order the shelving?"},
+                ask: {kind: "approval", text: "OK to merge the layout and order the shelving?", where: "At my Mac", whereBy: "claude"},
                 progress: {done: 6, total: 6},
                 artifact: {title: "Shed layout", url: "https://claude.ai/artifact/demo"},
                 topic: "Shed interior layout with a workbench and bike storage",
@@ -58,14 +58,14 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             }, 2000, [pr(9, "Perennial planting plan", "merged")], 1500),
             thread("demo_garden", "demo_g5", "Choose a compost bin", "blocked", 60 * 24 * 10),
             {...thread("demo_garden", "demo_g7", "Set up the drip timer", "working", 20), todos: [
-                {id: "demo_todo1", text: "Turn the outdoor tap's water back on", addedAt: at(25), worth: 2, size: "minutes",
+                {id: "demo_todo1", text: "Turn the outdoor tap's water back on", addedAt: at(25), worth: 2, size: "minutes", where: "Home", whereBy: "jon",
                     why: "The drip line test can't run dry", doneWhen: ["Water comes out of the tap"],
                     interest: {guess: "drawn", reason: "a quick hands-on win"}},
-                {id: "demo_todo2", text: "Add the timer's Wi-Fi password in its app", link: "https://example.com/timer", addedAt: at(90),
+                {id: "demo_todo2", text: "Add the timer's Wi-Fi password in its app", link: "https://example.com/timer", addedAt: at(90), where: "Home",
                     worth: 2, size: "minutes", needs: ["The Wi-Fi password, on the router's sticker"], interest: {guess: "neutral"}},
-                {id: "demo_todo3", text: "Watch the first drip run and check every bed gets wet", addedAt: at(20), worth: 3, size: "half_hour",
+                {id: "demo_todo3", text: "Watch the first drip run and check every bed gets wet", addedAt: at(20), worth: 3, size: "half_hour", where: "Home",
                     waitsOn: ["demo_todo1", "demo_todo2"], interest: {guess: "drawn", reason: "outside, watching it work"}},
-                {id: "demo_todo4", text: "Send the HOA the shed permit form", addedAt: at(200), worth: 3, size: "half_hour",
+                {id: "demo_todo4", text: "Send the HOA the shed permit form", addedAt: at(200), worth: 3, size: "half_hour", where: "At my Mac",
                     delayClass: "fixed_date", dueOn: new Date(Date.now() + 3 * 864e5).toISOString().slice(0, 10),
                     interest: {guess: "reluctant", reason: "forms"}}
             ]},
@@ -100,7 +100,12 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             artifact("Rail pass comparison", ["demo_t1"], 3, 900, 300)
         ]),
         project("demo_taxes", "Taxes", undefined, 60 * 7, [
-            thread("demo_taxes", "demo_x1", "Sort receipts by category", "working", 60 * 7),
+            {...thread("demo_taxes", "demo_x1", "Sort receipts by category", "working", 60 * 7), todos: [
+                {id: "demo_todo5", text: "Photograph the receipts box in the garage", addedAt: at(400), worth: 2, size: "minutes",
+                    where: "Garage", interest: {guess: "neutral"}},
+                {id: "demo_todo6", text: "Print last year's return at the library", addedAt: at(500), worth: 2, size: "minutes",
+                    where: "Library", interest: {guess: "neutral"}}
+            ]},
             thread("demo_taxes", "demo_x2", "Estimate quarterly payment", "done", 60 * 30)
         ]),
         // nothing waiting and nothing in weeks: Your move folds it away

@@ -1,5 +1,6 @@
 import { MindMapGraphDataRecord } from "./MindMap";
 import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
+import { Spot, Whereabouts } from "./spots";
 import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 
 /* A map as the server holds it: the app's graph plus the revision last saved */
@@ -101,6 +102,16 @@ export const ServerApi = {
         request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/set-aside`, {
             method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({until})
         }),
+    /* where Jon can be (his spots) and where he is now */
+    where: () => request<{spots: Spot[], now?: Whereabouts}>("/api/where"),
+    setWhere: (spotId: string | null, until?: string) =>
+        request<void>("/api/where", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({spotId, until})}),
+    saveSpots: (spots: Spot[]) =>
+        request<Spot[]>("/api/where/spots", {method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify(spots)}),
+    setTodoWhere: (id: string, where: string) =>
+        request<void>(`/api/checklist/${encodeURIComponent(id)}/where`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({where})}),
+    setAskWhere: (threadId: string, where: string) =>
+        request<void>(`/api/claude-map/threads/${encodeURIComponent(threadId)}/where`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({where})}),
     markClaudeThreadOpened: (id: string) =>
         request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),

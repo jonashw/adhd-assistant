@@ -83,6 +83,10 @@ export function ringsFor(method: string, pathname: string): LiveRing[] {
         // a photo only shows once the map that points at it is saved, and that save rings
         return rest === "/media" ? [] : [{topic: "trail", mapId}];
     }
+    // where Jon is, his spots, and where a to-do can be done all change what Your move shows
+    if (pathname.startsWith("/api/where") || /^\/api\/checklist\/[^/]+\/where$/.test(pathname)) {
+        return [{topic: "claude"}];
+    }
     if (pathname.startsWith("/api/items/") || pathname.startsWith("/api/checklist/")) {
         return [{topic: "trail"}];
     }

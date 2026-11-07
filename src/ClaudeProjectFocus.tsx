@@ -25,7 +25,10 @@ export type ForYouItem = {
     leverage: number,
     ready: boolean,
     /* an ask set aside until a later day: shown under Opens up later, and not counted as needing Jon */
-    setAside?: boolean
+    setAside?: boolean,
+    /* the spot it needs (src/spots.ts), and who said so: Claude's guess until Jon corrects it */
+    where?: string,
+    whereBy?: "claude" | "jon"
 };
 
 /* What needs Jon now: everything but asks set aside for later */
@@ -79,14 +82,17 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
                 thread: t,
                 reason: reasonLine({size: asks[i].size, claudeWaits: true}, scored),
                 leverage: scored.leverage,
-                ready: scored.ready
+                ready: scored.ready,
+                where: ask?.where,
+                whereBy: ask?.whereBy
             };
         }),
         ...todos.map(({todo, t}): ForYouItem => {
             const scored = scores.get(todo.id)!;
             return {
                 key: `todo:${todo.id}`, label: "To-do", color: "claude.todoBg", textColor: "claude.ink", text: todo.text, thread: t, link: todo.link,
-                todo, reason: reasonLine(todo, scored), leverage: scored.leverage, ready: scored.ready
+                todo, reason: reasonLine(todo, scored), leverage: scored.leverage, ready: scored.ready,
+                where: todo.where, whereBy: todo.whereBy
             };
         })
     ];
