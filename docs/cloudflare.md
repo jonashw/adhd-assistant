@@ -84,7 +84,10 @@ The rules live in the connector itself (its MCP instructions, in `worker/src/mcp
 connector follows them without anything pasted into a project. If a reminder helps, one line in Settings → Your
 Claude → Instructions is enough:
 
-> ADHD Assist: if you have the ADHD Assist connector, follow its instructions in every turn.
+> ADHD Assist: in a thread that has the ADHD Assist connector, follow its instructions every turn. Without it (a
+> project chat never has it), skip this silently.
+
+Name the project chat: given just "follow its instructions", a coordinator read it as meant for itself.
 
 **Changing the rules.** A thread reads the connector's instructions once, when its session starts. So that running
 threads don't keep old rules, the protocol is versioned (`worker/src/protocol.ts`): when you change a rule, add an
