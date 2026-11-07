@@ -131,7 +131,7 @@ function Player({id}: {id: string}) {
             .catch(e => setError(e.message));
     }, [id]);
     const frames = React.useMemo(() => data && map ? framesOf(data, map) : [], [data, map]);
-    const utterances = data?.monologue.utterances ?? [];
+    const utterances = React.useMemo(() => data?.monologue.utterances ?? [], [data]);
     //playing: each sentence holds for about as long as it took to say
     React.useEffect(() => {
         if (!playing || utterances.length === 0) return;
