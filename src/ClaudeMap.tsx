@@ -12,7 +12,7 @@ import {
     claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
 import { ClaudeThreadGlance, NewDot, PillChip, PrChip } from "./ClaudeThreadGlance";
-import { Pill, artifactLinkProps, artifactPill } from "./claudeArtifacts";
+import { Pill, artifactLinkProps, artifactPill, pillColor } from "./claudeArtifacts";
 import { artifactMatches, matchesSearch } from "./claudeSearch";
 import { ServerApi } from "./ServerApi";
 import { safetyPollMs, useRing } from "./live";
@@ -24,15 +24,13 @@ import { ProjectForYou, forYou, isQuiet, lastMoved, quietDays } from "./ClaudePr
 import { YourMoveSections } from "./YourMove";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
+import { ClaudeTokens, useClaudeColors, useColorMode, ColorChoice } from "./theme";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
 
+/* The map's colours are theme tokens (palette.claude, in theme.ts) so they follow light and dark */
 export const claudeStyle = {
-    ring: "#D97757",
-    fill: "#FAF6EF",
-    ink: "#3D2B1F",
-    link: "#E3C7B5",
     font: "'Source Serif 4', Georgia, 'Times New Roman', serif"
 };
 
@@ -179,7 +177,7 @@ function wrap(text: string, width: number): string[] {
 
 const radiusOf = (kind: MapNode["kind"]) => kind === "root" ? 9 : kind === "project" ? 7 : kind === "artifact" ? 4.5 : 5;
 
-function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, selectedId?: string) {
+function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, c: ClaudeTokens, selectedId?: string) {
     const x = node.x ?? 0, y = node.y ?? 0;
     const r = radiusOf(node.kind);
     const dimmed = (node.badge === "done" || node.badge === "someday") && node.kind === "thread";
@@ -191,7 +189,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
         const phase = (Date.now() % 2000) / 2000;
         ctx.beginPath();
         ctx.arc(x, y, r + 1 + phase * 4, 0, 2 * Math.PI);
-        ctx.strokeStyle = claudeBadges.working.color;
+        ctx.strokeStyle = c.badges.working.color;
         ctx.globalAlpha = (1 - phase) * 0.6;
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -211,10 +209,10 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     } else {
         ctx.arc(x, y, r, 0, 2 * Math.PI);
     }
-    ctx.fillStyle = node.kind === "root" ? claudeStyle.ring : claudeStyle.fill;
+    ctx.fillStyle = node.kind === "root" ? c.ring : c.fill;
     ctx.fill();
     ctx.lineWidth = node.id === selectedId ? 2.2 : 1.2;
-    ctx.strokeStyle = node.id === selectedId ? claudeStyle.ink : claudeStyle.ring;
+    ctx.strokeStyle = node.id === selectedId ? c.ink : c.ring;
     if (node.badge && quietBadges.includes(node.badge)) {
         ctx.setLineDash([1.5, 1.5]);
     }
@@ -225,7 +223,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     if (node.badge && node.kind !== "root") {
         ctx.beginPath();
         ctx.arc(x, y, r * 0.45, 0, 2 * Math.PI);
-        ctx.fillStyle = claudeBadges[node.badge].color;
+        ctx.fillStyle = c.badges[node.badge].color;
         ctx.fill();
     }
 
@@ -233,16 +231,16 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
     if (node.kind === "thread" && node.thread && isNewSince(node.thread)) {
         ctx.beginPath();
         ctx.arc(x + r * 0.75, y - r * 0.75, 1.7, 0, 2 * Math.PI);
-        ctx.fillStyle = claudeStyle.ring;
+        ctx.fillStyle = c.ring;
         ctx.fill();
         ctx.lineWidth = 0.6;
-        ctx.strokeStyle = "#FFFFFF";
+        ctx.strokeStyle = c.halo;
         ctx.stroke();
     }
 
     // an artifact: lines of writing on the page
     if (node.kind === "artifact") {
-        ctx.strokeStyle = node.pill?.text === "New" ? "#7C3AED" : claudeStyle.ring;
+        ctx.strokeStyle = node.pill?.text === "New" ? c.artifact : c.ring;
         ctx.lineWidth = 0.5;
         for (const dy of [-1.5, 0, 1.5]) {
             ctx.beginPath();
@@ -263,7 +261,7 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
         ctx.fillText(node.label, x, y);
     } else {
         ctx.font = `${small ? 500 : 600} ${fontSize}px ${claudeStyle.font}`;
-        ctx.fillStyle = claudeStyle.ink;
+        ctx.fillStyle = c.ink;
         ctx.textBaseline = "top";
         const lines = wrap(node.label, node.kind === "project" ? 20 : 18);
         lines.forEach((line, i) => ctx.fillText(line, x, y + r + 1.5 + i * fontSize * 1.1));
@@ -275,23 +273,23 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
             const w = ctx.measureText(pill.text).width + pillFont;
             const h = pillFont * 1.5;
             const top = y + r + 2.5 + lines.length * fontSize * 1.1;
-            ctx.fillStyle = pill.bg;
+            ctx.fillStyle = pillColor(c, pill.bg);
             ctx.beginPath();
             ctx.roundRect(x - w / 2, top, w, h, h / 2);
             ctx.fill();
             if (pill.outline) {
-                ctx.strokeStyle = pill.outline;
+                ctx.strokeStyle = pillColor(c, pill.outline);
                 ctx.lineWidth = 0.3;
                 ctx.stroke();
             }
-            ctx.fillStyle = pill.fg;
+            ctx.fillStyle = pillColor(c, pill.fg);
             ctx.textBaseline = "middle";
             ctx.fillText(pill.text, x, top + h / 2);
         }
         // badge pill under the label
         if (node.badge) {
-            const badge = claudeBadges[node.badge];
-            const text = node.badgeText ?? badge.label;
+            const badge = c.badges[node.badge];
+            const text = node.badgeText ?? claudeBadges[node.badge].label;
             const pillFont = fontSize * 0.78;
             ctx.font = `600 ${pillFont}px system-ui, sans-serif`;
             const w = ctx.measureText(text).width + pillFont;
@@ -317,10 +315,10 @@ function drawNode(node: NodeObject<MapNode>, ctx: CanvasRenderingContext2D, sele
 }
 
 export function BadgeChip({kind, text}: {kind: ClaudeBadgeKind, text?: string}) {
-    const badge = claudeBadges[kind];
+    const badge = useClaudeColors().badges[kind];
     return <Chip
         size="small"
-        label={text ?? badge.label}
+        label={text ?? claudeBadges[kind].label}
         sx={{
             bgcolor: badge.color, color: badge.text, fontWeight: 600,
             border: quietBadges.includes(kind) ? "1px dashed #9CA3AF" : undefined
@@ -369,14 +367,14 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
     const listed = all ? artifacts : artifacts.slice(0, listArtifactsAtFirst);
     const threadTitle = (a: ClaudeArtifact) => a.threadIds.map(id => project.threads.find(t => t.id === id)?.title).find(Boolean);
     return <>
-        <ListSubheader disableSticky sx={{lineHeight: "28px", bgcolor: "#fff", color: "#5B21B6", fontWeight: 600}}>
+        <ListSubheader disableSticky sx={{lineHeight: "28px", bgcolor: "claude.surface", color: "claude.artifactText", fontWeight: 600}}>
             Artifacts ({artifacts.length})
         </ListSubheader>
         {listed.map(a => {
             const flag = artifactFlag(a, project);
             const pill = artifactPill(a, flag);
             return <ListItemButton key={a.id} {...artifactLinkProps(a.url)} onClick={() => onOpen(a)} sx={{gap: 1.5, pl: 3}}>
-                <Description sx={{color: flag ? "#7C3AED" : claudeStyle.ring}}/>
+                <Description sx={{color: flag ? "claude.artifact" : "claude.ring"}}/>
                 <ListItemText
                     primary={a.title}
                     secondary={[threadTitle(a), flag ? undefined : pill.text].filter(Boolean).join(" · ") || undefined}
@@ -387,7 +385,7 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
             </ListItemButton>;
         })}
         {artifacts.length > listArtifactsAtFirst && <Box sx={{pl: 2.5, pb: 1}}>
-            <Button size="small" sx={{color: "#5B21B6"}} onClick={() => onAll(!all)}>
+            <Button size="small" sx={{color: "claude.artifactText"}} onClick={() => onAll(!all)}>
                 {all ? "Show fewer artifacts" : `Show all ${artifacts.length} artifacts`}
             </Button>
         </Box>}
@@ -456,8 +454,8 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
             artifacts > 0 && `${artifacts} artifact${artifacts === 1 ? "" : "s"}`
         ].filter(Boolean).join(" · ");
         return <React.Fragment key={p.id}>
-            <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
-                <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
+            <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: "claude.fill"}}>
+                <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: "claude.ink", flexGrow: 1}}>
                     {projectLabel(p)}
                 </Typography>
                 <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
@@ -481,7 +479,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         </React.Fragment>;
     };
 
-    return <List dense data-testid="your-move" sx={{bgcolor: "#fff", pb: "45dvh"}}>
+    return <List dense data-testid="your-move" sx={{bgcolor: "claude.surface", pb: "45dvh"}}>
         <YourMoveSections
             projects={active}
             threadLinkProps={t => linkProps(t.url, openIn)}
@@ -493,12 +491,12 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
             onInterest={onInterest}
             projectName={projectLabel}
         />
-        <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: claudeStyle.ink, mt: 2, borderTop: `1px solid ${claudeStyle.link}`}}>
+        <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 2, borderTop: 1, borderColor: "claude.link"}}>
             Projects
         </ListSubheader>
         {active.map(projectBlock)}
         {quiet.length > 0 && <>
-            <ListItemButton onClick={() => setQuietOpen(o => !o)} sx={{bgcolor: claudeStyle.fill, mt: 1}}>
+            <ListItemButton onClick={() => setQuietOpen(o => !o)} sx={{bgcolor: "claude.fill", mt: 1}}>
                 <ListItemIcon sx={{minWidth: 28}}>{quietOpen ? <ExpandLess fontSize="small"/> : <ExpandMore fontSize="small"/>}</ListItemIcon>
                 <ListItemText
                     primary={`Quiet for ${quietDays} days: ${quiet.map(projectLabel).join(", ")}`}
@@ -523,6 +521,12 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         </Menu>
     </List>;
 }
+
+const colorChoiceLabels: Record<ColorChoice, string> = {
+    system: "Match this device",
+    light: "Light",
+    dark: "Dark"
+};
 
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
 /* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
@@ -701,6 +705,8 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
+    const colors = useClaudeColors();
+    const colorMode = useColorMode();
     /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
     const [onBreak, setOnBreak] = React.useState<BreakPlace | undefined>(readBreak);
     const [view, setView] = React.useState<"map" | "list" | "events">(() =>
@@ -917,8 +923,8 @@ export function ClaudeMap() {
         }
     };
 
-    return <Box sx={{display: "flex", flexDirection: "column", height: "100dvh", bgcolor: claudeStyle.fill}}>
-        <AppBar position="static" elevation={0} sx={{bgcolor: claudeStyle.ring, color: "#fff"}}>
+    return <Box sx={{display: "flex", flexDirection: "column", height: "100dvh", bgcolor: "claude.fill"}}>
+        <AppBar position="static" elevation={0} sx={{bgcolor: "claude.bar", color: "claude.barText", borderBottom: theme => theme.palette.mode === "dark" ? `1px solid ${theme.palette.divider}` : "none"}}>
             <Toolbar sx={{gap: 1}}>
                 <IconButton color="inherit" edge="start" aria-label="Back to your maps" onClick={() => navigate("/")}>
                     <ArrowBack/>
@@ -932,7 +938,7 @@ export function ClaudeMap() {
                     value={view}
                     onChange={(_, v) => setView(v)}
                     textColor="inherit"
-                    TabIndicatorProps={{style: {backgroundColor: "#fff"}}}
+                    TabIndicatorProps={{style: {backgroundColor: colors.barIndicator}}}
                     // three tabs fit a phone only without the default minimum width
                     sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
@@ -971,11 +977,20 @@ export function ClaudeMap() {
                         <ListItemIcon>{showArtifacts ? <CheckBox fontSize="small"/> : <CheckBoxOutlineBlank fontSize="small"/>}</ListItemIcon>
                         Show artifacts
                     </MenuItem>
+                    <ListSubheader sx={{lineHeight: "32px"}}>Light or dark</ListSubheader>
+                    {(Object.keys(colorChoiceLabels) as ColorChoice[]).map(value => <MenuItem
+                        key={value}
+                        selected={colorMode.choice === value}
+                        onClick={() => colorMode.setChoice(value)}
+                    >
+                        <ListItemIcon>{colorMode.choice === value ? <Check fontSize="small"/> : null}</ListItemIcon>
+                        {colorChoiceLabels[value]}
+                    </MenuItem>)}
                 </Menu>
             </Toolbar>
         </AppBar>
 
-        {(projects?.length ?? 0) > 0 && <Stack direction="row" alignItems="center" gap={1.5} sx={{px: 2, py: 1, bgcolor: "#fff", borderBottom: `1px solid ${claudeStyle.link}`}}>
+        {(projects?.length ?? 0) > 0 && <Stack direction="row" alignItems="center" gap={1.5} sx={{px: 2, py: 1, bgcolor: "claude.surface", borderBottom: 1, borderColor: "claude.link"}}>
             <TextField
                 size="small"
                 value={query}
@@ -998,7 +1013,7 @@ export function ClaudeMap() {
         {error && <Alert severity="warning" sx={{borderRadius: 0}}>Couldn't refresh the Claude map. {error}</Alert>}
         {demo && <Alert severity="info" sx={{borderRadius: 0}}>Sample data. Nothing here is real.</Alert>}
 
-        {projects && projects.length === 0 && <Paper elevation={0} sx={{m: 2, p: 2, bgcolor: "#fff"}}>
+        {projects && projects.length === 0 && <Paper elevation={0} sx={{m: 2, p: 2, bgcolor: "claude.surface"}}>
             <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, mb: 1}}>No Claude projects yet</Typography>
             <Typography variant="body2">
                 A project appears here the first time a Claude in it syncs. To opt a project in, add the Claude map line to its
@@ -1014,13 +1029,13 @@ export function ClaudeMap() {
                 graphData={graphData}
                 dagMode="radialout"
                 dagLevelDistance={60}
-                backgroundColor={claudeStyle.fill}
-                linkColor={() => claudeStyle.link}
+                backgroundColor={colors.fill}
+                linkColor={() => colors.link}
                 linkWidth={1.5}
                 nodeRelSize={6}
                 nodeVal={n => radiusOf(n.kind) ** 2 / 36}
                 nodeLabel={n => n.kind === "thread" || n.kind === "artifact" ? n.label : ""}
-                nodeCanvasObject={(n, ctx) => drawNode(n, ctx, selectedId)}
+                nodeCanvasObject={(n, ctx) => drawNode(n, ctx, colors, selectedId)}
                 nodePointerAreaPaint={(n, color, ctx) => {
                     ctx.fillStyle = color;
                     ctx.beginPath();
@@ -1101,8 +1116,8 @@ export function ClaudeMap() {
             startIcon={<VisibilityOff/>}
             onClick={() => setDoneListOpen(true)}
             sx={{
-                position: "fixed", left: 16, bottom: 16, bgcolor: "#fff", color: claudeStyle.ink, borderColor: claudeStyle.link,
-                "&:hover": {bgcolor: "#fff", borderColor: claudeStyle.ring}
+                position: "fixed", left: 16, bottom: 16, bgcolor: "claude.surface", color: "claude.ink", borderColor: "claude.link",
+                "&:hover": {bgcolor: "claude.surface", borderColor: "claude.ring"}
             }}
         >
             {hiddenDone.length} resolved thread{hiddenDone.length === 1 ? "" : "s"} hidden
@@ -1117,7 +1132,7 @@ export function ClaudeMap() {
         >
             <Stack direction="row" alignItems="center" gap={1} sx={{p: 2, pb: 1}}>
                 <Box sx={{flexGrow: 1, minWidth: 0}}>
-                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
+                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: "claude.ink"}}>
                         Resolved, off the map
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -1147,13 +1162,13 @@ export function ClaudeMap() {
             ref={cardRef}
             elevation={6}
             sx={{
-                position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto",
+                position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: 4, borderTopColor: "claude.ring", maxWidth: 560, mx: "auto",
                 maxHeight: "70dvh", overflowY: "auto"
             }}
         >
             <Stack direction="row" alignItems="flex-start" gap={1}>
                 <Box sx={{flexGrow: 1, minWidth: 0}}>
-                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>
+                    <Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: "claude.ink"}}>
                         {selected.label}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -1189,7 +1204,7 @@ export function ClaudeMap() {
                 {hideDone && selected.kind === "thread" && selected.badge === "done" && shownDone.has(selected.id) && <Button
                     size="small"
                     startIcon={<VisibilityOff/>}
-                    sx={{color: claudeStyle.ink}}
+                    sx={{color: "claude.ink"}}
                     onClick={() => {
                         setShownDone(selected.id, false);
                         setSelectedId(undefined);
@@ -1201,7 +1216,7 @@ export function ClaudeMap() {
                     variant="contained"
                     size="small"
                     endIcon={<OpenInNew/>}
-                    sx={{bgcolor: claudeStyle.ring, "&:hover": {bgcolor: "#C4623F"}}}
+                    sx={{bgcolor: "claude.ring", "&:hover": {bgcolor: "claude.ringHover"}}}
                     {...(selected.artifact ? artifactLinkProps(selected.artifact.url) : linkProps(selected.url, openIn))}
                     onClick={() => selected.artifact ? markArtifactOpened(selected.artifact) : markOpened(selected.thread)}
                 >

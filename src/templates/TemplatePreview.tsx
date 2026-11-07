@@ -90,7 +90,7 @@ export function TemplatePreview({graph, focus, title}: {graph: MindMapGraphData,
                     <g key={n.id} style={{transform: `translate(${px(p)}px, ${py(p)}px)`, transition: ease, opacity: shown ? 1 : 0.4}}>
                         {focus === n.id && <circle r={r + 5} fill="none" stroke={warn} strokeWidth={2.5}/>}
                         {home
-                            ? <image href="/Enso.svg" x={-r * 1.6} y={-r * 1.6} width={r * 3.2} height={r * 3.2}/>
+                            ? <image className="line-art" href="/Enso.svg" x={-r * 1.6} y={-r * 1.6} width={r * 3.2} height={r * 3.2}/>
                             : <circle r={r} fill={filled ? color : theme.palette.background.paper} stroke={color}
                                 strokeWidth={1.6} strokeDasharray={dashed ? "3 2" : undefined}/>}
                         {n.status === "done" && <path d={`M${-r / 2} 0 l${r / 3} ${r / 3} l${r * 0.6} ${-r * 0.7}`} fill="none" stroke={accent} strokeWidth={1.8}/>}

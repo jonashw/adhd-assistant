@@ -7,6 +7,7 @@ import "../crew/rabbit.css";
 import "../crew/balloon.css";
 import { CrewLead } from "./templates";
 
+
 /* One character for each starter map, drawn the way the map opens: the rabbit by a single hole for the burrow,
    Balloon-head under a single cloud for the walk, and the crew member who leads the rest. */
 
@@ -53,7 +54,7 @@ export function MapEmblem({crew, size = 56}: {crew: CrewLead, size?: number}) {
         case "spider":
         case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
-        case "none": return <img src="/Enso.svg" width={size * 0.8} height={size * 0.8} alt="An enso"/>;
-        case "review": return <img src="/review.svg" width={size * 0.8} height={size * 0.8} alt="A week on a calendar inside a looping arrow"/>;
+        case "none": return <img className="line-art" src="/Enso.svg" width={size * 0.8} height={size * 0.8} alt="An enso"/>;
+        case "review": return <img className="line-art" src="/review.svg" width={size * 0.8} height={size * 0.8} alt="A week on a calendar inside a looping arrow"/>;
     }
 }

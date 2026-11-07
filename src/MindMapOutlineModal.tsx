@@ -1,4 +1,4 @@
-import { Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography } from '@mui/material';
+import { Breadcrumbs, Button, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography, alpha, useTheme } from '@mui/material';
 import { DirectedGraphNode, MindMap, MindMapGraphData, MindMapGraphNode } from './MindMap';
 import { useNavigator } from './NavigatorContext';
 import { formatDue } from './Navigator';
@@ -41,10 +41,11 @@ function HierarchicalNodeList({root, onPath, selectedId, onSelect}:{
     selectedId?: string,
     onSelect?: (id: string) => void
 }){
+    const theme = useTheme();
     const name = (n: HierarchicalNode) => {
         const style = {
             fontWeight: onPath.has(n.id) ? 700 : undefined,
-            background: n.id === selectedId ? 'rgba(25,118,210,0.12)' : undefined,
+            background: n.id === selectedId ? alpha(theme.palette.primary.main, 0.16) : undefined,
             borderRadius: 4, padding: '0 4px', margin: '0 -4px'
         };
         return onSelect

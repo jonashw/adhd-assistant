@@ -7,28 +7,25 @@ import { GraphRepositoryContextProvider } from './GraphRepositoryContext';
 import {
   CssBaseline
 } from "@mui/material";
-import { createTheme, ThemeProvider } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
 import { GraphList } from './GraphList';
 import { SignInGate } from './SignInGate';
 import { CrewPreview } from './CrewPreview';
 import { TemplatePicker } from './templates/TemplatePicker';
 import { ClaudeMap } from './ClaudeMap';
 import { hideSplash } from './splash';
-
-const defaultTheme = createTheme();
+import { ColorModeContext, useColorModeState } from './theme';
+import './theme.css';
 
 const router = createBrowserRouter([
   {
     path: '/',
     element: (
-      <ThemeProvider theme={defaultTheme}>
-        <CssBaseline />
-        <main>
-          <SignInGate>
-            <Outlet/>
-          </SignInGate>
-        </main>
-      </ThemeProvider>
+      <main>
+        <SignInGate>
+          <Outlet/>
+        </SignInGate>
+      </main>
     ),
     children: [
       {
@@ -52,12 +49,7 @@ const router = createBrowserRouter([
   },
   {
     path: "/crew",
-    element: (
-      <ThemeProvider theme={defaultTheme}>
-        <CssBaseline />
-        <CrewPreview />
-      </ThemeProvider>
-    )
+    element: <CrewPreview />
   },
   {
     path: "/recognize",
@@ -65,11 +57,27 @@ const router = createBrowserRouter([
   },
 ]);
 
+/* Light or dark: follows the device unless a pick is kept (the Claude map's settings menu has it) */
+function Themed({children}: {children: React.ReactNode}) {
+  const {choice, mode, setChoice, theme} = useColorModeState();
+  const value = React.useMemo(() => ({choice, mode, setChoice}), [choice, mode, setChoice]);
+  return (
+    <ColorModeContext.Provider value={value}>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
+    </ColorModeContext.Provider>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <GraphRepositoryContextProvider>
-      <RouterProvider router={router} />
-    </GraphRepositoryContextProvider>
+    <Themed>
+      <GraphRepositoryContextProvider>
+        <RouterProvider router={router} />
+      </GraphRepositoryContextProvider>
+    </Themed>
   </React.StrictMode>,
 )
 

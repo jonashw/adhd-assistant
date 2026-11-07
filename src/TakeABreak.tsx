@@ -1,8 +1,9 @@
 import React from "react";
-import { Box, Button, SvgIcon, Typography } from "@mui/material";
+import { Box, Button, SvgIcon, Typography, useTheme } from "@mui/material";
 import { Head } from "./crew/Jon";
 import { Fidget, useFidget } from "./crew/useFidget";
 import "./crew/crew.css";
+import { sky } from "./theme";
 
 /* Take a break: the Sky loading screen comes back over the page and waits. It says only that he's on a break: no
    clock, no count, and no reminder of what he was doing (he knows the app remembers). The place is saved on the
@@ -54,9 +55,10 @@ const fidgets: Fidget[] = [
 
 function SkyBalloon() {
     const fidget = useFidget(fidgets, [2000, 6000]);
+    const s = sky[useTheme().palette.mode];
     return <svg className={["break-fly", "crew", "crew-jon", fidget].filter(Boolean).join(" ")} viewBox="-14 -13 28 74" aria-hidden="true">
-        <path d="M0 11.6 C-3 24 4 36 -1 47 C-3 52 0 55 0 57.5" fill="none" stroke="#5a4636" strokeWidth=".55" strokeLinecap="round"/>
-        <circle cx="0" cy="58" r="1.2" fill="#23313d"/>
+        <path d="M0 11.6 C-3 24 4 36 -1 47 C-3 52 0 55 0 57.5" fill="none" stroke={s.string} strokeWidth=".55" strokeLinecap="round"/>
+        <circle cx="0" cy="58" r="1.2" fill={s.weight}/>
         <g className="break-bob">
             <Head x={0} y={1.5} r={10}/>
         </g>
@@ -74,6 +76,7 @@ export function BalloonIcon() {
 
 export function BreakVeil({onBack}: {onBack: () => void}) {
     const back = React.useRef<HTMLButtonElement>(null);
+    const s = sky[useTheme().palette.mode];
     React.useEffect(() => back.current?.focus(), []);
     return <Box
         role="dialog"
@@ -82,7 +85,7 @@ export function BreakVeil({onBack}: {onBack: () => void}) {
         data-testid="break-veil"
         sx={{
             position: "fixed", inset: 0, zIndex: 1500, display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "flex-end", overflow: "hidden", background: "linear-gradient(#cfe3f2,#eef5fa 70%,#f7f3ea)",
+            justifyContent: "flex-end", overflow: "hidden", background: s.gradient,
             "@keyframes break-in": {from: {opacity: 0}},
             animation: "break-in .45s ease",
             "& .break-fly": {height: "min(42dvh, 340px)", width: "auto", mb: "-0.6dvh", position: "relative"},
@@ -92,25 +95,29 @@ export function BreakVeil({onBack}: {onBack: () => void}) {
         }}
     >
         <svg viewBox="0 0 360 150" aria-hidden="true" style={{position: "absolute", top: "10dvh", left: "50%", transform: "translateX(-50%)", width: "min(100%, 720px)", height: "auto"}}>
-            <g fill="#fff" opacity=".9">
+            {s.stars > 0 && <g fill="#fff" opacity={s.stars}>
+                <circle cx="30" cy="12" r=".9"/><circle cx="160" cy="8" r=".7"/><circle cx="215" cy="40" r="1"/>
+                <circle cx="330" cy="20" r=".8"/><circle cx="250" cy="76" r=".6"/><circle cx="20" cy="96" r=".7"/>
+            </g>}
+            <g fill={s.cloud} opacity={s.cloudOpacity}>
                 <ellipse cx="80" cy="38" rx="56" ry="18"/><ellipse cx="110" cy="26" rx="34" ry="20"/>
                 <ellipse cx="280" cy="124" rx="50" ry="15"/><ellipse cx="300" cy="114" rx="28" ry="16"/>
             </g>
         </svg>
         <SkyBalloon/>
         <Box sx={{
-            width: "140%", minHeight: "max(34dvh, 230px)", bgcolor: "#cfdcb8", borderRadius: "50% 50% 0 0 / 38px 38px 0 0",
+            width: "140%", minHeight: "max(34dvh, 230px)", bgcolor: s.ground, borderRadius: "50% 50% 0 0 / 38px 38px 0 0",
             display: "flex", flexDirection: "column", alignItems: "center", pt: "max(3.5dvh, 22px)", pb: 3, gap: 1, textAlign: "center"
         }}>
-            <Typography id="break-words" sx={{fontSize: "clamp(32px, 9vw, 52px)", fontWeight: 600, color: "#23313d", letterSpacing: "-.01em", lineHeight: 1.1}}>
+            <Typography id="break-words" sx={{fontSize: "clamp(32px, 9vw, 52px)", fontWeight: 600, color: s.words, letterSpacing: "-.01em", lineHeight: 1.1}}>
                 You are on a break
             </Typography>
-            <Typography sx={{color: "#3b4733", fontSize: "1.1rem"}}>Come back whenever</Typography>
+            <Typography sx={{color: s.sub, fontSize: "1.1rem"}}>Come back whenever</Typography>
             <Button
                 ref={back}
                 variant="contained"
                 onClick={onBack}
-                sx={{mt: 1, bgcolor: "#23313d", color: "#fff", borderRadius: 999, px: 3, textTransform: "none", fontSize: "1rem", "&:hover": {bgcolor: "#3a4c5c"}}}
+                sx={{mt: 1, bgcolor: s.button, color: s.buttonText, borderRadius: 999, px: 3, textTransform: "none", fontSize: "1rem", "&:hover": {bgcolor: s.buttonHover}}}
             >
                 I'm back
             </Button>
