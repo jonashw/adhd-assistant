@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader, Paper, Stack, Tooltip, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader, Paper, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
 import { Close, OpenInNew, PushPin, PushPinOutlined } from "@mui/icons-material";
 import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, standingAsk } from "./ClaudeMapTypes";
 import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
@@ -114,6 +114,86 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
     </Paper>;
 }
 
+
+const heat = ["#F3ECE2", "#F6D9C4", "#EFAF8A", "#D97757"];
+const heatOf = (h: number) => h > 0.66 ? 3 : h > 0.4 ? 2 : h > 0.18 ? 1 : 0;
+
+/* Why this order: the to-dos that wait on each other, left to right ("done here opens that"), coloured by Leverage.
+   The key has the heavy border; what still waits is dashed. Items with no links are left off: the list has them. */
+function OrderGraph({all, keyItem, selected, onSelect}: {
+    all: MoveItem[], keyItem?: string, selected: string[], onSelect: (key: string) => void
+}) {
+    const todos = all.filter(i => i.todo);
+    const byTodo = new Map(todos.map(i => [i.todo!.id, i]));
+    const waits = (i: MoveItem) => (i.todo?.waitsOn ?? []).filter(id => byTodo.has(id));
+    const linked = todos.filter(i => waits(i).length > 0 || todos.some(j => waits(j).includes(i.todo!.id)));
+    if (linked.length === 0) {
+        return <Typography variant="body2" color="text.secondary" sx={{px: 2, py: 2}}>
+            Nothing here waits on anything else yet, so the order is just Leverage: quick, worthwhile things first.
+        </Typography>;
+    }
+    // column = the longest chain of waits behind it
+    const column = new Map<string, number>();
+    const depth = (i: MoveItem, seen: Set<string>): number => {
+        if (column.has(i.key)) return column.get(i.key)!;
+        const d = Math.max(0, ...waits(i).filter(id => !seen.has(id)).map(id => 1 + depth(byTodo.get(id)!, new Set([...seen, id]))));
+        column.set(i.key, d);
+        return d;
+    };
+    linked.forEach(i => depth(i, new Set([i.todo!.id])));
+    const columns: MoveItem[][] = [];
+    linked.forEach(i => (columns[column.get(i.key)!] ??= []).push(i));
+    columns.forEach(c => c.sort((a, b) => b.leverage - a.leverage));
+    const w = 190, h = 54, gapX = 56, gapY = 14, pad = 8;
+    const pos = new Map<string, {x: number, y: number}>();
+    columns.forEach((c, ci) => c.forEach((i, ri) => pos.set(i.key, {x: pad + ci * (w + gapX), y: pad + ri * (h + gapY)})));
+    const width = pad * 2 + columns.length * w + (columns.length - 1) * gapX;
+    const height = pad * 2 + Math.max(...columns.map(c => c.length)) * (h + gapY) - gapY;
+    const max = Math.max(...all.map(i => i.leverage), 0.001);
+    const short = (t: string, n: number) => t.length > n ? `${t.slice(0, n - 1)}…` : t;
+    return <Box sx={{px: 1, pb: 1}}>
+        <Box sx={{overflowX: "auto"}}>
+            <svg data-testid="order-graph" width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Which to-dos open which">
+                {linked.flatMap(i => waits(i).map(id => {
+                    const from = pos.get(byTodo.get(id)!.key)!, to = pos.get(i.key)!;
+                    const x1 = from.x + w, y1 = from.y + h / 2, x2 = to.x, y2 = to.y + h / 2;
+                    return <path key={`${id}-${i.key}`} d={`M${x1} ${y1} C${x1 + gapX / 2} ${y1} ${x2 - gapX / 2} ${y2} ${x2} ${y2}`}
+                        fill="none" stroke="#C9B8A6" strokeWidth={1.5} markerEnd="url(#order-arrow)"/>;
+                }))}
+                <defs>
+                    <marker id="order-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                        <path d="M0 0 L8 4 L0 8 z" fill="#C9B8A6"/>
+                    </marker>
+                </defs>
+                {linked.map(i => {
+                    const {x, y} = pos.get(i.key)!;
+                    const level = heatOf(i.leverage / max);
+                    const isKey = i.key === keyItem;
+                    const words = short(i.text, 52);
+                    const cut = words.length > 26 ? words.lastIndexOf(" ", 26) : -1;
+                    const lines = cut > 0 ? [words.slice(0, cut), words.slice(cut + 1)] : [words];
+                    return <g key={i.key} role="button" tabIndex={0} style={{cursor: "pointer"}} onClick={() => onSelect(i.key)}
+                        onKeyDown={e => (e.key === "Enter" || e.key === " ") && onSelect(i.key)} aria-label={i.text}>
+                        <rect x={x} y={y} width={w} height={h} rx={8} fill={heat[level]}
+                            stroke={isKey || selected.includes(i.key) ? "#3D2B1F" : "#C9B8A6"}
+                            strokeWidth={isKey ? 3.5 : selected.includes(i.key) ? 2 : 1}
+                            strokeDasharray={i.ready ? undefined : "5 4"}/>
+                        {lines.map((line, li) => <text key={li} x={x + 10} y={y + 20 + li * 16} fontSize={12.5}
+                            fill={level === 3 ? "#fff" : "#3D2B1F"} fontWeight={isKey ? 700 : 400}>{line}</text>)}
+                    </g>;
+                })}
+            </svg>
+        </Box>
+        <Stack direction="row" gap={1.5} flexWrap="wrap" sx={{mt: 0.5, px: 1}}>
+            {[["most leverage", 3], ["some", 1], ["little", 0]].map(([label, level]) => <Stack key={label} direction="row" gap={0.5} alignItems="center">
+                <Box sx={{width: 14, height: 14, borderRadius: 0.5, bgcolor: heat[level as number], border: "1px solid #C9B8A6"}}/>
+                <Typography variant="caption">{label}</Typography>
+            </Stack>)}
+            <Typography variant="caption">heavy border: start here · dashed: still waiting · arrow: done here opens that</Typography>
+        </Stack>
+    </Box>;
+}
+
 export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, projectName}: {
     projects: ClaudeProject[],
     threadLinkProps: (t: ClaudeThread) => object,
@@ -129,6 +209,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     const [selected, setSelected] = React.useState<string>();
     const [pinned, setPinned] = React.useState<string[]>([]);
     const [allReady, setAllReady] = React.useState(false);
+    const [why, setWhy] = React.useState(false);
     const byKey = new Map(all.map(i => [i.key, i]));
     // pinned cards stay; the one just tapped joins them; two at most, half and half
     const cards = [...new Set([...pinned, ...(selected ? [selected] : [])])].filter(k => byKey.has(k)).slice(-2);
@@ -172,7 +253,14 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     const start = ready.slice(0, 1 + alternates);
     const rest = ready.slice(1 + alternates);
     return <Box data-testid="your-move-sections">
-        <List dense disablePadding>
+        <Stack direction="row" justifyContent="flex-end" sx={{px: 2, pt: 1}}>
+            <ToggleButtonGroup size="small" exclusive value={why ? "why" : "list"} onChange={(_, v) => v && setWhy(v === "why")}>
+                <ToggleButton value="list" sx={{textTransform: "none", py: 0.25}}>In order</ToggleButton>
+                <ToggleButton value="why" sx={{textTransform: "none", py: 0.25}}>Why this order</ToggleButton>
+            </ToggleButtonGroup>
+        </Stack>
+        {why && <OrderGraph all={all} keyItem={start[0]?.key} selected={cards} onSelect={setSelected}/>}
+        {!why && <List dense disablePadding>
             {start.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F"}}>Start here</ListSubheader>}
             {start.map((item, i) => row(item, i === 0 ? "key" : "alt"))}
             {rest.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F", mt: 1}}>Ready</ListSubheader>}
@@ -182,7 +270,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
             </Button>}
             {later.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F", mt: 1}}>Opens up later</ListSubheader>}
             {later.map(item => row(item, "later"))}
-        </List>
+        </List>}
         {cards.length > 0 && <Box sx={{
             position: "fixed", left: 16, right: 16, bottom: 16, zIndex: 10, maxWidth: cards.length > 1 ? 1100 : 560, mx: "auto",
             display: "grid", gap: 1.5, gridTemplateColumns: {xs: "1fr", sm: cards.length > 1 ? "1fr 1fr" : "1fr"}
