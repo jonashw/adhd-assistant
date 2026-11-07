@@ -13,6 +13,7 @@ import { SignInGate } from './SignInGate';
 import { CrewPreview } from './CrewPreview';
 import { TemplatePicker } from './templates/TemplatePicker';
 import { ClaudeMap } from './ClaudeMap';
+import { hideSplash } from './splash';
 
 const defaultTheme = createTheme();
 
@@ -71,3 +72,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </GraphRepositoryContextProvider>
   </React.StrictMode>,
 )
+
+// Pages outside the sign-in gate (the crew preview, the speech demo) don't wait on it,
+// and if the gate is ever slow the loading screen still steps aside after a few seconds.
+if (/^\/(crew|recognize)/.test(window.location.pathname)) hideSplash();
+else window.setTimeout(hideSplash, 8000);
