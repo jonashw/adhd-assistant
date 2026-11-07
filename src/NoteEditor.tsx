@@ -215,7 +215,7 @@ export function NoteEditor({body, onChange, onPromote, uploadPhoto}: {
                                 </a>
                                 <IconButton size="small" aria-label="Remove photo"
                                     onClick={() => onChange(NoteBody.remove(body, group.index))}
-                                    sx={{position: "absolute", top: 4, right: 4, bgcolor: "rgba(255,255,255,0.8)",
+                                    sx={{position: "absolute", top: 4, right: 4, bgcolor: "rgba(255,255,255,0.8)", color: "#1f1e1d",
                                         "&:hover": {bgcolor: "rgba(255,255,255,0.95)"}}}>
                                     <Close fontSize="small"/>
                                 </IconButton>

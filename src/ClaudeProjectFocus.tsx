@@ -65,7 +65,7 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
         ...todos.map(({todo, t}): ForYouItem => {
             const scored = scores.get(todo.id)!;
             return {
-                key: `todo:${todo.id}`, label: "To-do", color: "#F3ECE2", textColor: "#3D2B1F", text: todo.text, thread: t, link: todo.link,
+                key: `todo:${todo.id}`, label: "To-do", color: "claude.todoBg", textColor: "claude.ink", text: todo.text, thread: t, link: todo.link,
                 todo, reason: reasonLine(todo, scored), leverage: scored.leverage, ready: scored.ready
             };
         })
@@ -90,7 +90,7 @@ export function InterestThumbs({todo, onAnswer}: {todo: ClaudeTodo, onAnswer: (a
             e.stopPropagation();
             onAnswer(answered === answer ? undefined : answer);
         }}
-        sx={{p: 0.25, color: answered === answer ? "#3D2B1F" : "#9C8B7A"}}
+        sx={{p: 0.25, color: answered === answer ? "claude.ink" : "claude.muted"}}
     >
         {answer === "up"
             ? answered === "up" ? <ThumbUp sx={{fontSize: 16}}/> : <ThumbUpOffAlt sx={{fontSize: 16}}/>
@@ -99,8 +99,8 @@ export function InterestThumbs({todo, onAnswer}: {todo: ClaudeTodo, onAnswer: (a
     return <Box component="span" sx={{display: "inline-flex", alignItems: "center", gap: 0.25, mt: 0.25}}>
         <Tooltip title={answered ? "You said" : "Claude's guess. Tap a thumb to say."}>
             <Typography component="span" variant="caption" sx={{
-                px: 0.75, borderRadius: 1, color: "#5B4636",
-                border: answered ? "1px solid #C9B8A6" : "1px dashed #C9B8A6"
+                px: 0.75, borderRadius: 1, color: "claude.inkSoft",
+                border: 1, borderStyle: answered ? "solid" : "dashed", borderColor: "claude.line"
             }}>
                 {answered ? (answered === "up" ? "You want to" : "You'd rather not") : guessWords}
                 {!answered && interest.reason ? ` (${interest.reason})` : ""}
@@ -157,7 +157,7 @@ export function ProjectForYou({project, threadLinkProps, onOpenThread, onInteres
                 </ListItemButton>
             </ListItem>)}
         </List>
-        {items.length > firstShown && <Button size="small" onClick={() => setAll(!all)} sx={{color: "#3D2B1F"}}>
+        {items.length > firstShown && <Button size="small" onClick={() => setAll(!all)} sx={{color: "claude.ink"}}>
             {all ? "Show fewer" : `Show ${items.length - firstShown} more`}
         </Button>}
     </Box>;

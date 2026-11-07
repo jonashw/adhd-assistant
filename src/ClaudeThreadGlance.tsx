@@ -9,13 +9,6 @@ import { Pill, artifactLinkProps, artifactPill } from "./claudeArtifacts";
 /* What a thread said about itself, at a glance: what it asks of Jon, its latest reply, how far along
    its checklist is, its PRs and every artifact it made. Answers "should I open it now?" without opening it. */
 
-const ciColors: Record<ClaudeCiState, string> = {
-    success: "#16A34A",
-    failure: "#DC2626",
-    pending: "#F59E0B",
-    none: "#9CA3AF"
-};
-
 const ciWords: Record<ClaudeCiState, string> = {
     success: "checks passed",
     failure: "checks failed",
@@ -42,10 +35,10 @@ export function PrChip({pr}: {pr: ClaudePr}) {
             {pr.ci && !merged && pr.state !== "closed" && <Box
                 component="span"
                 aria-label={ciWords[pr.ci]}
-                sx={{width: 8, height: 8, borderRadius: "50%", bgcolor: ciColors[pr.ci], display: "inline-block"}}
+                sx={{width: 8, height: 8, borderRadius: "50%", bgcolor: `claude.ci.${pr.ci}`, display: "inline-block"}}
             />}
         </Stack>}
-        sx={{color: merged ? "#7C3AED" : undefined, borderColor: merged ? "#C4B5FD" : undefined}}
+        sx={{color: merged ? "claude.artifact" : undefined, borderColor: merged ? "claude.artifactEdge" : undefined}}
     />;
 }
 
@@ -53,7 +46,7 @@ export function PillChip({pill}: {pill: Pill}) {
     return <Chip
         size="small"
         label={pill.text}
-        sx={{bgcolor: pill.bg, color: pill.fg, fontWeight: 600, height: 20, border: pill.outline ? `1px solid ${pill.outline}` : undefined}}
+        sx={{bgcolor: `claude.${pill.bg}`, color: pill.fg === "white" ? "#fff" : `claude.${pill.fg}`, fontWeight: 600, height: 20, ...(pill.outline ? {border: 1, borderColor: `claude.${pill.outline}`} : {})}}
     />;
 }
 
@@ -73,7 +66,7 @@ export function ArtifactChip({artifact, project, onOpen}: {artifact: ClaudeArtif
         label={flag === "new" ? `${artifact.title} · New` : flag === "updated" ? `${artifact.title} · Updated` : artifact.title}
         sx={{
             maxWidth: 280,
-            ...(flag === "new" ? {bgcolor: "#7C3AED", color: "#fff"} : flag === "updated" ? {bgcolor: "#F3E8FF", color: "#5B21B6", border: "1px solid #7C3AED"} : {})
+            ...(flag === "new" ? {bgcolor: "claude.artifact", color: "#fff"} : flag === "updated" ? {bgcolor: "claude.artifactSoft", color: "claude.artifactText", border: 1, borderColor: "claude.artifact"} : {})
         }}
     />;
 }
@@ -83,7 +76,7 @@ const artifactsAtFirst = 4;
 
 export function NewDot({thread}: {thread: ClaudeThread}) {
     return isNewSince(thread)
-        ? <Chip size="small" label="New" sx={{bgcolor: "#D97757", color: "#fff", fontWeight: 600, height: 20}}/>
+        ? <Chip size="small" label="New" sx={{bgcolor: "claude.ring", color: "#fff", fontWeight: 600, height: 20}}/>
         : null;
 }
 
@@ -104,11 +97,11 @@ export function ClaudeThreadGlance({thread, project, onOpenArtifact}: {
         </Typography>;
     }
     return <Stack gap={1} sx={{mt: 1.25}}>
-        {ask && <Box sx={{bgcolor: "#FEF3C7", borderLeft: "3px solid #F59E0B", px: 1.25, py: 0.75, borderRadius: 1}}>
-            <Typography variant="caption" sx={{fontWeight: 700, color: "#92400E", textTransform: "uppercase", letterSpacing: 0.4}}>
+        {ask && <Box sx={{bgcolor: "claude.askBg", borderLeft: 3, borderLeftColor: "claude.askEdge", px: 1.25, py: 0.75, borderRadius: 1}}>
+            <Typography variant="caption" sx={{fontWeight: 700, color: "claude.askLabel", textTransform: "uppercase", letterSpacing: 0.4}}>
                 {askLabels[ask.kind]}
             </Typography>
-            <Typography variant="body2" sx={{color: "#1F1300"}}>{ask.text}</Typography>
+            <Typography variant="body2" sx={{color: "claude.askText"}}>{ask.text}</Typography>
         </Box>}
         {card?.headline && <Stack direction="row" alignItems="flex-start" gap={1}>
             <Typography variant="body2" color="text.secondary" sx={{flexGrow: 1}}>{card.headline}</Typography>
@@ -126,7 +119,7 @@ export function ClaudeThreadGlance({thread, project, onOpenArtifact}: {
             <LinearProgress
                 variant="determinate"
                 value={100 * card.progress.done / card.progress.total}
-                sx={{height: 4, borderRadius: 2, bgcolor: "#F1E4DA", "& .MuiLinearProgress-bar": {bgcolor: "#D97757"}}}
+                sx={{height: 4, borderRadius: 2, bgcolor: "claude.track", "& .MuiLinearProgress-bar": {bgcolor: "claude.ring"}}}
             />
         </Box>}
         {prs.length > 0 && <Stack direction="row" gap={0.75} flexWrap="wrap" alignItems="center">
@@ -147,7 +140,7 @@ export function ClaudeThreadGlance({thread, project, onOpenArtifact}: {
                     label={latestOnly.title}
                     sx={{maxWidth: 280}}
                 />}
-                {own.length > artifactsAtFirst && <Button size="small" onClick={() => setAllArtifacts(v => !v)} sx={{color: "#5B21B6"}}>
+                {own.length > artifactsAtFirst && <Button size="small" onClick={() => setAllArtifacts(v => !v)} sx={{color: "claude.artifactText"}}>
                     {allArtifacts ? "Fewer" : `All ${own.length}`}
                 </Button>}
             </Stack>

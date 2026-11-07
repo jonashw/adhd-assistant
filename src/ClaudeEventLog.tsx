@@ -8,6 +8,7 @@ import { ClaudeEvent, ClaudeLogEntry, ClaudeProject, ClaudeSync, ClaudeThreadSta
 import { OpenIn, claudeStyle, keep, linkProps, projectLabel } from "./ClaudeMap";
 import { ServerApi } from "./ServerApi";
 import { safetyPollMs, useRing } from "./live";
+import { useClaudeColors } from "./theme";
 
 /* The Claude event log: what changed in Claude, newest first, as the syncs saw it. With "Syncs" on, every sync
    shows too, and tapping one shows exactly what Claude sent, so it doubles as a debugging tool.
@@ -79,6 +80,7 @@ const timeOf = (iso: string) => new Date(iso).toLocaleTimeString(undefined, {hou
 type Props = {projects: ClaudeProject[], query: string, openIn: OpenIn, demo: boolean};
 
 export function ClaudeEventLog({projects, query, openIn, demo}: Props) {
+    const colors = useClaudeColors();
     const [entries, setEntries] = React.useState<ClaudeLogEntry[]>();
     const [older, setOlder] = React.useState<ClaudeLogEntry[]>([]);
     const [noMore, setNoMore] = React.useState(false);
@@ -157,7 +159,7 @@ export function ClaudeEventLog({projects, query, openIn, demo}: Props) {
     });
 
     let lastDay = "";
-    return <Box sx={{bgcolor: "#fff", minHeight: "100%", pb: 10}}>
+    return <Box sx={{bgcolor: "claude.surface", minHeight: "100%", pb: 10}}>
         <Stack direction="row" alignItems="center" gap={1} sx={{px: 2, py: 1}}>
             <Typography variant="caption" color="text.secondary" sx={{flexGrow: 1}}>
                 Newest first. Each change is timed by the sync that brought it, so it can trail the change itself.
@@ -178,7 +180,7 @@ export function ClaudeEventLog({projects, query, openIn, demo}: Props) {
         <List dense disablePadding>
             {shown.map(e => {
                 const day = dayOf(e.at);
-                const header = day !== lastDay ? <ListSubheader sx={{bgcolor: claudeStyle.fill, fontFamily: claudeStyle.font, color: claudeStyle.ink}}>{day}</ListSubheader> : null;
+                const header = day !== lastDay ? <ListSubheader sx={{bgcolor: "claude.fill", fontFamily: claudeStyle.font, color: "claude.ink"}}>{day}</ListSubheader> : null;
                 lastDay = day;
                 const project = projectsById.get(e.projectId);
                 const where = project ? projectLabel(project) : (e.type === "sync" ? e.projectName : undefined) ?? e.projectId;
@@ -201,7 +203,7 @@ export function ClaudeEventLog({projects, query, openIn, demo}: Props) {
                 }
                 const thread = titleOf(e.threadId);
                 const url = e.threadId ? claudeThreadUrl(e.projectId, e.threadId) : project?.url;
-                const color = e.kind === "thread_state" && e.to ? claudeBadges[e.to as ClaudeThreadState] : undefined;
+                const color = e.kind === "thread_state" && e.to ? colors.badges[e.to as ClaudeThreadState] : undefined;
                 return <React.Fragment key={`e${e.id}`}>
                     {header}
                     <ListItemButton {...linkProps(url, openIn)} sx={{gap: 1.5}}>

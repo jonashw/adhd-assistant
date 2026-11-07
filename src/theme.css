@@ -1,0 +1,3 @@
+/* Black line drawings (the enso, the weekly-review loop, the graph mark) turn light in dark mode.
+   theme.ts sets data-theme on <html>; index.html sets it before the first paint. */
+[data-theme=dark] .line-art { filter: invert(0.9); }

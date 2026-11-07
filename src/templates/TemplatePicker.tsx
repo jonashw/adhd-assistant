@@ -35,8 +35,8 @@ function CrewFace({crew, size = 40}: {crew: CrewLead, size?: number}) {
         case "rabbit": return <RabbitBurrowLoop size={size}/>;
         case "claude": return <ClaudeMapIcon size={size * 0.7}/>;
         case "sloth":
-        case "none": return <img src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
-        case "review": return <img src="/review.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
+        case "none": return <img className="line-art" src="/Enso.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
+        case "review": return <img className="line-art" src="/review.svg" width={size * 0.7} height={size * 0.7} alt=""/>;
     }
 }
 
@@ -170,7 +170,10 @@ function useTail(bubble: React.RefObject<HTMLElement>, mouth: MouthRef, side: "t
 function SpeechBubble({text, mouth, side = "top"}: {text: string, mouth: MouthRef, side?: "top" | "left"}) {
     const ref = React.useRef<HTMLDivElement>(null);
     const tail = useTail(ref, mouth, side);
-    const edge = "rgba(0,0,0,0.28)";
+    // the tail is filled with the bubble's own paper, so it joins seamlessly in light and dark
+    const theme = useTheme();
+    const paper = theme.palette.background.paper;
+    const edge = theme.palette.mode === "dark" ? "rgba(222,220,209,0.35)" : "rgba(0,0,0,0.28)";
     const w = 8;
     const points = tail && (side === "left"
         ? [[1.5, tail.base - w], tail.tip, [1.5, tail.base + w]]
@@ -183,9 +186,9 @@ function SpeechBubble({text, mouth, side = "top"}: {text: string, mouth: MouthRe
             {/* the tail, drawn over the bubble's edge so the gap where it joins is white */}
             {points && <Box component="svg" aria-hidden width={1} height={1}
                 sx={{position: "absolute", top: 0, left: 0, overflow: "visible", pointerEvents: "none"}}>
-                <path d={`M${points.map(p => p.join(" ")).join(" L")}`} fill="white" stroke={edge} strokeWidth={1.5} strokeLinejoin="round"/>
+                <path d={`M${points.map(p => p.join(" ")).join(" L")}`} fill={paper} stroke={edge} strokeWidth={1.5} strokeLinejoin="round"/>
                 <path d={side === "left" ? `M1.5 ${tail.base - w + 1.5} L1.5 ${tail.base + w - 1.5}` : `M${tail.base - w + 1.5} 1.5 L${tail.base + w - 1.5} 1.5`}
-                    stroke="white" strokeWidth={3}/>
+                    stroke={paper} strokeWidth={3}/>
             </Box>}
         </Box>
     );

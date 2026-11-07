@@ -17,10 +17,10 @@ export function ClaudeMapEntry() {
     const count = (kind: string) => badges.filter(b => b === kind).length;
     const needsYou = count("blocked"), ready = count("review_ready"), working = count("working");
     const fresh = shown.flatMap(p => (p.artifacts ?? []).filter(a => artifactFlag(a, p) === "new")).length;
-    return <Paper elevation={0} sx={{m: 1, border: `1px solid ${claudeStyle.ring}`, bgcolor: claudeStyle.fill}}>
+    return <Paper elevation={0} sx={{m: 1, border: 1, borderColor: "claude.ring", bgcolor: "claude.fill"}}>
         <ListItemButton onClick={() => navigate("/claude")}>
             <ListItemText
-                primary={<Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink}}>Claude map</Typography>}
+                primary={<Typography sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: "claude.ink"}}>Claude map</Typography>}
                 secondary={projects === undefined ? "Loading…"
                     : shown.length === 0 ? "Kept by Claude. Opted-in projects show up here."
                     : `${shown.length} project${shown.length === 1 ? "" : "s"}, kept by Claude`}
@@ -29,7 +29,7 @@ export function ClaudeMapEntry() {
                 {needsYou > 0 && <BadgeChip kind="blocked" text={`${needsYou} need${needsYou === 1 ? "s" : ""} you`}/>}
                 {ready > 0 && <BadgeChip kind="review_ready" text={`${ready} ready`}/>}
                 {working > 0 && <BadgeChip kind="working" text={`${working} working`}/>}
-                {fresh > 0 && <Chip size="small" label={`${fresh} new artifact${fresh === 1 ? "" : "s"}`} sx={{bgcolor: "#7C3AED", color: "#fff", fontWeight: 600}}/>}
+                {fresh > 0 && <Chip size="small" label={`${fresh} new artifact${fresh === 1 ? "" : "s"}`} sx={{bgcolor: "claude.artifact", color: "#fff", fontWeight: 600}}/>}
             </Stack>
         </ListItemButton>
     </Paper>;

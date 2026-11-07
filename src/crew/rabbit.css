@@ -64,3 +64,6 @@
 }
 
 .crew-rabbit .burrow-chamber.is-selected .burrow-tunnel { stroke: #4dd0e1; stroke-width: 1.2; }
+
+/* Dark mode: the sky over the burrow at dusk; the earth already reads on dark */
+[data-theme=dark] .crew-rabbit .burrow-sky { fill: #1f2530; }

@@ -56,3 +56,21 @@
 .balloon-trail .trail-hammock { fill: #e58e3c; stroke: #b5651d; stroke-width: 1; }
 .balloon-trail .trail-hammock-stripe { fill: none; stroke: #ffd38a; stroke-width: 1.6; stroke-dasharray: 5 4; }
 .balloon-trail .trail-hand, .balloon-trail .jon-hand { fill: #f1c7a5; }
+
+/* Dark mode: the same trail at dusk, so the scene doesn't glare out of Claude's dark page. Signs stay lit. */
+[data-theme=dark] .balloon-trail .trail-sky-high { stop-color: #161b26; }
+[data-theme=dark] .balloon-trail .trail-sky-low { stop-color: #2a3140; }
+[data-theme=dark] .balloon-trail .trail-ground { fill: #3b4831; }
+[data-theme=dark] .balloon-trail .trail-grass { fill: #4b6038; }
+[data-theme=dark] .balloon-trail .trail-path { stroke: #6b6250; }
+[data-theme=dark] .balloon-trail .trail-level line { opacity: 0.25; }
+[data-theme=dark] .balloon-trail .trail-level text { fill: #9fb3c8; }
+[data-theme=dark] .balloon-trail .trail-home-text { fill: #c2c0b6; }
+[data-theme=dark] .balloon-trail .trail-more { fill: #a8c08f; }
+[data-theme=dark] .balloon-trail .trail-cloud { fill: #3b404b; }
+[data-theme=dark] .balloon-trail .trail-cloud-edge { fill: #525a6a; stroke: #525a6a; }
+[data-theme=dark] .balloon-trail .trail-cloud-text { fill: #e8e6dc; }
+[data-theme=dark] .balloon-trail .trail-cloud-place.is-passed .trail-cloud { fill: #4a4434; }
+[data-theme=dark] .balloon-trail .trail-cloud-place.is-passed .trail-cloud-text { fill: #f0dfae; }
+[data-theme=dark] .balloon-trail .trail-cloud-place.is-lit .trail-cloud { fill: #5a4c25; }
+[data-theme=dark] .balloon-trail .trail-cloud-place.is-lit .trail-cloud-text { fill: #ffe7a8; }

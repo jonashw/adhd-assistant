@@ -36,7 +36,7 @@ import { ServerApi } from './ServerApi';
 import { ConnectedAppsDialog } from './ConnectedAppsDialog';
 import { ClaudeMapEntry } from './ClaudeMapEntry';
 
-function GraphIcon({size}:{size?:number}){ return <img src="/graph.svg" width={size} height={size}/>; }
+function GraphIcon({size}:{size?:number}){ return <img className="line-art" src="/graph.svg" width={size} height={size} alt=""/>; }
 
 const previewLength = 60;
 
@@ -249,7 +249,7 @@ export function GraphList() {
                     open={speedDialOpen}
                 >
                         <SpeedDialAction
-                            icon={<img src="/Enso.svg" width={24} />}
+                            icon={<img className="line-art" src="/Enso.svg" width={24} />}
                             tooltipTitle={"Empty"}
                             tooltipOpen
                             onClick={() => {

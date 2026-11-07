@@ -50,7 +50,7 @@ export function Mindful() {
     return (
         <Stack ref={ref} alignItems="center" gap={2} sx={{py: 3, textAlign: "center", width: "100%"}} data-testid="mindful">
             {size > 0 && <Box sx={{position: "relative", width: size, height: size}}>
-                <img src="/Enso.svg" alt="" width={size} height={size}/>
+                <img className="line-art" src="/Enso.svg" alt="" width={size} height={size}/>
                 {/* the sloth hooks its claws over the inside edge of the enso's top, so its body hangs against the white */}
                 <Box sx={{position: "absolute", top: 28 * u, left: "50%", transform: "translateX(-50%)", lineHeight: 0}}><Sloth size={44 * u} bar={false}/></Box>
                 <Box sx={{position: "absolute", bottom: 24 * u, left: "54%", transform: "translateX(-50%)", lineHeight: 0}}>

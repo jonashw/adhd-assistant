@@ -326,7 +326,7 @@
 .crew-jon .jon-face-ink { fill: var(--crew-balloon-face); }
 .crew-jon .jon-smile { fill: none; stroke: var(--crew-balloon-face); stroke-width: 1.6; stroke-linecap: round; }
 .crew-jon .jon-knot { fill: none; stroke: var(--crew-eye); stroke-width: 1.4; }
-.crew-jon .jon-string { fill: none; stroke: var(--crew-ink); stroke-width: 1; stroke-linecap: round; }
+.crew-jon .jon-string { fill: none; stroke: var(--crew-string); stroke-width: 1; stroke-linecap: round; }
 .crew-jon .jon-hand { fill: var(--crew-metal-dark); }
 .crew-jon .jon-work { fill: var(--crew-work); stroke: var(--crew-work-edge); stroke-width: 1.2; }
 .crew-jon .jon-work-lines { fill: none; stroke: var(--crew-work-edge); stroke-width: 0.7; opacity: 0.6; stroke-linecap: round; }
@@ -594,3 +594,15 @@
 @keyframes yanchi-tilt { 0%, 100% { transform: rotate(0); } 35%, 65% { transform: rotate(-4deg); } }
 @keyframes yanchi-wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } }
 @keyframes yanchi-wink { 0%, 50% { opacity: 0.2; } 25%, 75% { opacity: 1; } }
+
+/* Dark mode (theme.ts sets data-theme on <html>): the crew keeps its colours, so it stays the same crew, and gains
+   a faint light rim so dark parts don't sink into Claude's dark surfaces. What hangs in the air (your string, Yanchi's
+   strap and boom) turns light, since it has no body behind it. */
+.crew { --crew-string: var(--crew-ink); }
+[data-theme=dark] .crew {
+    --crew-string: #b8c3c9;
+    --crew-you-legs: #5b7280;
+    filter: drop-shadow(0 0 0.6px rgba(250, 249, 245, 0.55));
+}
+[data-theme=dark] .crew-yanchi .yanchi-band,
+[data-theme=dark] .crew-yanchi .yanchi-boom { stroke: var(--crew-string); }

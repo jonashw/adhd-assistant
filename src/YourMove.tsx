@@ -3,6 +3,7 @@ import { Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, List
 import { Close, OpenInNew, PushPin, PushPinOutlined } from "@mui/icons-material";
 import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, standingAsk } from "./ClaudeMapTypes";
 import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
+import { useClaudeColors } from "./theme";
 
 /* The top of Your move: everything every project needs from Jon, in one Leverage order.
 
@@ -42,7 +43,7 @@ function withLinks(line: string) {
 
 function Section({title, children}: {title: string, children: React.ReactNode}) {
     return <Box sx={{mt: 1}}>
-        <Typography variant="overline" sx={{lineHeight: 1.6, color: "#5B4636"}}>{title}</Typography>
+        <Typography variant="overline" sx={{lineHeight: 1.6, color: "claude.inkSoft"}}>{title}</Typography>
         {children}
     </Box>;
 }
@@ -63,7 +64,7 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
     const {opens, waitsOn} = links(item, all);
     const todo = item.todo;
     const ask = standingAsk(item.thread);
-    return <Paper elevation={6} data-testid="move-card" sx={{p: 2, borderTop: "4px solid #D97757", minWidth: 0, overflowY: "auto", maxHeight: {xs: half ? "30dvh" : "42dvh", sm: "46dvh"}}}>
+    return <Paper elevation={6} data-testid="move-card" sx={{p: 2, borderTop: 4, borderTopColor: "claude.ring", minWidth: 0, overflowY: "auto", maxHeight: {xs: half ? "30dvh" : "42dvh", sm: "46dvh"}}}>
         <Stack direction="row" alignItems="flex-start" gap={1}>
             <Chip size="small" label={item.label} sx={{bgcolor: item.color, color: item.textColor, fontWeight: 600, mt: 0.25}}/>
             <Typography sx={{flexGrow: 1, fontWeight: 600, overflowWrap: "anywhere"}}>{item.text}</Typography>
@@ -97,14 +98,14 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
         {todo && <Box sx={{mt: 1}}><InterestThumbs todo={todo} onAnswer={answer => onInterest(todo, answer)}/></Box>}
         <Stack direction="row" gap={1} sx={{mt: 1.5}} flexWrap="wrap">
             {item.link && <Button size="small" variant="outlined" endIcon={<OpenInNew/>} href={item.link} target="_blank" rel="noopener noreferrer"
-                sx={{color: "#3D2B1F", borderColor: "#C9B8A6"}}>
+                sx={{color: "claude.ink", borderColor: "claude.line"}}>
                 Where you do it
             </Button>}
             <Button
                 size="small"
                 variant="contained"
                 endIcon={<OpenInNew/>}
-                sx={{bgcolor: "#D97757", "&:hover": {bgcolor: "#C4623F"}}}
+                sx={{bgcolor: "claude.ring", "&:hover": {bgcolor: "claude.ringHover"}}}
                 {...threadLinkProps(item.thread)}
                 onClick={() => onOpenThread(item.thread)}
             >
@@ -115,7 +116,6 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
 }
 
 
-const heat = ["#F3ECE2", "#F6D9C4", "#EFAF8A", "#D97757"];
 const heatOf = (h: number) => h > 0.66 ? 3 : h > 0.4 ? 2 : h > 0.18 ? 1 : 0;
 
 /* Why this order: the to-dos that wait on each other, left to right ("done here opens that"), coloured by Leverage.
@@ -123,6 +123,7 @@ const heatOf = (h: number) => h > 0.66 ? 3 : h > 0.4 ? 2 : h > 0.18 ? 1 : 0;
 function OrderGraph({all, keyItem, selected, onSelect}: {
     all: MoveItem[], keyItem?: string, selected: string[], onSelect: (key: string) => void
 }) {
+    const c = useClaudeColors();
     const todos = all.filter(i => i.todo);
     const byTodo = new Map(todos.map(i => [i.todo!.id, i]));
     const waits = (i: MoveItem) => (i.todo?.waitsOn ?? []).filter(id => byTodo.has(id));
@@ -150,6 +151,7 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     const width = pad * 2 + columns.length * w + (columns.length - 1) * gapX;
     const height = pad * 2 + Math.max(...columns.map(c => c.length)) * (h + gapY) - gapY;
     const max = Math.max(...all.map(i => i.leverage), 0.001);
+    const {heat, line: edge, ink} = c;
     const short = (t: string, n: number) => t.length > n ? `${t.slice(0, n - 1)}…` : t;
     return <Box sx={{px: 1, pb: 1}}>
         <Box sx={{overflowX: "auto"}}>
@@ -158,11 +160,11 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
                     const from = pos.get(byTodo.get(id)!.key)!, to = pos.get(i.key)!;
                     const x1 = from.x + w, y1 = from.y + h / 2, x2 = to.x, y2 = to.y + h / 2;
                     return <path key={`${id}-${i.key}`} d={`M${x1} ${y1} C${x1 + gapX / 2} ${y1} ${x2 - gapX / 2} ${y2} ${x2} ${y2}`}
-                        fill="none" stroke="#C9B8A6" strokeWidth={1.5} markerEnd="url(#order-arrow)"/>;
+                        fill="none" stroke={edge} strokeWidth={1.5} markerEnd="url(#order-arrow)"/>;
                 }))}
                 <defs>
                     <marker id="order-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-                        <path d="M0 0 L8 4 L0 8 z" fill="#C9B8A6"/>
+                        <path d="M0 0 L8 4 L0 8 z" fill={edge}/>
                     </marker>
                 </defs>
                 {linked.map(i => {
@@ -175,18 +177,18 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
                     return <g key={i.key} role="button" tabIndex={0} style={{cursor: "pointer"}} onClick={() => onSelect(i.key)}
                         onKeyDown={e => (e.key === "Enter" || e.key === " ") && onSelect(i.key)} aria-label={i.text}>
                         <rect x={x} y={y} width={w} height={h} rx={8} fill={heat[level]}
-                            stroke={isKey || selected.includes(i.key) ? "#3D2B1F" : "#C9B8A6"}
+                            stroke={isKey || selected.includes(i.key) ? ink : edge}
                             strokeWidth={isKey ? 3.5 : selected.includes(i.key) ? 2 : 1}
                             strokeDasharray={i.ready ? undefined : "5 4"}/>
                         {lines.map((line, li) => <text key={li} x={x + 10} y={y + 20 + li * 16} fontSize={12.5}
-                            fill={level === 3 ? "#fff" : "#3D2B1F"} fontWeight={isKey ? 700 : 400}>{line}</text>)}
+                            fill={level === 3 ? "#fff" : ink} fontWeight={isKey ? 700 : 400}>{line}</text>)}
                     </g>;
                 })}
             </svg>
         </Box>
         <Stack direction="row" gap={1.5} flexWrap="wrap" sx={{mt: 0.5, px: 1}}>
             {[["most leverage", 3], ["some", 1], ["little", 0]].map(([label, level]) => <Stack key={label} direction="row" gap={0.5} alignItems="center">
-                <Box sx={{width: 14, height: 14, borderRadius: 0.5, bgcolor: heat[level as number], border: "1px solid #C9B8A6"}}/>
+                <Box sx={{width: 14, height: 14, borderRadius: 0.5, bgcolor: c.heat[level as number], border: 1, borderColor: "claude.line"}}/>
                 <Typography variant="caption">{label}</Typography>
             </Stack>)}
             <Typography variant="caption">heavy border: start here · dashed: still waiting · arrow: done here opens that</Typography>
@@ -236,8 +238,8 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         }}
         sx={{
             gap: 1.5, alignItems: "flex-start", mx: 1, my: kind === "key" ? 0.5 : 0, borderRadius: 1.5,
-            border: kind === "key" ? "3px solid #D97757" : kind === "alt" ? "1px solid #E7D9CB" : "1px solid transparent",
-            opacity: kind === "later" ? 0.6 : 1, bgcolor: kind === "key" ? "#FFF8F3" : undefined
+            border: kind === "key" ? 3 : 1, borderColor: kind === "key" ? "claude.ring" : kind === "alt" ? "claude.cardEdge" : "transparent",
+            opacity: kind === "later" ? 0.6 : 1, bgcolor: kind === "key" ? "claude.keyCardBg" : undefined
         }}
     >
         <Chip size="small" label={item.label} sx={{bgcolor: item.color, color: item.textColor, fontWeight: 600, mt: 0.25, flexShrink: 0}}/>
@@ -261,14 +263,14 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         </Stack>
         {why && <OrderGraph all={all} keyItem={start[0]?.key} selected={cards} onSelect={setSelected}/>}
         {!why && <List dense disablePadding>
-            {start.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F"}}>Start here</ListSubheader>}
+            {start.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink"}}>Start here</ListSubheader>}
             {start.map((item, i) => row(item, i === 0 ? "key" : "alt"))}
-            {rest.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F", mt: 1}}>Ready</ListSubheader>}
+            {rest.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 1}}>Ready</ListSubheader>}
             {(allReady ? rest : rest.slice(0, readyShown)).map(item => row(item, "ready"))}
-            {rest.length > readyShown && <Button size="small" sx={{ml: 2, color: "#3D2B1F"}} onClick={() => setAllReady(!allReady)}>
+            {rest.length > readyShown && <Button size="small" sx={{ml: 2, color: "claude.ink"}} onClick={() => setAllReady(!allReady)}>
                 {allReady ? "Show fewer" : `Show ${rest.length - readyShown} more`}
             </Button>}
-            {later.length > 0 && <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: "#3D2B1F", mt: 1}}>Opens up later</ListSubheader>}
+            {later.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 1}}>Opens up later</ListSubheader>}
             {later.map(item => row(item, "later"))}
         </List>}
         {cards.length > 0 && <Box sx={{

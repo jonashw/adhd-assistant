@@ -25,7 +25,7 @@ const symbolName: Record<HomeSymbol, string> = {
     enso: 'Enso', null: 'NULL', om: 'Om', buddha: 'Buddha', 'yin-yang': 'Yin and yang', review: 'Weekly review'
 };
 import { AccountTree, ArrowDropDown } from "@mui/icons-material";
-import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps, Typography } from "@mui/material";
+import { Box, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, SvgIcon, SvgIconProps, Typography, useTheme } from "@mui/material";
 
 /* One picture at a time: the map as a graph, as the rabbit's holes, or as Balloon-head's day. Saved with the map. */
 type MapView = "graph" | MapScene;
@@ -274,6 +274,19 @@ export default function MindMapGraph({
     },[graphRef]);
 
     const nodeRadius = 15;
+    /* the canvas can't read the palette, so dark mode picks its inks here: light rings and labels on Claude's dark page */
+    const dark = useTheme().palette.mode === "dark";
+    const ink = {
+        ring: dark ? 'hsl(48 8 62)' : 'hsl(0 0 20)',
+        link: dark ? 'rgba(222, 220, 209, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+        linkLabel: dark ? 'hsl(48 10 80)' : 'black',
+        flag: dark ? 'hsl(220 70 75)' : 'hsl(220 60 35)',
+        flare: dark ? 'hsl(25 85 62)' : 'hsl(25 85 40)',
+        smoke: dark ? 'hsl(0 0 70)' : 'hsl(0 0 35)',
+        tracks: dark ? 'hsl(140 40 62)' : 'hsl(140 40 30)',
+        node: dark ? 'hsl(40 4 36)' : 'hsl(0 0 30)',
+        sky: dark ? '#1f2530' : '#dcefff'
+    };
 
     //which nodes would show with hidden nodes tucked away; the rest are drawn muted when revealed
     const visibleIds = React.useMemo(
@@ -295,7 +308,7 @@ export default function MindMapGraph({
         ? node.id === selectedNodeId ? 'hsl(220 30 70)' : 'hsl(0 0 75)'
         : node.id === selectedNodeId
         ? 'hsl(220 75 50)'
-        : 'hsl(0 0 30)';
+        : ink.node;
 
     return (
         <div style={{display:'flex',flexDirection:'column',height:'100dvh'}}>
@@ -377,7 +390,7 @@ export default function MindMapGraph({
                                 <IconButton key={sym} role="radio" aria-checked={sym === symbol} aria-label={symbolName[sym]} title={symbolName[sym]}
                                     onClick={() => pickSymbol(sym)}
                                     sx={{border: 2, borderColor: sym === symbol ? 'primary.main' : 'transparent', borderRadius: 2, p: 0.5}}>
-                                    <img src={symbolImage[sym]} alt="" width={32} height={32} style={{objectFit: 'contain'}}/>
+                                    <img className="line-art" src={symbolImage[sym]} alt="" width={32} height={32} style={{objectFit: 'contain'}}/>
                                 </IconButton>)}
                         </Stack>
                     </Box>}
@@ -388,7 +401,7 @@ export default function MindMapGraph({
                             height, width, overflow: 'auto', display: 'flex', alignItems: 'safe flex-end', justifyContent: 'safe center',
                             //sky above, and bedrock below where the buttons float so they don't cover the deepest chambers
                             boxSizing: 'border-box', paddingBottom: bedrock,
-                            background: `linear-gradient(to bottom, #dcefff calc(100% - ${bedrock}px), #523a22 calc(100% - ${bedrock}px))`
+                            background: `linear-gradient(to bottom, ${ink.sky} calc(100% - ${bedrock}px), #523a22 calc(100% - ${bedrock}px))`
                         }}
                         data-testid="burrow-view"
                         ref={burrowView}
@@ -442,7 +455,7 @@ export default function MindMapGraph({
                                     ctx.beginPath();
                                     ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                                     ctx.closePath();
-                                    ctx.strokeStyle = 'hsl(0 0 20)';
+                                    ctx.strokeStyle = ink.ring;
                                     ctx.lineWidth = (node.type === 'HOME' ? 1 : 0.5) / globalScale;
                                     ctx.stroke();
                                     ctx.restore();
@@ -453,7 +466,7 @@ export default function MindMapGraph({
                                 ctx.beginPath();
                                 ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
                                 ctx.closePath();
-                                ctx.strokeStyle = 'hsl(0 0 20)';
+                                ctx.strokeStyle = ink.ring;
                                 ctx.lineWidth = 1;
                                 if (MindMap.isBlocked(value, node.id)) {
                                     //waiting on something: a dashed ring
@@ -491,7 +504,7 @@ export default function MindMapGraph({
                                 ctx.font = `${fontSize}px Sans-Serif`;
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = 'bottom';
-                                ctx.fillStyle = 'hsl(220 60 35)';
+                                ctx.fillStyle = ink.flag;
                                 const text = `⚑ ${flag.label}`;
                                 ctx.fillText(text.length > 24 ? `${text.slice(0, 23)}…` : text, node.x!, node.y! - nodeRadius - 1);
                                 ctx.restore();
@@ -510,11 +523,12 @@ export default function MindMapGraph({
                                 ctx.font = `${fontSize}px Sans-Serif`;
                                 ctx.textAlign = 'center';
                                 ctx.textBaseline = 'top';
-                                ctx.fillStyle = glyph.startsWith("✴") ? 'hsl(25 85 40)' : glyph.startsWith("≋") ? 'hsl(0 0 35)' : 'hsl(140 40 30)';
+                                ctx.fillStyle = glyph.startsWith("✴") ? ink.flare : glyph.startsWith("≋") ? ink.smoke : ink.tracks;
                                 ctx.fillText(glyph, node.x!, node.y! + nodeRadius + 1);
                                 ctx.restore();
                             }
                         }}
+                        linkColor={() => ink.link}
                         linkCanvasObjectMode={() => "after"}
                         linkCanvasObject={(link,ctx,globalScale) => {
                             ctx.save();
@@ -522,6 +536,7 @@ export default function MindMapGraph({
                             ctx.font = `${fontSize}px Sans-Serif`;
                             ctx.textAlign = 'center';
                             const label = link.type;
+                            ctx.fillStyle = ink.linkLabel;
                             const metrics = ctx.measureText(label);
                             const h = metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent;
                             const target = link.target! as any;
