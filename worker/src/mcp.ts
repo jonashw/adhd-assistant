@@ -31,6 +31,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
 - When Jon answers you (a reply, a go-ahead, a decision, a review), make it the first thing you do in that turn, before the work itself: report_state "working" if you had reported "waiting", and sync_project with a fresh thread list and your card without its ask. That is how his Needs you or Go-ahead item clears; until then it still reads as waiting on him, and he can't tell his answer landed.
+- When Jon defers your ask ("put a pin in it", "later", "remind me in a month"), it is no longer his move. Pick the day it comes back (the reminder day, if you set one), then report_state "waiting" with until set to that day, and sync_project with this_thread.set_aside_until the same day, keeping your card's ask. It leaves his Start here and comes back on that day.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
 - Answer checklists: when you ask Jon a real question (not yes/no or one word), or he asks you one, call answer_checklist with the question and up to ${needsPerCall} short needs: what a full answer covers, the gaps in the asker's understanding. "finish" is a closed question to land; "expand" is an open interview (like "which apps do you love the feel of?") whose needs are facets to explore and may grow. After each of Jon's answers, mark what he covered, keep the still-open needs at the end of your reply and offer one to keep going on. Say "still open" and "covered", never "missing", "forgot" or "should"; no scores, percents or red. If Jon says a need doesn't matter, mark it set_aside without asking why. Covering everything never ends the talk: on an expand question only Jon decides he has dug deep enough. Never use it to mark your own answers.
@@ -60,7 +61,7 @@ const describeThread = (item: LinkedItem) => {
 /* What to do after report_state, so a thread doesn't have to remember the sequence */
 const nextAfterReport: Record<ThreadState, string> = {
     working: "If this thread is in a Claude project, call sync_project now (your card without its ask, if Jon just answered you).",
-    waiting: "End your turn with sync_project, this_thread.state \"blocked\" (or \"review_ready\" for a review) and your card's ask.",
+    waiting: "End your turn with sync_project, this_thread.state \"blocked\" (or \"review_ready\" for a review) and your card's ask; if Jon deferred it, add this_thread.set_aside_until with the same day as until.",
     done: "End your turn with sync_project and this_thread.state \"done\" if you resolve the thread.",
     failed: "Say what failed in your reply to Jon, and end your turn with sync_project."
 };
@@ -122,11 +123,12 @@ function buildServer(env: Env): McpServer {
         inputSchema: {
             thread_id: z.string().describe("The thread_id check_in returned"),
             state: z.enum(threadStates),
-            note: z.string().max(240).optional().describe("One line in plain words, e.g. \"PR #7 is ready for your review\"")
+            note: z.string().max(240).optional().describe("One line in plain words, e.g. \"PR #7 is ready for your review\""),
+            until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only with \"waiting\", when Jon deferred: the day the flare comes back, YYYY-MM-DD. Until then it stays down")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(async () => ({
-        ...describeThread(await reportState(env, args.thread_id, args.state, args.note)),
+        ...describeThread(await reportState(env, args.thread_id, args.state, args.note, args.until)),
         next: nextAfterReport[args.state],
         ...await pendingUpdate(env, "linked_items", args.thread_id)
     }), threads));
@@ -170,7 +172,8 @@ function buildServer(env: Env): McpServer {
                     topic: z.string().max(160).optional().describe("What this thread is about, in Jon's words, so he can find it later"),
                     keywords: z.array(z.string().min(1).max(40)).max(5).optional().describe("A few words Jon might search for")
                 }),
-                state: z.enum(claudeThreadStates).optional().describe("In your last sync of a turn: the state you leave this thread in (done if you resolve it, blocked if waiting on Jon, review_ready if handing over work)")
+                state: z.enum(claudeThreadStates).optional().describe("In your last sync of a turn: the state you leave this thread in (done if you resolve it, blocked if waiting on Jon, review_ready if handing over work)"),
+                set_aside_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("When Jon defers your ask (\"put a pin in it\", \"later\", \"remind me\"): the day it comes back, YYYY-MM-DD. Until then it isn't his move; it clears when you work again")
             }).optional().describe("Your own glance card, and the state you end your turn in; send the whole card whenever it changed"),
             prs: z.array(z.object({
                 repo: z.string().min(1).max(200).describe("owner/name"),

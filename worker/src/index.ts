@@ -6,7 +6,7 @@ import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
-import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden } from "./claude";
+import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden, setThreadAside } from "./claude";
 import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
@@ -64,6 +64,12 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     const openedMatch = /^\/api\/claude-map\/threads\/([^/]+)\/opened$/.exec(url.pathname);
     if (openedMatch && request.method === "POST") {
         await markThreadOpened(env, decodeURIComponent(openedMatch[1]));
+        return new Response(null, {status: 204});
+    }
+    const asideMatch = /^\/api\/claude-map\/threads\/([^/]+)\/set-aside$/.exec(url.pathname);
+    if (asideMatch && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {until?: unknown};
+        await setThreadAside(env, decodeURIComponent(asideMatch[1]), typeof body.until === "string" ? body.until : null);
         return new Response(null, {status: 204});
     }
     const artifactMatch = /^\/api\/claude-map\/artifacts\/(\d{1,15})\/opened$/.exec(url.pathname);

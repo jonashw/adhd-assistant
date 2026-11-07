@@ -49,7 +49,7 @@ export type ClaudeTokens = {
     todoBg: string,
     /* a thin ring that lifts a dot off whatever it sits on */
     halo: string,
-    badges: Record<"blocked" | "review_ready" | "working" | "failed" | "stopped" | "done" | "stale" | "gone" | "someday", BadgeColors>,
+    badges: Record<"blocked" | "review_ready" | "working" | "failed" | "stopped" | "done" | "stale" | "gone" | "someday" | "later", BadgeColors>,
     ci: Record<"success" | "failure" | "pending" | "none", string>
 };
 
@@ -62,7 +62,8 @@ const lightBadges: ClaudeTokens["badges"] = {
     done: {color: "#9CA3AF", text: "#FFFFFF"},
     stale: {color: "#E5E7EB", text: "#374151"},
     gone: {color: "#E5E7EB", text: "#374151"},
-    someday: {color: "#FDE9C4", text: "#7C4A03"}
+    someday: {color: "#FDE9C4", text: "#7C4A03"},
+    later: {color: "#E0E7FF", text: "#3730A3"}
 };
 
 const claudeLight: ClaudeTokens = {
@@ -147,7 +148,8 @@ const claudeDarkTokens: ClaudeTokens = {
         done: {color: "#5F5E5A", text: "#E8E6DC"},
         stale: {color: claudeDark.raised, text: claudeDark.textSoft},
         gone: {color: claudeDark.raised, text: claudeDark.textSoft},
-        someday: {color: "#4A3B1E", text: "#F6CF86"}
+        someday: {color: "#4A3B1E", text: "#F6CF86"},
+        later: {color: "#2E3150", text: "#C7CCF5"}
     },
     ci: {success: "#22C55E", failure: "#EF4444", pending: "#F59E0B", none: "#9C9A92"}
 };

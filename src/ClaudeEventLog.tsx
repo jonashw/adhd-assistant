@@ -50,6 +50,7 @@ function describeEvent(e: ClaudeEvent): string {
         case "thread_unlisted": return `Left out of the latest list: ${e.to}`;
         case "ask": return e.to ? `Asks you: ${askText(e.to)}` : "Ask cleared";
         case "reply": return `Replied: ${e.to}`;
+        case "set_aside": return e.to ? `Set aside until ${e.to}` : "Back from set aside";
         case "pr_new": return `PR ${prNumber(e.pr)} opened: ${e.to}`;
         case "pr_state": return `PR ${prNumber(e.pr)}: ${e.from} → ${e.to}`;
         case "pr_ci": return `PR ${prNumber(e.pr)} checks: ${e.to}`;
@@ -60,7 +61,7 @@ function describeEvent(e: ClaudeEvent): string {
 
 const kindLabels: Record<ClaudeEvent["kind"], string> = {
     project_new: "Project", project_renamed: "Rename", short_name: "Label", thread_new: "New",
-    thread_renamed: "Rename", thread_state: "State", thread_unlisted: "Unlisted", ask: "Ask", reply: "Reply",
+    thread_renamed: "Rename", thread_state: "State", thread_unlisted: "Unlisted", ask: "Ask", reply: "Reply", set_aside: "Later",
     pr_new: "PR", pr_state: "PR", pr_ci: "Checks", artifact_new: "Artifact", artifact_updated: "Artifact"
 };
 

@@ -15,3 +15,6 @@ Inferred (my reading): Jon needs immediate confirmation that an answer landed; a
 
 Follow-up, Jon said: "Is there a way we could avoid this moment again, when we have to have deliver no instructions to all projects about how to interact with ADHD Assist mCP? Surely we can build this protocol definition*inside* our model context protocol?!??!?"
 Inferred (my reading): rules for threads belong in the connector, never in per-project pastes; running threads must pick up rule changes without a restart.
+
+Follow-up, Jon said: "Please consider the ongoing"needs you" badge despite putting a pin in the thread and waiting for*it* to revisit the topic"
+Inferred (my reading): a deferral is an answer too; once Jon defers, the item must leave his list until its day.

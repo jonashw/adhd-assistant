@@ -1,7 +1,7 @@
 import React from "react";
-import { Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader, Paper, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
-import { Close, OpenInNew, PushPin, PushPinOutlined } from "@mui/icons-material";
-import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, standingAsk } from "./ClaudeMapTypes";
+import { Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader, Menu, MenuItem, Paper, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import { Close, OpenInNew, PushPin, PushPinOutlined, Snooze } from "@mui/icons-material";
+import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, dayLabel, isSetAside, standingAsk } from "./ClaudeMapTypes";
 import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
 import { useClaudeColors } from "./theme";
 
@@ -41,6 +41,49 @@ function withLinks(line: string) {
         : <React.Fragment key={i}>{part}</React.Fragment>);
 }
 
+/* A day n days from now, as YYYY-MM-DD in Jon's own time zone */
+const dayFromNow = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/* "Put a pin in it" from Your move: the ask leaves Start here until the day Jon picks, then comes back by itself */
+function LaterButton({thread, onSetAside}: {thread: ClaudeThread, onSetAside: (t: ClaudeThread, until: string | null) => void}) {
+    const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+    const [picking, setPicking] = React.useState(false);
+    const choose = (until: string | null) => {
+        setAnchor(null);
+        setPicking(false);
+        onSetAside(thread, until);
+    };
+    if (isSetAside(thread)) {
+        return <Button size="small" variant="outlined" sx={{color: "claude.ink", borderColor: "claude.line"}} onClick={() => choose(null)}>
+            Bring it back now
+        </Button>;
+    }
+    return <>
+        <Button size="small" variant="outlined" startIcon={<Snooze/>} sx={{color: "claude.ink", borderColor: "claude.line"}}
+            onClick={e => setAnchor(e.currentTarget)}>
+            Later
+        </Button>
+        <Menu anchorEl={anchor} open={!!anchor} onClose={() => {
+            setAnchor(null);
+            setPicking(false);
+        }}>
+            <MenuItem onClick={() => choose(dayFromNow(1))}>Tomorrow</MenuItem>
+            <MenuItem onClick={() => choose(dayFromNow(7))}>In a week</MenuItem>
+            <MenuItem onClick={() => choose(dayFromNow(30))}>In a month</MenuItem>
+            {picking
+                ? <Box sx={{px: 2, py: 1}}>
+                    <TextField type="date" size="small" label="Until" InputLabelProps={{shrink: true}} inputProps={{min: dayFromNow(1)}}
+                        onChange={e => e.target.value && choose(e.target.value)}/>
+                </Box>
+                : <MenuItem onClick={() => setPicking(true)}>Pick a day…</MenuItem>}
+        </Menu>
+    </>;
+}
+
 function Section({title, children}: {title: string, children: React.ReactNode}) {
     return <Box sx={{mt: 1}}>
         <Typography variant="overline" sx={{lineHeight: 1.6, color: "claude.inkSoft"}}>{title}</Typography>
@@ -48,7 +91,7 @@ function Section({title, children}: {title: string, children: React.ReactNode}) 
     </Box>;
 }
 
-function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onOpenThread, onInterest, projectName}: {
+function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onOpenThread, onInterest, onSetAside, projectName}: {
     item: MoveItem,
     /* sharing the screen with a pinned card: on a phone they stack, so each gets less height */
     half: boolean,
@@ -59,6 +102,7 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
     threadLinkProps: (t: ClaudeThread) => object,
     onOpenThread: (t: ClaudeThread) => void,
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
+    onSetAside: (t: ClaudeThread, until: string | null) => void,
     projectName: (p: ClaudeProject) => string
 }) {
     const {opens, waitsOn} = links(item, all);
@@ -80,8 +124,14 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
         {(todo?.why || (!todo && item.thread.card?.headline)) && <Section title="Why it matters">
             <Typography variant="body2">{todo?.why ?? item.thread.card?.headline}</Typography>
         </Section>}
-        {!todo && ask && <Section title="Claude is waiting on">
+        {!todo && ask && !isSetAside(item.thread) && <Section title="Claude is waiting on">
             <Typography variant="body2">Your {ask.kind === "approval" ? "go-ahead" : ask.kind}, in the thread.</Typography>
+        </Section>}
+        {!todo && isSetAside(item.thread) && <Section title="Set aside">
+            <Typography variant="body2">
+                {item.thread.setAsideBy === "thread" ? "You put a pin in it" : "You set it aside"} until {dayLabel(item.thread.setAsideUntil!)}.
+                It comes back to Start here that morning.
+            </Typography>
         </Section>}
         {todo?.needs?.length ? <Section title="You'll need">
             <Box component="ul" sx={{m: 0, pl: 2.5}}>{todo.needs.map((n, i) => <Typography component="li" variant="body2" key={i}>{withLinks(n)}</Typography>)}</Box>
@@ -111,6 +161,7 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
             >
                 {todo ? "Open the thread" : "Answer in Claude"}
             </Button>
+            {!todo && <LaterButton thread={item.thread} onSetAside={onSetAside}/>}
         </Stack>
     </Paper>;
 }
@@ -196,13 +247,14 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     </Box>;
 }
 
-export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, projectName}: {
+export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName}: {
     projects: ClaudeProject[],
     threadLinkProps: (t: ClaudeThread) => object,
     /* goes to the thread (a double click), the way Jon chose to open Claude */
     openThread: (t: ClaudeThread) => void,
     onOpenThread: (t: ClaudeThread) => void,
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
+    onSetAside: (t: ClaudeThread, until: string | null) => void,
     projectName: (p: ClaudeProject) => string
 }) {
     const all = moveItems(projects);
@@ -288,6 +340,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
                 threadLinkProps={threadLinkProps}
                 onOpenThread={onOpenThread}
                 onInterest={onInterest}
+                onSetAside={onSetAside}
                 projectName={projectName}
             />)}
         </Box>}
