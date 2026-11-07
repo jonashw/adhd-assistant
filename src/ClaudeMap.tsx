@@ -5,7 +5,7 @@ import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
     InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
 } from "@mui/material";
-import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
+import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, ExpandLess, ExpandMore, MoreHoriz, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import { Description } from "@mui/icons-material";
 import {
     ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, artifactFlag, badgeFor, badgeOrder, byLatestChange, claudeBadges,
@@ -20,7 +20,7 @@ import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
-import { ProjectForYou } from "./ClaudeProjectFocus";
+import { ProjectForYou, forYou, isQuiet, lastMoved, quietDays } from "./ClaudeProjectFocus";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
 
@@ -393,6 +393,124 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
     </>;
 }
 
+/* Your move: what each project needs from Jon, and nothing he's done with. A project's asks and to-dos come first, then
+   its stuck threads; the threads still working fold into one line. Resolved threads are left out (a search finds them).
+   Projects that have gone quiet fold away at the bottom by themselves, and Hide sits in each project's ⋯ menu. */
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, hiddenCount, showHidden, onShowHidden}: {
+    projects: ClaudeProject[],
+    searching: boolean,
+    openIn: OpenIn,
+    onOpenThread: (t?: ClaudeThread) => void,
+    onOpenArtifact: (a: ClaudeArtifact) => void,
+    onToggleHidden: (p: ClaudeProject) => void,
+    hiddenCount: number,
+    showHidden: boolean,
+    onShowHidden: (show: boolean) => void
+}) {
+    const now = Date.now();
+    const [unfolded, setUnfolded] = React.useState<Set<string>>(new Set());
+    const [quietOpen, setQuietOpen] = React.useState(false);
+    const [allArtifactsOf, setAllArtifactsOf] = React.useState<Set<string>>(new Set());
+    const [menu, setMenu] = React.useState<{anchor: HTMLElement, project: ClaudeProject}>();
+    const toggle = (set: Set<string>, id: string) => {
+        const next = new Set(set);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+    };
+    const needs = (p: ClaudeProject) => forYou(p, now).length + p.threads.filter(t => badgeFor(t, p, now) === "failed").length;
+    const ordered = [...projects].sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || lastMoved(b).localeCompare(lastMoved(a)));
+    const active = searching ? ordered : ordered.filter(p => !isQuiet(p, now));
+    const quiet = searching ? [] : ordered.filter(p => isQuiet(p, now));
+
+    const threadRow = (t: ClaudeThread, p: ClaudeProject, indent = false) => <ListItemButton
+        key={t.id} {...linkProps(t.url, openIn)} onClick={() => onOpenThread(t)} sx={{gap: 1.5, pl: indent ? 4 : 2}}
+    >
+        <BadgeChip kind={badgeFor(t, p, now)}/>
+        <ListItemText
+            primary={t.title}
+            secondary={[glanceLine(t), t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`].filter(Boolean).join(" · ")}
+            secondaryTypographyProps={{noWrap: true}}
+            sx={{minWidth: 0}}
+        />
+        {t.prs?.filter(pr => pr.state === "open" || pr.state === "draft").map(pr => <PrChip key={`${pr.repo}#${pr.number}`} pr={pr}/>)}
+        <NewDot thread={t}/>
+    </ListItemButton>;
+
+    const projectBlock = (p: ClaudeProject) => {
+        const asking = new Set(forYou(p, now).map(i => i.thread.id));
+        const stuck = p.threads.filter(t => badgeFor(t, p, now) === "failed");
+        const rest = p.threads
+            .filter(t => !asking.has(t.id) && !stuck.includes(t) && (searching || t.state !== "done"))
+            .sort((a, b) => byUrgency(badgeFor(a, p, now), badgeFor(b, p, now)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""));
+        const open = searching || unfolded.has(p.id);
+        const artifacts = p.artifacts?.length ?? 0;
+        // one line for the folded threads, counted by badge in badge order: "2 working · 1 not heard lately"
+        const counts = new Map<ClaudeBadgeKind, number>();
+        rest.forEach(t => counts.set(badgeFor(t, p, now), (counts.get(badgeFor(t, p, now)) ?? 0) + 1));
+        const foldWords = [
+            ...[...counts].map(([kind, n]) => `${n} ${claudeBadges[kind].label.toLowerCase()}`),
+            artifacts > 0 && `${artifacts} artifact${artifacts === 1 ? "" : "s"}`
+        ].filter(Boolean).join(" · ");
+        return <React.Fragment key={p.id}>
+            <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
+                <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
+                    {projectLabel(p)}
+                </Typography>
+                <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
+                <IconButton size="small" title="Open this project in Claude" {...linkProps(p.url, openIn)}><OpenInNew fontSize="small"/></IconButton>
+                <IconButton size="small" aria-label={`More for ${projectLabel(p)}`} onClick={e => setMenu({anchor: e.currentTarget, project: p})}>
+                    <MoreHoriz fontSize="small"/>
+                </IconButton>
+            </ListSubheader>
+            <Box sx={{px: 1}}>
+                <ProjectForYou project={p} heading={false} firstShown={6} threadLinkProps={t => linkProps(t.url, openIn)} onOpenThread={onOpenThread}/>
+            </Box>
+            {stuck.map(t => threadRow(t, p))}
+            {needs(p) === 0 &&
+                <Typography variant="body2" color="text.secondary" sx={{px: 2, py: 0.5}}>Nothing here needs you.</Typography>}
+            {foldWords && !searching && <ListItemButton onClick={() => setUnfolded(u => toggle(u, p.id))} sx={{py: 0.25}}>
+                <ListItemIcon sx={{minWidth: 28}}>{open ? <ExpandLess fontSize="small"/> : <ExpandMore fontSize="small"/>}</ListItemIcon>
+                <ListItemText secondary={foldWords}/>
+            </ListItemButton>}
+            {open && rest.map(t => threadRow(t, p, !searching))}
+            {open && artifacts > 0 && <ProjectArtifacts
+                project={p}
+                all={searching || allArtifactsOf.has(p.id)}
+                onAll={() => setAllArtifactsOf(a => toggle(a, p.id))}
+                onOpen={onOpenArtifact}
+            />}
+        </React.Fragment>;
+    };
+
+    return <List dense data-testid="your-move" sx={{bgcolor: "#fff", pb: 10}}>
+        {active.map(projectBlock)}
+        {quiet.length > 0 && <>
+            <ListItemButton onClick={() => setQuietOpen(o => !o)} sx={{bgcolor: claudeStyle.fill, mt: 1}}>
+                <ListItemIcon sx={{minWidth: 28}}>{quietOpen ? <ExpandLess fontSize="small"/> : <ExpandMore fontSize="small"/>}</ListItemIcon>
+                <ListItemText
+                    primary={`Quiet for ${quietDays} days: ${quiet.map(projectLabel).join(", ")}`}
+                    secondary="Nothing in these waits on you. They come back up when a thread moves."
+                />
+            </ListItemButton>
+            {quietOpen && quiet.map(projectBlock)}
+        </>}
+        {hiddenCount > 0 && <Box sx={{p: 2}}>
+            <Button size="small" onClick={() => onShowHidden(!showHidden)}>
+                {showHidden ? "Leave out hidden projects" : `Show ${hiddenCount} hidden project${hiddenCount === 1 ? "" : "s"}`}
+            </Button>
+        </Box>}
+        <Menu anchorEl={menu?.anchor} open={!!menu} onClose={() => setMenu(undefined)}>
+            {menu && <MenuItem onClick={() => {
+                onToggleHidden(menu.project);
+                setMenu(undefined);
+            }}>
+                <ListItemIcon>{menu.project.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}</ListItemIcon>
+                {menu.project.hidden ? "Show this project again" : "Hide this project"}
+            </MenuItem>}
+        </Menu>
+    </List>;
+}
+
 /* Where "Open in Claude" goes. Kept per device, since the desktop app is only on some of them. */
 /* No "reuse one tab" choice: claude.ai sends Cross-Origin-Opener-Policy: same-origin, which cuts the tab off
    from the page that opened it, so neither its name nor a kept handle can reach it again (tried 2026-11-05). */
@@ -622,8 +740,6 @@ export function ClaudeMap() {
             return {...p, threads, artifacts};
         }).filter(p => p.threads.length > 0 || (p.artifacts?.length ?? 0) > 0)
         : visible, [visible, query, searching]);
-    /* projects whose artifacts the list view shows in full */
-    const [allArtifactsOf, setAllArtifactsOf] = React.useState<Set<string>>(new Set());
     const isHiddenDone = React.useCallback<ThreadFilter>(
         (t, p) => hideDone && badgeFor(t, p) === "done" && !shownDone.has(t.id), [hideDone, shownDone]);
     // a search finds done threads too, so nothing is out of reach
@@ -798,7 +914,7 @@ export function ClaudeMap() {
                     sx={{"& .MuiTab-root": {minWidth: {xs: 0, sm: 90}, px: {xs: 1.25, sm: 2}}}}
                 >
                     <Tab value="map" label="Map"/>
-                    <Tab value="list" label="List"/>
+                    <Tab value="list" label="Your move"/>
                     <Tab value="events" label="Log"/>
                 </Tabs>
                 <LiveDot/>
@@ -942,49 +1058,17 @@ export function ClaudeMap() {
 
             {view === "events" && <ClaudeEventLog projects={projects ?? []} query={query} openIn={openIn} demo={demo}/>}
 
-            {view === "list" && <List dense sx={{bgcolor: "#fff", pb: 10}}>
-                {shown.map(p => <React.Fragment key={p.id}>
-                    <ListSubheader sx={{display: "flex", alignItems: "center", gap: 1, bgcolor: claudeStyle.fill}}>
-                        <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: claudeStyle.ink, flexGrow: 1}}>
-                            {projectLabel(p)}
-                        </Typography>
-                        <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
-                        <IconButton size="small" title="Open this project in Claude" {...linkProps(p.url, openIn)}><OpenInNew fontSize="small"/></IconButton>
-                        <IconButton size="small" title={p.hidden ? "Show this project" : "Hide this project"} onClick={() => toggleHidden(p)}>
-                            {p.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}
-                        </IconButton>
-                    </ListSubheader>
-                    {[...p.threads]
-                        .sort((a, b) => byUrgency(badgeFor(a, p), badgeFor(b, p)) || (b.lastActivityAt ?? "").localeCompare(a.lastActivityAt ?? ""))
-                        .map(t => <ListItemButton key={t.id} {...linkProps(t.url, openIn)} onClick={() => markOpened(t)} sx={{gap: 1.5, opacity: t.state === "done" ? 0.6 : 1}}>
-                            <BadgeChip kind={badgeFor(t, p)}/>
-                            <ListItemText
-                                primary={t.title}
-                                secondary={[glanceLine(t), t.inLatest ? ago(t.lastActivityAt) : `not seen since ${ago(t.lastSeenAt)}`]
-                                    .filter(Boolean).join(" · ")}
-                                secondaryTypographyProps={{noWrap: true}}
-                                sx={{minWidth: 0}}
-                            />
-                            {t.prs?.filter(pr => pr.state === "open" || pr.state === "draft").map(pr => <PrChip key={`${pr.repo}#${pr.number}`} pr={pr}/>)}
-                            <NewDot thread={t}/>
-                        </ListItemButton>)}
-                    {(p.artifacts?.length ?? 0) > 0 && <ProjectArtifacts
-                        project={p}
-                        all={searching || allArtifactsOf.has(p.id)}
-                        onAll={all => setAllArtifactsOf(previous => {
-                            const next = new Set(previous);
-                            if (all) next.add(p.id); else next.delete(p.id);
-                            return next;
-                        })}
-                        onOpen={markArtifactOpened}
-                    />}
-                </React.Fragment>)}
-                {hiddenCount > 0 && <Box sx={{p: 2}}>
-                    <Button size="small" onClick={() => setShowHidden(s => !s)}>
-                        {showHidden ? "Leave out hidden projects" : `Show ${hiddenCount} hidden project${hiddenCount === 1 ? "" : "s"}`}
-                    </Button>
-                </Box>}
-            </List>}
+            {view === "list" && <YourMoveList
+                projects={shown}
+                searching={searching}
+                openIn={openIn}
+                onOpenThread={markOpened}
+                onOpenArtifact={markArtifactOpened}
+                onToggleHidden={toggleHidden}
+                hiddenCount={hiddenCount}
+                showHidden={showHidden}
+                onShowHidden={setShowHidden}
+            />}
         </Box>
 
         {view === "map" && showingGraph && !searching && hiddenDone.length > 0 && !doneListOpen && !selected && <Button

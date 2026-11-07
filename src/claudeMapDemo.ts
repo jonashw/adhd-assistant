@@ -89,6 +89,11 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
         project("demo_taxes", "Taxes", undefined, 60 * 7, [
             thread("demo_taxes", "demo_x1", "Sort receipts by category", "working", 60 * 7),
             thread("demo_taxes", "demo_x2", "Estimate quarterly payment", "done", 60 * 30)
+        ]),
+        // nothing waiting and nothing in weeks: Your move folds it away
+        project("demo_bike", "Fix up the old bike", "Bike", 60 * 24 * 20, [
+            thread("demo_bike", "demo_b1", "Find a chain that fits", "done", 60 * 24 * 21),
+            thread("demo_bike", "demo_b2", "Price new brake pads", "working", 60 * 24 * 20)
         ])
     ];
 }
