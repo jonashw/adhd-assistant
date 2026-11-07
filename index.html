@@ -15,10 +15,37 @@
     <link rel="manifest" href="/site.webmanifest">
     <link rel="icon" type="image/svg+xml" href="/icon.svg">
     <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#d32f2f">
-    <meta name="msapplication-TileColor" content="#ffffff">
-    <meta name="theme-color" content="#ffffff">
+    <meta name="msapplication-TileColor" content="#dcebf5">
+    <meta name="theme-color" content="#dcebf5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-375x667@2x.png">
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-390x844@3x.png">
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-393x852@3x.png">
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-430x932@3x.png">
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-414x896@2x.png">
+    <style id="splash-style">
+      /* The loading screen ("Sky"): plain CSS and the system font, so it shows before anything downloads */
+      #splash{position:fixed;inset:0;z-index:2000;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;overflow:hidden;
+        background:linear-gradient(#cfe3f2,#eef5fa 70%,#f7f3ea);transition:opacity .45s ease;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      #splash.gone{opacity:0;pointer-events:none}
+      #splash .splash-clouds{position:absolute;top:14vh;left:50%;transform:translateX(-50%);width:min(100%,720px);height:auto}
+      #splash .splash-fly{height:min(48vh,380px);width:auto;margin-bottom:-0.6vh;position:relative}
+      #splash .splash-ground{width:140%;height:max(24vh,150px);background:#cfdcb8;border-radius:50% 50% 0 0/38px 38px 0 0;display:flex;flex-direction:column;align-items:center;padding-top:max(4vh,24px);gap:6px}
+      #splash .splash-words{font-size:clamp(32px,9vw,52px);font-weight:600;color:#23313d;letter-spacing:-.01em}
+      #splash .splash-name{font-size:16px;color:#4d5b44}
+      #splash .splash-bob{transform-box:fill-box;transform-origin:50% 100%}
+      @media (prefers-reduced-motion:no-preference){#splash .splash-bob{animation:splash-bob 3.6s ease-in-out infinite}}
+      @keyframes splash-bob{50%{transform:translateY(-1px) rotate(-2deg)}}
+    </style>
   </head>
   <body>
+    <div id="splash" role="img" aria-label="ADHD Assist is opening. You are here.">
+      <svg class="splash-clouds" viewBox="0 0 360 150" aria-hidden="true">
+        <g fill="#fff" opacity=".9"><ellipse cx="80" cy="38" rx="56" ry="18"/><ellipse cx="110" cy="26" rx="34" ry="20"/><ellipse cx="280" cy="124" rx="50" ry="15"/><ellipse cx="300" cy="114" rx="28" ry="16"/></g>
+      </svg>
+      <!-- splash:balloon --><svg class="splash-fly" viewBox="-14 -13 28 74" aria-hidden="true"><path d="M0 11.6 C-3 24 4 36 -1 47 C-3 52 0 55 0 57.5" fill="none" stroke="#5a4636" stroke-width=".55" stroke-linecap="round"/><circle cx="0" cy="58" r="1.2" fill="#23313d"/><g class="splash-bob"><g id="art"><path id="knot" d="M-1.4 11.6 L0 9.6 L1.4 11.6 Z" fill="#b71c1c"/><ellipse id="balloon" cx="0" cy="0" rx="8.6" ry="10" fill="#d32f2f" stroke="#b71c1c" stroke-width="0.6"/><ellipse id="shine" cx="-3.6" cy="-4.5" rx="1.7" ry="3.2" transform="rotate(25 -3.6 -4.5)" fill="#ffffff" opacity="0.45"/></g><g id="face-calm"><g id="eyes"><ellipse cx="-2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/><ellipse cx="2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/></g><path id="mouth" d="M-3.4 2.5 Q0 4.6 3.4 2.5" fill="none" stroke="#ffffff" stroke-width="1.25" stroke-linecap="round"/></g></g></svg><!-- /splash:balloon -->
+      <div class="splash-ground"><div class="splash-words">you are here</div><div class="splash-name">ADHD Assist</div></div>
+    </div><!-- /splash -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
