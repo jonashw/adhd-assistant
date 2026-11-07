@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Your face, drawn once. Every balloon in the app wears it.
+<!-- Your face, drawn once (the Slight smile, picked 2026-11-07). Every balloon in the app wears it.
      One layer per expression; the app shows one at a time. Keep the frame (viewBox) as it is:
      the face is placed into the balloon's anchor-face box, centre to centre. -->
 <svg xmlns="http://www.w3.org/2000/svg"
@@ -7,16 +7,16 @@
      viewBox="-6 -6 12 12" width="120" height="120">
   <g id="face-calm" inkscape:groupmode="layer" inkscape:label="face-calm">
     <g id="eyes">
-      <circle cx="-3" cy="-0.8" r="1.7" fill="#ffffff"/>
-      <circle cx="3" cy="-0.8" r="1.7" fill="#ffffff"/>
+      <ellipse cx="-2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/>
+      <ellipse cx="2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/>
     </g>
-    <path id="mouth" d="M-3.8 3 q3.8 3.6 7.6 0" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    <path id="mouth" d="M-3.4 2.5 Q0 4.6 3.4 2.5" fill="none" stroke="#ffffff" stroke-width="1.25" stroke-linecap="round"/>
   </g>
   <g id="face-blink" inkscape:groupmode="layer" inkscape:label="face-blink" style="display:none">
-    <g id="eyes-shut" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round">
-      <path d="M-4.6 -0.8 q1.6 1.2 3.2 0"/>
-      <path d="M1.4 -0.8 q1.6 1.2 3.2 0"/>
+    <g id="eyes-shut" fill="none" stroke="#ffffff" stroke-width="1.1" stroke-linecap="round">
+      <path d="M-3.8 -1.4 q1.1 0.9 2.2 0"/>
+      <path d="M1.6 -1.4 q1.1 0.9 2.2 0"/>
     </g>
-    <path d="M-3.8 3 q3.8 3.6 7.6 0" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+    <path d="M-3.4 2.5 Q0 4.6 3.4 2.5" fill="none" stroke="#ffffff" stroke-width="1.25" stroke-linecap="round"/>
   </g>
 </svg>

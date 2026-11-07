@@ -8,8 +8,8 @@ export const art = {
             12
         ],
         "layers": {
-            "calm": "<g class=\"face-calm\"><g class=\"eyes\"><circle cx=\"-3\" cy=\"-0.8\" r=\"1.7\" fill=\"#ffffff\"/><circle cx=\"3\" cy=\"-0.8\" r=\"1.7\" fill=\"#ffffff\"/></g><path d=\"M-3.8 3 q3.8 3.6 7.6 0\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\" class=\"mouth\"/></g>",
-            "blink": "<g class=\"face-blink\"><g fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.2\" stroke-linecap=\"round\" class=\"eyes-shut\"><path d=\"M-4.6 -0.8 q1.6 1.2 3.2 0\"/><path d=\"M1.4 -0.8 q1.6 1.2 3.2 0\"/></g><path d=\"M-3.8 3 q3.8 3.6 7.6 0\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"2\" stroke-linecap=\"round\"/></g>"
+            "calm": "<g class=\"face-calm\"><g class=\"eyes\"><ellipse cx=\"-2.7\" cy=\"-1.6\" rx=\"1.15\" ry=\"1.55\" fill=\"#ffffff\"/><ellipse cx=\"2.7\" cy=\"-1.6\" rx=\"1.15\" ry=\"1.55\" fill=\"#ffffff\"/></g><path d=\"M-3.4 2.5 Q0 4.6 3.4 2.5\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.25\" stroke-linecap=\"round\" class=\"mouth\"/></g>",
+            "blink": "<g class=\"face-blink\"><g fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.1\" stroke-linecap=\"round\" class=\"eyes-shut\"><path d=\"M-3.8 -1.4 q1.1 0.9 2.2 0\"/><path d=\"M1.6 -1.4 q1.1 0.9 2.2 0\"/></g><path d=\"M-3.4 2.5 Q0 4.6 3.4 2.5\" fill=\"none\" stroke=\"#ffffff\" stroke-width=\"1.25\" stroke-linecap=\"round\"/></g>"
         }
     },
     "balloon": {
