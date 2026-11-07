@@ -5,7 +5,7 @@ import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, dayLabel, isSe
 import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
 import { useClaudeColors } from "./theme";
 import { OpenState, Spot, byName, fits, hoursLine, openState } from "./spots";
-import { WhereChip, WherePicker } from "./WhereYouAre";
+import { WhereChip, WhereLocation, WherePicker, WhereSuggestion } from "./WhereYouAre";
 
 /* The top of Your move: everything every project needs from Jon, in one Leverage order.
 
@@ -261,7 +261,7 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     </Box>;
 }
 
-export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere}: {
+export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere, location}: {
     projects: ClaudeProject[],
     /* where Jon can be, and where he said he is (until when) */
     spots: Spot[],
@@ -270,6 +270,8 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     onPick: (spot: Spot | undefined) => void,
     onEditSpots: () => void,
     onWhere: (item: MoveItem, where: string) => void,
+    /* suggesting a spot from where the phone is */
+    location?: WhereLocation,
     threadLinkProps: (t: ClaudeThread) => object,
     /* goes to the thread (a double click), the way Jon chose to open Claude */
     openThread: (t: ClaudeThread) => void,
@@ -301,7 +303,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         if (selected === key) setSelected(undefined);
     };
 
-    const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots}/>;
+    const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots} location={location}/>;
     if (all.length === 0) {
         return <Box sx={{px: 2, py: 3}}>
             <Typography sx={{fontWeight: 600}}>Nothing waits on you right now.</Typography>
@@ -348,6 +350,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
                 <ToggleButton value="why" sx={{textTransform: "none", py: 0.25}}>Why this order</ToggleButton>
             </ToggleButtonGroup>
         </Stack>
+        {location && <WhereSuggestion location={location}/>}
         {why && <OrderGraph all={all} keyItem={start[0]?.key} selected={cards} onSelect={setSelected}/>}
         {!why && <List dense disablePadding>
             {start.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink"}}>Start here</ListSubheader>}

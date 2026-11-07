@@ -5,12 +5,13 @@ import { Spot, Whereabouts, byName, inOrder, spotNameMax, treeProblem } from "..
 /* Where Jon can be (src/spots.ts): the tree, where he says he is now, and the tags on to-dos and asks.
    Tags are spot names, so a thread can write them; renaming a spot carries its tags along. */
 
-type SpotRow = {id: string, parent_id: string | null, name: string, stays_put: number, hours: string | null, position: number};
+type SpotRow = {id: string, parent_id: string | null, name: string, stays_put: number, hours: string | null, osm: string | null, position: number};
 
 const spotOf = (r: SpotRow): Spot => {
     const spot: Spot = {id: r.id, name: r.name, position: r.position};
     if (r.parent_id) spot.parentId = r.parent_id;
     if (r.stays_put) spot.staysPut = true;
+    if (r.osm) spot.osm = r.osm;
     if (r.hours) {
         try {
             spot.hours = JSON.parse(r.hours);
@@ -41,7 +42,8 @@ export async function saveSpots(env: Env, input: unknown): Promise<Spot[]> {
     }
     const spots: Spot[] = input.map((s, i) => ({
         id: String(s?.id ?? ""), parentId: s?.parentId ? String(s.parentId) : undefined, name: String(s?.name ?? "").trim(),
-        staysPut: !!s?.staysPut, hours: s?.hours ?? undefined, position: Number.isInteger(s?.position) ? s.position : i
+        staysPut: !!s?.staysPut, hours: s?.hours ?? undefined, osm: typeof s?.osm === "string" && s.osm.trim() ? s.osm.trim() : undefined,
+        position: Number.isInteger(s?.position) ? s.position : i
     }));
     if (spots.some(s => !/^[\w-]{1,60}$/.test(s.id))) {
         throw new HttpError(422, "A spot's id isn't valid.");
@@ -60,8 +62,8 @@ export async function saveSpots(env: Env, input: unknown): Promise<Spot[]> {
         // names are unique, so clear the old tree before writing the new one, parents before children
         env.DB.prepare("DELETE FROM spots"),
         ...inOrder(spots).map(({spot: s}) => env.DB.prepare(
-            "INSERT INTO spots (id, parent_id, name, stays_put, hours, position) VALUES (?, ?, ?, ?, ?, ?)"
-        ).bind(s.id, s.parentId ?? null, s.name, s.staysPut ? 1 : 0, s.hours ? JSON.stringify(s.hours) : null, s.position)),
+            "INSERT INTO spots (id, parent_id, name, stays_put, hours, osm, position) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).bind(s.id, s.parentId ?? null, s.name, s.staysPut ? 1 : 0, s.hours ? JSON.stringify(s.hours) : null, s.osm ?? null, s.position)),
         ...renames.flatMap(({from, to}) => [
             env.DB.prepare("UPDATE checklist_items SET where_spot = ? WHERE where_spot = ? COLLATE NOCASE").bind(to, from),
             env.DB.prepare("UPDATE claude_threads SET ask_where = ? WHERE ask_where = ? COLLATE NOCASE").bind(to, from),
