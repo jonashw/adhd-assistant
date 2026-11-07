@@ -1,5 +1,6 @@
 {
     "name": "ADHD Assist",
+    "description": "You are here. Your move.",
     "short_name": "ADHD Assist",
     "icons": [
         {
@@ -11,10 +12,16 @@
             "src": "/android-chrome-512x512.png",
             "sizes": "512x512",
             "type": "image/png"
+        },
+        {
+            "src": "/icon-maskable-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
-    "theme_color": "#ffffff",
-    "background_color": "#ffffff",
+    "theme_color": "#dcebf5",
+    "background_color": "#dcebf5",
     "start_url": "https://adhd.jonashw.dev",
     "display": "standalone"
 }
