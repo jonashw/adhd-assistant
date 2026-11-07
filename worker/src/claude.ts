@@ -1,5 +1,6 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
+import { resumeAnswered } from "./items";
 import {
     ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
@@ -251,11 +252,20 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
     ];
     await env.DB.batch(statements);
 
+    const after = await mapOf(env, snapshot.project_id);
+
     // 3. the event log; a failure here must not fail a sync that already landed
     try {
-        await logChanges(env, before, await mapOf(env, snapshot.project_id), hash, snapshot.this_thread?.thread_id, now);
+        await logChanges(env, before, after, hash, snapshot.this_thread?.thread_id, now);
     } catch (e) {
         console.error("Couldn't write the Claude event log", e);
+    }
+
+    // 4. a thread that waited on Jon and now works again got his answer: its flare on the map comes down too
+    try {
+        await resumeAnswered(env, answeredBetween(before, after));
+    } catch (e) {
+        console.error("Couldn't take down answered flares", e);
     }
 
     if (snapshot.threads) {
@@ -555,6 +565,13 @@ async function mapOf(env: Env, projectId: string): Promise<MapState> {
         prs: new Map((prs.results as PrRow[]).map(r => [`${r.repo}#${r.number}`, r])),
         artifacts: new Map((artifacts.results as ArtifactState[]).map(a => [a.url, a]))
     };
+}
+
+/* Threads that waited on Jon (needs you, ready to review) before a sync and are working after it: he answered */
+export function answeredBetween(before: MapState, after: MapState): string[] {
+    return [...after.threads.values()]
+        .filter(t => t.state === "working" && ["blocked", "review_ready"].includes(before.threads.get(t.id)?.state ?? ""))
+        .map(t => t.id);
 }
 
 type Change = {kind: ClaudeEventKind, threadId?: string, pr?: string, from?: string | null, to?: string | null};

@@ -80,14 +80,23 @@ and press **Open in Claude**, to jump to that thread. Jon only reads it, and can
 view. Try it without a server at `/claude?demo`.
 
 **Opting a project in.** Threads do the syncing: project coordinators don't get the connector, so they can't.
-This repo's `CLAUDE.md` opts in every project that has the repo attached. For any other project, paste this
-into its project instructions (or into Settings → Your Claude → Instructions to cover every project):
+The rules live in the connector itself (its MCP instructions, in `worker/src/mcp.ts`), so any thread with the
+connector follows them without anything pasted into a project. If a reminder helps, one line in Settings → Your
+Claude → Instructions is enough:
 
-> ADHD Assist Claude map: if you are a thread in a Claude project and have both a list_threads tool and the
-> ADHD Assist sync_project tool, call sync_project when you start work, whenever you call check_in or
-> report_state, and as the last step of every turn, with the project's id and name and every one of its
-> threads as list_threads gives them (id, title, state, created and last-activity times). If either tool is
-> missing, skip this silently.
+> ADHD Assist: if you have the ADHD Assist connector, follow its instructions in every turn.
+
+**Changing the rules.** A thread reads the connector's instructions once, when its session starts. So that running
+threads don't keep old rules, the protocol is versioned (`worker/src/protocol.ts`): when you change a rule, add an
+entry to `protocolChanges` with the full new rule. Each thread's next `check_in`, `report_state` or `sync_project`
+reply then carries `protocol_update` with every change since the version it knows, once (tracked per thread in
+`protocol_seen`). Replies to `check_in` and `report_state` also say what to call next.
+
+**When Jon answers.** An ask (Needs you, Go-ahead, Review) clears as soon as any sync shows its thread working
+again, and the open page updates live. The thread Jon answered is the one that wakes, so the connector tells it to
+sync first thing in that turn, before the work. That same sync also takes down the thread's flare on Jon's map:
+a checked-in thread still marked "waiting" whose Claude thread went from waiting to working goes back to working,
+as if it had called `report_state` itself.
 
 **What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
 so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours

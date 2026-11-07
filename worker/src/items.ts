@@ -170,6 +170,34 @@ export async function reportState(env: Env, threadId: string, state: ThreadState
     return (await getItem(env, threadId))!;
 }
 
+/* Jon answered: the platform shows these Claude threads (claude.ai thread ids) working again after they waited on him.
+   A checked-in thread that still says "waiting" goes back to working, so its flare comes down without waiting for the
+   thread to call report_state itself. Returns how many flares came down. */
+export async function resumeAnswered(env: Env, claudeThreadIds: string[]): Promise<number> {
+    if (claudeThreadIds.length === 0) {
+        return 0;
+    }
+    const wanted = new Set(claudeThreadIds);
+    const waiting = await env.DB.prepare(
+        "SELECT id, url FROM linked_items WHERE kind = 'claude.thread' AND state = 'waiting' AND url IS NOT NULL"
+    ).all<{id: string, url: string}>();
+    const answered = waiting.results.filter(r => {
+        try {
+            return wanted.has(new URL(r.url).searchParams.get("thread") ?? "");
+        } catch {
+            return false;
+        }
+    });
+    const now = new Date().toISOString();
+    for (const item of answered) {
+        await env.DB.prepare(
+            "UPDATE linked_items SET state = 'working', state_note = NULL, last_heard_at = ? WHERE id = ? AND state = 'waiting'"
+        ).bind(now, item.id).run();
+        await raiseFor(env, item.id);
+    }
+    return answered.length;
+}
+
 /* Jon answers "Which place does this thread serve?", or moves a thread, from the app */
 export async function placeItem(env: Env, itemId: string, place: PlaceRef): Promise<LinkedItem> {
     if (!await getItem(env, itemId)) {

@@ -6,9 +6,10 @@ import { Env } from "./env";
 import { HttpError } from "./http";
 import { checkIn, reportState, suggestPlace } from "./items";
 import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places";
-import { LinkedItem, threadStates } from "../../src/TrailTypes";
+import { LinkedItem, ThreadState, threadStates } from "../../src/TrailTypes";
 import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates, delayClasses, interestGuesses, todoSizes } from "../../src/ClaudeMapTypes";
 import { syncProject } from "./claude";
+import { pendingUpdate, protocolVersion } from "./protocol";
 import { logMonologue, monologueMaxChars } from "./monologues";
 import { LiveRing, ring } from "./live";
 import { addChecklistItems, completeChecklistItem, listChecklistItems } from "./checklist";
@@ -20,17 +21,20 @@ import { answerModes, askedBys, evidenceMaxChars, needMaxChars, needStates, need
 
 export type ConnectorProps = {email: string};
 
-const instructions = `ADHD Assist is Jon's attention navigator: a map of the places (projects, areas, tasks) he cares about.
+const instructions = `Protocol version ${protocolVersion}. Newer rules reach running threads as protocol_update in a tool reply; follow them over these.
+
+ADHD Assist is Jon's attention navigator: a map of the places (projects, areas, tasks) he cares about.
 Your thread's state shows up as a signal on his map, so he knows when you need him without checking every thread.
 
 - When you start work for Jon, call check_in with this thread's title and, if you know it, its link. Keep the thread_id it returns.
 - Name the place this thread serves: call find_places with a few words, and pass the best match as place. Regions right under HOME can't be targets; pick a place inside one.
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
+- When Jon answers you (a reply, a go-ahead, a decision, a review), make it the first thing you do in that turn, before the work itself: report_state "working" if you had reported "waiting", and sync_project with a fresh thread list and your card without its ask. That is how his Needs you or Go-ahead item clears; until then it still reads as waiting on him, and he can't tell his answer landed.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
 - Answer checklists: when you ask Jon a real question (not yes/no or one word), or he asks you one, call answer_checklist with the question and up to ${needsPerCall} short needs: what a full answer covers, the gaps in the asker's understanding. "finish" is a closed question to land; "expand" is an open interview (like "which apps do you love the feel of?") whose needs are facets to explore and may grow. After each of Jon's answers, mark what he covered, keep the still-open needs at the end of your reply and offer one to keep going on. Say "still open" and "covered", never "missing", "forgot" or "should"; no scores, percents or red. If Jon says a need doesn't matter, mark it set_aside without asking why. Covering everything never ends the talk: on an expand question only Jon decides he has dug deep enough. Never use it to mark your own answers.
-- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
+- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, at the start of every turn that brings Jon's answer, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
   - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
   - this_thread: your own thread id and card (headline, ask, progress, artifact, artifacts, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
@@ -51,6 +55,14 @@ const describeThread = (item: LinkedItem) => {
         state: item.state,
         place: primary ? "set" : "not set: if no existing place fits, call suggest_place; otherwise Jon will be asked to pick one",
     };
+};
+
+/* What to do after report_state, so a thread doesn't have to remember the sequence */
+const nextAfterReport: Record<ThreadState, string> = {
+    working: "If this thread is in a Claude project, call sync_project now (your card without its ask, if Jon just answered you).",
+    waiting: "End your turn with sync_project, this_thread.state \"blocked\" (or \"review_ready\" for a review) and your card's ask.",
+    done: "End your turn with sync_project and this_thread.state \"done\" if you resolve the thread.",
+    failed: "Say what failed in your reply to Jon, and end your turn with sync_project."
 };
 
 /* Runs a tool. A tool that writes names what it changed, and every open tab of the app hears it at once. */
@@ -77,7 +89,6 @@ function buildServer(env: Env): McpServer {
     // what each kind of write changed, for the tabs that are open
     const trail = {env, rings: [{topic: "trail"}] as LiveRing[]};
     const threads = {env, rings: [{topic: "trail"}, {topic: "claude"}] as LiveRing[]};
-    const claude = {env, rings: [{topic: "claude"}] as LiveRing[]};
     const monologues = {env, rings: [{topic: "monologues"}] as LiveRing[]};
     const place = z.string().describe("A place value from find_places, like \"<map id>/<place id>\"");
 
@@ -92,11 +103,18 @@ function buildServer(env: Env): McpServer {
             also_at: z.array(place).max(10).optional().describe("Other places this thread touches (optional)")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(async () => describeThread(await checkIn(env, {
-        title: args.title, url: args.url, threadId: args.thread_id,
-        place: args.place ? parsePlace(args.place) : undefined,
-        alsoAt: args.also_at?.map(parsePlace)
-    })), threads));
+    }, args => run(async () => {
+        const item = await checkIn(env, {
+            title: args.title, url: args.url, threadId: args.thread_id,
+            place: args.place ? parsePlace(args.place) : undefined,
+            alsoAt: args.also_at?.map(parsePlace)
+        });
+        return {
+            ...describeThread(item),
+            next: "If this thread is in a Claude project, call sync_project now, and again as the last step of every turn.",
+            ...await pendingUpdate(env, "linked_items", item.id)
+        };
+    }, threads));
 
     server.registerTool("report_state", {
         title: "Report state",
@@ -107,7 +125,11 @@ function buildServer(env: Env): McpServer {
             note: z.string().max(240).optional().describe("One line in plain words, e.g. \"PR #7 is ready for your review\"")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(async () => describeThread(await reportState(env, args.thread_id, args.state, args.note)), threads));
+    }, args => run(async () => ({
+        ...describeThread(await reportState(env, args.thread_id, args.state, args.note)),
+        next: nextAfterReport[args.state],
+        ...await pendingUpdate(env, "linked_items", args.thread_id)
+    }), threads));
 
     server.registerTool("sync_project", {
         title: "Sync a project",
@@ -167,7 +189,11 @@ function buildServer(env: Env): McpServer {
             })).max(200).optional().describe("The project's artifacts as list_project_artifacts gives them, when they changed since your last sync; added to what the map has, never a replacement")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(() => syncProject(env, args), claude));
+    // a sync can take down an answered thread's flare, so the trail rings too
+    }, args => run(async () => ({
+        ...await syncProject(env, args),
+        ...await pendingUpdate(env, "claude_threads", args.this_thread?.thread_id)
+    }), threads));
 
     server.registerTool("log_monologue", {
         title: "Log a monologue",
