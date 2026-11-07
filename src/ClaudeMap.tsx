@@ -23,6 +23,7 @@ import { LiveDot } from "./LiveDot";
 import { ProjectForYou, forYou, isQuiet, needsJon, lastMoved, quietDays } from "./ClaudeProjectFocus";
 import { MoveItem, YourMoveSections } from "./YourMove";
 import { SpotsEditor, WhereLocation, useWhere } from "./WhereYouAre";
+import { ArrivalAlerts } from "./ArrivalAlerts";
 import { Spot } from "./spots";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
@@ -400,7 +401,8 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
 type WhereProps = {
     spots: Spot[], here?: Spot, hereUntil?: string,
     onPick: (spot: Spot | undefined) => void, onEditSpots: () => void, onWhere: (item: MoveItem, where: string) => void,
-    location: WhereLocation
+    location: WhereLocation,
+    onArrivalAlerts: () => void
 };
 
 function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
@@ -719,12 +721,15 @@ export function ClaudeMap() {
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
     const where = useWhere(demo);
     const [editingSpots, setEditingSpots] = React.useState(false);
+    const [alertsOpen, setAlertsOpen] = React.useState(false);
     const colors = useClaudeColors();
     const colorMode = useColorMode();
     /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
     const [onBreak, setOnBreak] = React.useState<BreakPlace | undefined>(readBreak);
     const [view, setView] = React.useState<"map" | "list" | "events">(() =>
-        onBreak && ["map", "list", "events"].includes(onBreak.tab) ? onBreak.tab as "map" | "list" | "events" : "map");
+        onBreak && ["map", "list", "events"].includes(onBreak.tab) ? onBreak.tab as "map" | "list" | "events"
+        // an arrival notification opens straight to Your move
+        : params.get("view") === "list" ? "list" : "map");
     const [showHidden, setShowHidden] = React.useState(false);
     const [selectedId, setSelectedId] = React.useState<string | undefined>(() => onBreak?.selectedId);
     const [query, setQuery] = React.useState("");
@@ -1143,7 +1148,8 @@ export function ClaudeMap() {
                 onSetAside={setAside}
                 where={{
                     spots: where.spots, here: where.here, hereUntil: where.until, onPick: where.pick,
-                    onEditSpots: () => setEditingSpots(true), onWhere: setItemWhere, location: where.location
+                    onEditSpots: () => setEditingSpots(true), onWhere: setItemWhere, location: where.location,
+                    onArrivalAlerts: () => setAlertsOpen(true)
                 }}
                 hiddenCount={hiddenCount}
                 showHidden={showHidden}
@@ -1275,5 +1281,6 @@ export function ClaudeMap() {
 
         {onBreak && <BreakVeil onBack={backFromBreak}/>}
         <SpotsEditor open={editingSpots} spots={where.spots} onClose={() => setEditingSpots(false)} onSave={where.save} location={where.location}/>
+        <ArrivalAlerts open={alertsOpen} onClose={() => setAlertsOpen(false)} spots={where.spots} demo={demo}/>
     </Box>;
 }

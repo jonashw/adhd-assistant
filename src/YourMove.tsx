@@ -261,7 +261,7 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     </Box>;
 }
 
-export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere, location}: {
+export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere, location, onArrivalAlerts}: {
     projects: ClaudeProject[],
     /* where Jon can be, and where he said he is (until when) */
     spots: Spot[],
@@ -272,6 +272,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     onWhere: (item: MoveItem, where: string) => void,
     /* suggesting a spot from where the phone is */
     location?: WhereLocation,
+    onArrivalAlerts?: () => void,
     threadLinkProps: (t: ClaudeThread) => object,
     /* goes to the thread (a double click), the way Jon chose to open Claude */
     openThread: (t: ClaudeThread) => void,
@@ -303,7 +304,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         if (selected === key) setSelected(undefined);
     };
 
-    const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots} location={location}/>;
+    const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots} location={location} onAlerts={onArrivalAlerts}/>;
     if (all.length === 0) {
         return <Box sx={{px: 2, py: 3}}>
             <Typography sx={{fontWeight: 600}}>Nothing waits on you right now.</Typography>

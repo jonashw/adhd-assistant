@@ -12,6 +12,7 @@ import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
 import { getWhere, saveSpots, setAskWhere, setTodoWhere, setWhere } from "./spots";
+import { createHookToken, handleHook, latestArrival, listHookTokens, pushCount, pushKey, revokeHookToken, subscribePush, unsubscribePush } from "./arrivals";
 
 export { LiveHub } from "./live";
 
@@ -91,6 +92,40 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     }
     if (url.pathname === "/api/where/spots" && request.method === "PUT") {
         return json(await saveSpots(env, await request.json().catch(() => undefined)));
+    }
+    // arrival alerts: notifications on this phone, and keys for the phone's automations
+    if (url.pathname === "/api/push/key" && request.method === "GET") {
+        let publicKey: string | undefined, problem: string | undefined;
+        try {
+            publicKey = pushKey(env);
+        } catch (e) {
+            problem = e instanceof Error ? e.message : String(e);
+        }
+        return json({publicKey, problem, subscriptions: await pushCount(env)});
+    }
+    if (url.pathname === "/api/push/latest" && request.method === "GET") {
+        return json(await latestArrival(env));
+    }
+    if (url.pathname === "/api/push/subscribe" && request.method === "POST") {
+        await subscribePush(env, await request.json().catch(() => undefined));
+        return new Response(null, {status: 204});
+    }
+    if (url.pathname === "/api/push/unsubscribe" && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {endpoint?: unknown};
+        await unsubscribePush(env, body.endpoint);
+        return new Response(null, {status: 204});
+    }
+    if (url.pathname === "/api/hooks" && request.method === "GET") {
+        return json(await listHookTokens(env));
+    }
+    if (url.pathname === "/api/hooks" && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {label?: unknown};
+        return json(await createHookToken(env, body.label), 201);
+    }
+    const hookRevokeMatch = /^\/api\/hooks\/([^/]+)\/revoke$/.exec(url.pathname);
+    if (hookRevokeMatch && request.method === "POST") {
+        await revokeHookToken(env, decodeURIComponent(hookRevokeMatch[1]));
+        return new Response(null, {status: 204});
     }
     const todoWhereMatch = /^\/api\/checklist\/([^/]+)\/where$/.exec(url.pathname);
     if (todoWhereMatch && request.method === "POST") {
@@ -208,6 +243,12 @@ const app = {
         try {
             if (url.pathname.startsWith("/auth/")) {
                 return await handleAuth(request, env, url);
+            }
+            // the phone's automations call this with an arrival key, not a signed-in session
+            if (url.pathname === "/api/hook/arrive") {
+                const result = await handleHook(request, env, url);
+                await ring(env, [{topic: "claude"}], undefined);
+                return json(result);
             }
             if (url.pathname.startsWith("/api/")) {
                 const response = await handleApi(request, env, url);

@@ -112,6 +112,15 @@ export const ServerApi = {
         request<void>(`/api/checklist/${encodeURIComponent(id)}/where`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({where})}),
     setAskWhere: (threadId: string, where: string) =>
         request<void>(`/api/claude-map/threads/${encodeURIComponent(threadId)}/where`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({where})}),
+    /* arrival alerts: Web Push on this phone, and keys for the phone's automations */
+    pushKey: () => request<{publicKey?: string, problem?: string, subscriptions: number}>("/api/push/key"),
+    subscribePush: (subscription: PushSubscriptionJSON, label: string) =>
+        request<void>("/api/push/subscribe", {method: "POST", body: JSON.stringify({...subscription, label})}),
+    unsubscribePush: (endpoint: string) =>
+        request<void>("/api/push/unsubscribe", {method: "POST", body: JSON.stringify({endpoint})}),
+    hookKeys: () => request<{id: string, label: string, createdAt: string, lastUsedAt?: string}[]>("/api/hooks"),
+    makeHookKey: (label: string) => request<{id: string, label: string, token: string}>("/api/hooks", {method: "POST", body: JSON.stringify({label})}),
+    revokeHookKey: (id: string) => request<void>(`/api/hooks/${encodeURIComponent(id)}/revoke`, {method: "POST"}),
     markClaudeThreadOpened: (id: string) =>
         request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),
