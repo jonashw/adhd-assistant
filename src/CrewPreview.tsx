@@ -1,9 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, Button, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, IconButton, Stack, Typography } from "@mui/material";
 import { ArrowBack } from "@mui/icons-material";
-import { CrewAtRest, Dog, Jon, MindfulScene, RabbitBurrow, RabbitBurrowLoop, Sloth, Spider, Squirrel, YouScene, YouStage } from "./Crew";
+import { CrewAtRest, Dog, Jon, MindfulScene, RabbitBurrow, RabbitBurrowLoop, Sloth, Spider, Squirrel, Yanchi, YanchiFace, YouScene, YouStage } from "./Crew";
 import { burrowDemoGraph } from "./crew/burrowDemo";
+import { ldaedFaces } from "./crew/ldaed.generated";
+
+const yanchiFaces = Object.keys(ldaedFaces) as YanchiFace[];
 import { Mindful } from "./WhatsNextDialog";
 import { CrewDemo } from "./CrewDemo";
 
@@ -35,6 +38,23 @@ function RabbitControls() {
             <Typography variant="caption" color="text.secondary">
                 Tap a chamber to send the rabbit there. Now: {at === "HOME" ? "at the surface by HOME" : label}{carrying ? ", carrying work" : ""}
             </Typography>
+        </Stack>
+    );
+}
+
+/* Yanchi with a face picker: every face is one of Jon's 2015 LDAED GIFs, played at his own timing */
+function YanchiControls() {
+    const [face, setFace] = React.useState<YanchiFace>("relaxing");
+    return (
+        <Stack alignItems="center" gap={1.5} sx={{p: 2, border: 1, borderColor: "divider", borderRadius: 2}}>
+            <Yanchi size={200} face={face}/>
+            <Stack direction="row" gap={0.75} flexWrap="wrap" justifyContent="center" sx={{maxWidth: 520}}>
+                {yanchiFaces.map(f => (
+                    <Chip key={f} label={f} size="small" color={f === face ? "primary" : "default"}
+                        variant={f === face ? "filled" : "outlined"} onClick={() => setFace(f)}/>
+                ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">Pick a face. He changes with a pixel dissolve, like an old LED sign.</Typography>
         </Stack>
     );
 }
@@ -91,6 +111,15 @@ export function CrewPreview() {
                 <Tile title="Carrying a piece of work"><RabbitBurrow size={110} graph={burrowDemoGraph} at="wrench" carrying labels={false}/></Tile>
                 <Tile title="On a loop, as on the page"><RabbitBurrowLoop size={110}/></Tile>
                 <Tile title="Small, as in the table"><RabbitBurrowLoop size={32}/></Tile>
+            </Stack>
+            <Typography variant="h6" sx={{mt: 3}}>Yanchi, the radio robot</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{mb: 2, maxWidth: 640}}>
+                The newest crew member wears Jon's own LDAED pixel faces from 2015, drawn as round LED dots.
+                He's named after John von Neumann, whose family called him Jancsi. For now he lives here only.
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={2} alignItems="flex-start">
+                <YanchiControls/>
+                <Tile title="Small, as in a top bar"><Yanchi size={48} face="nerdy"/></Tile>
             </Stack>
             <Typography variant="h6" sx={{mt: 3}}>The stage, as the day demo draws it</Typography>
             <Stack gap={1} sx={{maxWidth: 360}}>

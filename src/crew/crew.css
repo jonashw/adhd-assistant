@@ -560,3 +560,37 @@
 .crew-speaker.is-talk .speaker-mouth { animation: speaker-talk 1200ms ease-in-out; }
 @keyframes speaker-talk { 0%, 100% { transform: scaleY(1); } 20%, 60% { transform: scaleY(0.45); } 40%, 80% { transform: scaleY(1.1); } }
 @media (prefers-reduced-motion: reduce) { .crew-speaker.is-talk .speaker-mouth { animation: none; } }
+
+/* Yanchi, the radio robot (Yanchi.tsx): an avocado-era appliance with an LED screen for a face */
+.crew-yanchi {
+    --crew-yanchi: #a9c4bd;
+    --crew-yanchi-hi: #c4dad4;
+    --crew-yanchi-dark: #6c8c84;
+    --crew-yanchi-screen: #0b1a20;
+    --crew-yanchi-pixel: #29c6ff;
+    --crew-yanchi-led: #ff7a3d;
+}
+.crew-yanchi .yanchi-case { fill: var(--crew-yanchi); stroke: var(--crew-yanchi-dark); stroke-width: 1.5; }
+.crew-yanchi .yanchi-case-hi { fill: var(--crew-yanchi-hi); }
+.crew-yanchi .yanchi-grille { stroke: var(--crew-yanchi-dark); stroke-width: 2.2; stroke-linecap: round; }
+.crew-yanchi .yanchi-dial { fill: var(--crew-metal-dark); stroke: var(--crew-ink); stroke-width: 1.2; }
+.crew-yanchi .yanchi-needle { stroke: var(--crew-ink); stroke-width: 1.6; stroke-linecap: round; }
+.crew-yanchi .yanchi-wheel, .crew-yanchi .yanchi-neck { fill: var(--crew-metal-dark); }
+.crew-yanchi .yanchi-mast { stroke: var(--crew-metal-dark); stroke-width: 2.4; }
+.crew-yanchi .yanchi-led { fill: var(--crew-yanchi-led); }
+.crew-yanchi .yanchi-screen { fill: var(--crew-yanchi-screen); }
+.crew-yanchi .yanchi-unlit { fill: var(--crew-yanchi-pixel); opacity: 0.09; }
+.crew-yanchi .yanchi-lit { fill: var(--crew-yanchi-pixel); }
+.crew-yanchi .yanchi-scan { fill: var(--crew-yanchi-pixel); opacity: 0; }
+.crew-yanchi .yanchi-band { fill: none; stroke: var(--crew-ink); stroke-width: 4; stroke-linecap: round; }
+.crew-yanchi .yanchi-boom { fill: none; stroke: var(--crew-ink); stroke-width: 2.2; stroke-linecap: round; }
+.crew-yanchi .yanchi-head { transform-origin: 50% 100%; }
+.crew-yanchi .yanchi-antenna { transform-origin: 50% 100%; }
+.crew-yanchi.is-scan .yanchi-scan { animation: yanchi-scan 900ms linear; }
+.crew-yanchi.is-tilt .yanchi-head { animation: yanchi-tilt 1400ms ease-in-out; }
+.crew-yanchi.is-wobble .yanchi-antenna { animation: yanchi-wobble 900ms ease-in-out; }
+.crew-yanchi.is-wink .yanchi-led { animation: yanchi-wink 500ms steps(1); }
+@keyframes yanchi-scan { 0% { opacity: 0.55; transform: translateY(0); } 100% { opacity: 0; transform: translateY(50px); } }
+@keyframes yanchi-tilt { 0%, 100% { transform: rotate(0); } 35%, 65% { transform: rotate(-4deg); } }
+@keyframes yanchi-wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(8deg); } 60% { transform: rotate(-6deg); } }
+@keyframes yanchi-wink { 0%, 50% { opacity: 0.2; } 25%, 75% { opacity: 1; } }
