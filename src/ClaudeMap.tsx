@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Snackbar, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
 } from "@mui/material";
 import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import { Description } from "@mui/icons-material";
@@ -572,7 +572,6 @@ export function ClaudeMap() {
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
     /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
     const [onBreak, setOnBreak] = React.useState<BreakPlace | undefined>(readBreak);
-    const [welcomeBack, setWelcomeBack] = React.useState(false);
     const [view, setView] = React.useState<"map" | "list" | "events">(() =>
         onBreak && ["map", "list", "events"].includes(onBreak.tab) ? onBreak.tab as "map" | "list" | "events" : "map");
     const [showHidden, setShowHidden] = React.useState(false);
@@ -671,6 +670,8 @@ export function ClaudeMap() {
     const savedView = React.useRef<View>();
     const lastTickAt = React.useRef(0);
     const focusedProjectId = selected?.kind === "project" && view === "map" ? selected.id : undefined;
+    // the card mounts when its node's data arrives, which can be after the selection (a card reopened on load)
+    const cardShown = !!selected;
     React.useEffect(() => {
         const card = cardRef.current;
         if (!card) {
@@ -680,7 +681,7 @@ export function ClaudeMap() {
         const observer = new ResizeObserver(() => setCardHeight(card.getBoundingClientRect().height));
         observer.observe(card);
         return () => observer.disconnect();
-    }, [selectedId, view, !!selected]);
+    }, [selectedId, view, cardShown]);
     /* bumped when the first layout settles, so a card reopened on load (after a break) can fit its branch then */
     const [settled, setSettled] = React.useState(0);
     React.useEffect(() => {
@@ -734,17 +735,14 @@ export function ClaudeMap() {
     const takeBreak = () => {
         const place: BreakPlace = {
             tab: view,
-            selectedId: view === "map" ? selectedId : undefined,
-            label: view === "map" ? selected?.label : view === "list" ? "the List" : "the Log"
+            selectedId: view === "map" ? selectedId : undefined
         };
         saveBreak(place);
         setOnBreak(place);
-        setWelcomeBack(false);
     };
     const backFromBreak = () => {
         saveBreak(undefined);
         setOnBreak(undefined);
-        setWelcomeBack(!!onBreak?.label);
     };
 
     /* Jump to Claude; for a thread, what its card says now is no longer new */
@@ -1110,13 +1108,6 @@ export function ClaudeMap() {
             </Typography>}
         </Paper>}
 
-        {onBreak && <BreakVeil place={onBreak} onBack={backFromBreak}/>}
-        <Snackbar
-            open={welcomeBack}
-            autoHideDuration={5000}
-            onClose={() => setWelcomeBack(false)}
-            anchorOrigin={{vertical: "top", horizontal: "center"}}
-            message="Welcome back. Your place is just as you left it."
-        />
+        {onBreak && <BreakVeil onBack={backFromBreak}/>}
     </Box>;
 }

@@ -1,13 +1,11 @@
 import React from "react";
 import { Box, Button, SvgIcon, Typography } from "@mui/material";
 
-/* Take a break: the Sky loading screen comes back over the page, says where Jon was, and waits. No clock, no count:
-   the screen never says how long he's been away. The place is saved on the device, so a break survives closing the
-   app, and coming back lands him on what he left. */
+/* Take a break: the Sky loading screen comes back over the page and waits. It says only that he's on a break: no
+   clock, no count, and no reminder of what he was doing (he knows the app remembers). The place is saved on the
+   device, so a break survives closing the app, and coming back lands him on what he left. */
 
 export type BreakPlace = {
-    /* what the veil names: the project or thread he was on, or undefined for the whole map */
-    label?: string,
     /* enough to put him back: which tab and which card (the camera follows the card) */
     tab: string,
     selectedId?: string
@@ -69,7 +67,7 @@ export function BalloonIcon() {
     </SvgIcon>;
 }
 
-export function BreakVeil({place, onBack}: {place: BreakPlace, onBack: () => void}) {
+export function BreakVeil({onBack}: {onBack: () => void}) {
     const back = React.useRef<HTMLButtonElement>(null);
     React.useEffect(() => back.current?.focus(), []);
     return <Box
@@ -100,12 +98,9 @@ export function BreakVeil({place, onBack}: {place: BreakPlace, onBack: () => voi
             display: "flex", flexDirection: "column", alignItems: "center", pt: "max(3.5dvh, 22px)", pb: 3, gap: 1, textAlign: "center"
         }}>
             <Typography id="break-words" sx={{fontSize: "clamp(32px, 9vw, 52px)", fontWeight: 600, color: "#23313d", letterSpacing: "-.01em", lineHeight: 1.1}}>
-                you are here
+                You are on a break
             </Typography>
-            <Typography sx={{color: "#3b4733", maxWidth: "min(88vw, 460px)", px: 2}}>
-                {place.label ? <>You were on <strong>{place.label}</strong>. </> : "Your map is saved as you left it. "}
-                Come back whenever.
-            </Typography>
+            <Typography sx={{color: "#3b4733", fontSize: "1.1rem"}}>Come back whenever</Typography>
             <Button
                 ref={back}
                 variant="contained"
