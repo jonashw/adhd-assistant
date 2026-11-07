@@ -12,3 +12,6 @@ Jon said: "sometimes when I react to a Go-Ahead or Needs You item in What's Next
 Observed: asks already clear once any sync shows the thread working, but the woken thread synced only at turn end; report_state flares on the map needed the thread to call report_state "working".
 
 Inferred (my reading): Jon needs immediate confirmation that an answer landed; an ask that lingers after he acted reads as "you still owe this", which is the kind of nagging the app is meant to remove.
+
+Follow-up, Jon said: "Is there a way we could avoid this moment again, when we have to have deliver no instructions to all projects about how to interact with ADHD Assist mCP? Surely we can build this protocol definition*inside* our model context protocol?!??!?"
+Inferred (my reading): rules for threads belong in the connector, never in per-project pastes; running threads must pick up rule changes without a restart.
