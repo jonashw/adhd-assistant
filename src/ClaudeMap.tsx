@@ -8,7 +8,7 @@ import {
 import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, ExpandLess, ExpandMore, MoreHoriz, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import { Description } from "@mui/icons-material";
 import {
-    ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, artifactFlag, badgeFor, badgeOrder, byLatestChange, claudeBadges,
+    ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, artifactFlag, badgeFor, badgeOrder, byLatestChange, claudeBadges,
     claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
 } from "./ClaudeMapTypes";
 import { ClaudeThreadGlance, NewDot, PillChip, PrChip } from "./ClaudeThreadGlance";
@@ -396,7 +396,8 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
 /* Your move: what each project needs from Jon, and nothing he's done with. A project's asks and to-dos come first, then
    its stuck threads; the threads still working fold into one line. Resolved threads are left out (a search finds them).
    Projects that have gone quiet fold away at the bottom by themselves, and Hide sits in each project's ⋯ menu. */
-function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, hiddenCount, showHidden, onShowHidden}: {
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, hiddenCount, showHidden, onShowHidden}: {
+    onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
     projects: ClaudeProject[],
     searching: boolean,
     openIn: OpenIn,
@@ -418,7 +419,9 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         return next;
     };
     const needs = (p: ClaudeProject) => forYou(p, now).length + p.threads.filter(t => badgeFor(t, p, now) === "failed").length;
-    const ordered = [...projects].sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || lastMoved(b).localeCompare(lastMoved(a)));
+    // the project holding the highest-Leverage thing you can do now comes first
+    const top = (p: ClaudeProject) => Math.max(0, ...forYou(p, now).filter(i => i.ready).map(i => i.leverage));
+    const ordered = [...projects].sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || top(b) - top(a) || lastMoved(b).localeCompare(lastMoved(a)));
     const active = searching ? ordered : ordered.filter(p => !isQuiet(p, now));
     const quiet = searching ? [] : ordered.filter(p => isQuiet(p, now));
 
@@ -463,7 +466,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
                 </IconButton>
             </ListSubheader>
             <Box sx={{px: 1}}>
-                <ProjectForYou project={p} heading={false} firstShown={6} threadLinkProps={t => linkProps(t.url, openIn)} onOpenThread={onOpenThread}/>
+                <ProjectForYou project={p} heading={false} firstShown={6} threadLinkProps={t => linkProps(t.url, openIn)} onOpenThread={onOpenThread} onInterest={onInterest}/>
             </Box>
             {stuck.map(t => threadRow(t, p))}
             {needs(p) === 0 &&
@@ -886,6 +889,16 @@ export function ClaudeMap() {
         }
     };
 
+    /* Jon's thumb on Claude's interest guess for a to-do: shown at once, kept on the server for later guesses to learn */
+    const answerInterest = (todo: ClaudeTodo, answer: InterestAnswer | undefined) => {
+        setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => !t.todos?.some(x => x.id === todo.id) ? t : {
+            ...t, todos: t.todos.map(x => x.id !== todo.id || !x.interest ? x : {...x, interest: {...x.interest, answer}})
+        })})));
+        if (!demo) {
+            ServerApi.setChecklistInterest(todo.id, answer).catch(() => reload());
+        }
+    };
+
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
         setProjects(ps => ps?.map(p => p.id === project.id ? {...p, hidden} : p));
@@ -1065,6 +1078,7 @@ export function ClaudeMap() {
                 onOpenThread={markOpened}
                 onOpenArtifact={markArtifactOpened}
                 onToggleHidden={toggleHidden}
+                onInterest={answerInterest}
                 hiddenCount={hiddenCount}
                 showHidden={showHidden}
                 onShowHidden={setShowHidden}
@@ -1149,6 +1163,7 @@ export function ClaudeMap() {
                 project={selected.project}
                 threadLinkProps={t => linkProps(t.url, openIn)}
                 onOpenThread={markOpened}
+                onInterest={answerInterest}
             />}
             {selected.kind === "thread" && selected.thread && <ClaudeThreadGlance thread={selected.thread} project={selected.project!} onOpenArtifact={markArtifactOpened}/>}
             {selected.kind === "artifact" && selected.artifact && <ArtifactThreads

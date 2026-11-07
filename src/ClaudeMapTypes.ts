@@ -30,11 +30,36 @@ export type ClaudeThread = {
     todos?: ClaudeTodo[]
 };
 
-/* A to-do a thread left for Jon (a checklist item at a place), as the Claude map shows it */
+/* How long a to-do takes, kept coarse on purpose: time estimates are a known ADHD weak spot */
+export const todoSizes = ["minutes", "half_hour", "longer"] as const;
+export type TodoSize = typeof todoSizes[number];
+/* Kanban's classes of service: how the cost of waiting grows. Intangible is the honest home for "Someday?" */
+export const delayClasses = ["expedite", "fixed_date", "standard", "intangible"] as const;
+export type DelayClass = typeof delayClasses[number];
+/* Claude's guess at whether Jon will want to do it, until he says */
+export const interestGuesses = ["drawn", "neutral", "reluctant"] as const;
+export type InterestGuess = typeof interestGuesses[number];
+export type InterestAnswer = "up" | "down";
+
+/* A to-do a thread left for Jon (a checklist item at a place), as the Claude map shows it. The fields after link are
+   the thread's estimates for the Leverage order; any can be missing, and the order fills in a middling default. */
 export type ClaudeTodo = {
     id: string,
     text: string,
     link?: string,
+    /* 1 nice, 2 helps, 3 matters; why says to whom */
+    worth?: 1 | 2 | 3,
+    why?: string,
+    size?: TodoSize,
+    delayClass?: DelayClass,
+    /* for a fixed date: the day it starts to hurt (YYYY-MM-DD) */
+    dueOn?: string,
+    /* the concrete info to do it, and how Jon knows it's done */
+    needs?: string[],
+    doneWhen?: string[],
+    /* other to-dos (ids) that must be done first */
+    waitsOn?: string[],
+    interest?: {guess: InterestGuess, reason?: string, answer?: InterestAnswer},
     addedAt: string
 };
 

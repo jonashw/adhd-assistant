@@ -7,7 +7,7 @@ import { HttpError } from "./http";
 import { checkIn, reportState, suggestPlace } from "./items";
 import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places";
 import { LinkedItem, threadStates } from "../../src/TrailTypes";
-import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates } from "../../src/ClaudeMapTypes";
+import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates, delayClasses, interestGuesses, todoSizes } from "../../src/ClaudeMapTypes";
 import { syncProject } from "./claude";
 import { logMonologue, monologueMaxChars } from "./monologues";
 import { LiveRing, ring } from "./live";
@@ -209,12 +209,26 @@ function buildServer(env: Env): McpServer {
     const checklistItem = z.object({
         text: z.string().min(1).max(300).describe("One step only Jon can do, in plain words, e.g. \"Add the CLOUDFLARE_API_TOKEN secret to the House Party environment\""),
         group: z.string().min(1).max(40).optional().describe("An optional heading Jon sorts by, like \"From home\" (needs his laptop or accounts) or \"Anytime\" (a phone will do)"),
-        link: z.string().max(2000).optional().describe("Where he does it, if there is a page for it: the PR, the settings page, the sign-up page")
+        link: z.string().max(2000).optional().describe("Where he does it, if there is a page for it: the PR, the settings page, the sign-up page"),
+        // the Leverage estimates (src/leverage.ts); each is your best guess, and Jon can correct any
+        worth: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional()
+            .describe("1 nice to have, 2 helps, 3 matters (something he cares about stalls without it)"),
+        why: z.string().max(200).optional().describe("One line on why it matters and to whom, e.g. \"the deploy is stuck until this is set\""),
+        size: z.enum(todoSizes).optional().describe("minutes (under ~10), half_hour, or longer. Coarse on purpose; round up when unsure"),
+        delay_class: z.enum(delayClasses).optional()
+            .describe("expedite: waiting hurts now (a deploy down, a long outside wait to start). fixed_date: hurts after a date (give due_on). standard: hurts steadily. intangible: someday, no real cost to waiting"),
+        due_on: z.string().optional().describe("For fixed_date: the day it starts to hurt, YYYY-MM-DD"),
+        needs: z.array(z.string().max(300)).max(8).optional().describe("The concrete things he needs to do it: links, values to paste, where a setting lives"),
+        done_when: z.array(z.string().max(300)).max(3).optional().describe("One to three lines: how he knows it's done"),
+        waits_on: z.array(z.string().max(100)).max(20).optional().describe("Ids of other to-dos (from list_checklist_items) that must be done first"),
+        interest: z.enum(interestGuesses).optional()
+            .describe("Your guess at how he'll feel about doing it: drawn (hands-on, novel, quick win), neutral, or reluctant (admin, waiting on hold, forms). He answers with a thumb, and it shapes the order"),
+        interest_reason: z.string().max(120).optional().describe("A few words behind the guess, e.g. \"hands-on with gear\"")
     });
 
     server.registerTool("add_checklist_items", {
         title: "Add to-dos for Jon",
-        description: `Leave Jon to-dos at a place on his map: steps only he can do, such as creating an account, adding a secret or merging a PR. Not your own steps. Each item is marked with this thread and links back to it, shows in his What's next, and makes the place "need him" until he checks it off. Up to ${checklistMaxPerCall} items per call. The same text twice at one place is stored once, so it is safe to repeat; call list_checklist_items first anyway to see what is there and what he finished. Leave out place to use this thread's place; if this thread only has a suggested place (suggest_place), the items wait there and move over when Jon charts it.`,
+        description: `Leave Jon to-dos at a place on his map: steps only he can do, such as creating an account, adding a secret or merging a PR. Not your own steps. Each item is marked with this thread and links back to it, shows in his What's next, and makes the place "need him" until he checks it off. Up to ${checklistMaxPerCall} items per call. Give each one your estimates (worth, why, size, delay_class, done_when, and interest with a reason; needs and waits_on when they apply): Jon's Your move page orders his to-dos by Leverage, roughly (urgency + worth + what waits on it) × interest ÷ size, so small keys that open other work come first. Slice big steps into ones he can finish in one sitting. The same text twice at one place is stored once, so it is safe to repeat; call list_checklist_items first anyway to see what is there and what he finished. Leave out place to use this thread's place; if this thread only has a suggested place (suggest_place), the items wait there and move over when Jon charts it.`,
         inputSchema: {
             thread_id: z.string().describe("The thread_id check_in returned; check in with this thread's link so the items link back to it"),
             items: z.array(checklistItem).min(1).max(checklistMaxPerCall).describe(`1 to ${checklistMaxPerCall} to-dos, in the order Jon should do them`),

@@ -2,6 +2,7 @@ import { Env } from "./env";
 import { HttpError } from "./http";
 import { checkTarget, checkUrl, PlaceRef } from "./items";
 import { ChecklistItem, checklistDoneDays, checklistMaxPerCall } from "../../src/TrailTypes";
+import { DelayClass, InterestAnswer, InterestGuess, TodoSize } from "../../src/ClaudeMapTypes";
 
 /* To-dos a Claude thread leaves for Jon at a place. They are Jon's to do: each says which thread asked and links back
    to it. A thread whose place is only suggested can still leave them; they wait on the suggestion and move to the place
@@ -11,7 +12,8 @@ type Row = {
     id: string, map_id: string, note_id: string | null, text: string, text_key: string,
     item_group: string | null, link: string | null,
     thread_item_id: string | null, thread_title: string, thread_url: string | null,
-    added_at: string, done_at: string | null, done_by: ChecklistItem["doneBy"] | null
+    added_at: string, done_at: string | null, done_by: ChecklistItem["doneBy"] | null,
+    interest_guess: InterestGuess | null, interest_answer: InterestAnswer | null
 };
 
 const toItem = (row: Row): ChecklistItem => {
@@ -65,7 +67,36 @@ const whereSql = (target: Target, threadId: string) => target.noteId
     ? {sql: "map_id = ? AND note_id = ?", binds: [target.mapId, target.noteId]}
     : {sql: "note_id IS NULL AND thread_item_id = ?", binds: [threadId]};
 
-export type NewChecklistItem = {text: string, group?: string, link?: string};
+/* The Leverage estimates a thread may send with a to-do (see src/leverage.ts) */
+export type ItemEstimates = {
+    worth?: 1 | 2 | 3, why?: string, size?: TodoSize, delay_class?: DelayClass, due_on?: string,
+    needs?: string[], done_when?: string[], waits_on?: string[],
+    interest?: InterestGuess, interest_reason?: string
+};
+export type NewChecklistItem = {text: string, group?: string, link?: string} & ItemEstimates;
+
+const shortList = (list: string[] | undefined, what: string) => {
+    const clean = (list ?? []).map(s => s.trim()).filter(Boolean);
+    if (clean.length > 8 || clean.some(s => s.length > 300)) {
+        throw new HttpError(422, `${what}: up to 8 lines of up to 300 characters.`);
+    }
+    return clean.length ? JSON.stringify(clean) : null;
+};
+
+function estimates(item: ItemEstimates) {
+    if (item.due_on !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(item.due_on)) {
+        throw new HttpError(422, "due_on is a date like 2026-11-30.");
+    }
+    if (item.delay_class === "fixed_date" && !item.due_on) {
+        throw new HttpError(422, "A fixed_date item needs due_on, the day it starts to hurt.");
+    }
+    return [
+        item.worth ?? null, item.why?.trim() || null, item.size ?? null, item.delay_class ?? null, item.due_on ?? null,
+        shortList(item.needs, "needs"), shortList(item.done_when, "done_when"),
+        item.waits_on?.length ? JSON.stringify(item.waits_on.slice(0, 20)) : null,
+        item.interest ?? null, item.interest_reason?.trim() || null
+    ];
+}
 
 export async function addChecklistItems(env: Env, threadId: string, place: PlaceRef | undefined, items: NewChecklistItem[]) {
     if (items.length === 0 || items.length > checklistMaxPerCall) {
@@ -80,7 +111,7 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
         if (group && group.length > 40) {
             throw new HttpError(422, "A group name can have up to 40 characters.");
         }
-        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null};
+        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null, estimates: estimates(item)};
     });
     const thread = await requireThread(env, threadId);
     const target = await targetFor(env, thread, place);
@@ -89,10 +120,11 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
     const unique = clean.filter((item, i) => clean.findIndex(c => c.key === item.key) === i);
     const results = await env.DB.batch(unique.map(item => env.DB.prepare(
         `INSERT OR IGNORE INTO checklist_items
-            (id, map_id, note_id, text, text_key, item_group, link, thread_item_id, thread_title, thread_url, added_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+            (id, map_id, note_id, text, text_key, item_group, link, thread_item_id, thread_title, thread_url, added_at,
+             worth, why, size, delay_class, due_on, needs, done_when, waits_on, interest_guess, interest_reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
     ).bind(crypto.randomUUID(), target.mapId, target.noteId, item.text, item.key, item.group, item.link,
-        thread.id, thread.title, thread.url, now)));
+        thread.id, thread.title, thread.url, now, ...item.estimates)));
     const addedKeys = new Set(unique.filter((_, i) => results[i].results.length > 0).map(item => item.key));
     const where = whereSql(target, thread.id);
     const stored = (await env.DB.prepare(`SELECT * FROM checklist_items WHERE ${where.sql} AND text_key IN (SELECT value FROM json_each(?))`)
@@ -133,7 +165,10 @@ export async function listChecklistItems(env: Env, input: {place?: PlaceRef, thr
             id: r.id, text: r.text, group: r.item_group ?? undefined, link: r.link ?? undefined,
             done: r.done_at !== null,
             done_by: r.done_by === "claude" ? "a Claude thread" : r.done_by === "jon" ? "Jon" : undefined,
-            added_by: r.thread_title, added_by_this_thread: input.threadId !== undefined && r.thread_item_id === input.threadId
+            added_by: r.thread_title, added_by_this_thread: input.threadId !== undefined && r.thread_item_id === input.threadId,
+            // what Claude guessed about Jon's interest and what he said, so later guesses can learn
+            interest: r.interest_guess ?? undefined,
+            jon_said: r.interest_answer === "up" ? "wants to" : r.interest_answer === "down" ? "would rather not" : undefined
         }))
     };
 }
@@ -162,6 +197,15 @@ export async function setChecklistDone(env: Env, id: string, done: boolean): Pro
             .bind(new Date().toISOString(), id)
         : env.DB.prepare("UPDATE checklist_items SET done_at = NULL, done_by = NULL WHERE id = ?").bind(id)
     ).run();
+    if (!result.meta.changes) {
+        throw new HttpError(404, "That item is gone.");
+    }
+}
+
+/* Jon's thumbs up or down on Claude's interest guess, or undefined to take it back */
+export async function setChecklistInterest(env: Env, id: string, answer: InterestAnswer | undefined): Promise<void> {
+    const result = await env.DB.prepare("UPDATE checklist_items SET interest_answer = ?, interest_answered_at = ? WHERE id = ?")
+        .bind(answer ?? null, answer ? new Date().toISOString() : null, id).run();
     if (!result.meta.changes) {
         throw new HttpError(404, "That item is gone.");
     }
