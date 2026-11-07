@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
 } from "@mui/material";
 import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import { Description } from "@mui/icons-material";
@@ -20,6 +20,9 @@ import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
+import { ProjectForYou } from "./ClaudeProjectFocus";
+import { branchBox, fitIntoBand, View } from "./focusCamera";
+import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -567,9 +570,12 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
-    const [view, setView] = React.useState<"map" | "list" | "events">("map");
+    /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
+    const [onBreak, setOnBreak] = React.useState<BreakPlace | undefined>(readBreak);
+    const [view, setView] = React.useState<"map" | "list" | "events">(() =>
+        onBreak && ["map", "list", "events"].includes(onBreak.tab) ? onBreak.tab as "map" | "list" | "events" : "map");
     const [showHidden, setShowHidden] = React.useState(false);
-    const [selectedId, setSelectedId] = React.useState<string>();
+    const [selectedId, setSelectedId] = React.useState<string | undefined>(() => onBreak?.selectedId);
     const [query, setQuery] = React.useState("");
     const [openIn, setOpenInState] = React.useState<OpenIn>(readOpenIn);
     const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
@@ -656,7 +662,88 @@ export function ClaudeMap() {
         return () => window.clearTimeout(timer);
     }, [query, showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
+
+    /* Clicking a project: the camera glides so the project's branch fits between the top of the map and the top of its
+       card. Only the camera moves; no node does. Closing the card glides back to the view Jon had before. */
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [cardHeight, setCardHeight] = React.useState(0);
+    const savedView = React.useRef<View>();
+    const lastTickAt = React.useRef(0);
+    const focusedProjectId = selected?.kind === "project" && view === "map" ? selected.id : undefined;
+    // the card mounts when its node's data arrives, which can be after the selection (a card reopened on load)
+    const cardShown = !!selected;
+    React.useEffect(() => {
+        const card = cardRef.current;
+        if (!card) {
+            setCardHeight(0);
+            return;
+        }
+        const observer = new ResizeObserver(() => setCardHeight(card.getBoundingClientRect().height));
+        observer.observe(card);
+        return () => observer.disconnect();
+    }, [selectedId, view, cardShown]);
+    /* bumped when the first layout settles, so a card reopened on load (after a break) can fit its branch then */
+    const [settled, setSettled] = React.useState(0);
+    React.useEffect(() => {
+        const graph = graphRef.current;
+        const box = (sizeRef as React.RefObject<HTMLDivElement>).current;
+        const card = cardRef.current;
+        if (!graph || !box) {
+            return;
+        }
+        if (!focusedProjectId) {
+            // card closed (or something else selected): back to where Jon was
+            if (savedView.current && !selectedId) {
+                const {k, x, y} = savedView.current;
+                graph.centerAt(x, y, 400);
+                graph.zoom(k, 400);
+            }
+            if (!selectedId) {
+                savedView.current = undefined;
+            }
+            return;
+        }
+        // the first layout is still finding its shape: wait for it rather than freeze it half-made
+        if (!card || cardHeight === 0 || !fitted.current) {
+            return;
+        }
+        const branch = graphData.nodes.filter(n => n.id === focusedProjectId || (n.kind !== "project" && n.kind !== "root" && n.project?.id === focusedProjectId));
+        const bounds = branchBox(branch);
+        if (!bounds) {
+            return;
+        }
+        if (!savedView.current) {
+            const centre = graph.centerAt() as unknown as {x: number, y: number};
+            savedView.current = {k: graph.zoom() as unknown as number, x: centre.x, y: centre.y};
+        }
+        // still settling: hold every node where it is, so the fit stays true (the engine lets go when it stops)
+        if (Date.now() - lastTickAt.current < 200) {
+            graphData.nodes.forEach(n => {
+                n.fx = n.x;
+                n.fy = n.y;
+            });
+        }
+        const boxRect = box.getBoundingClientRect();
+        const target = fitIntoBand(bounds, {width: boxRect.width, height: boxRect.height},
+            {top: 0, bottom: card.getBoundingClientRect().top - boxRect.top});
+        graph.centerAt(target.x, target.y, 400);
+        graph.zoom(target.k, 400);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusedProjectId, selectedId, cardHeight, settled]);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
+
+    const takeBreak = () => {
+        const place: BreakPlace = {
+            tab: view,
+            selectedId: view === "map" ? selectedId : undefined
+        };
+        saveBreak(place);
+        setOnBreak(place);
+    };
+    const backFromBreak = () => {
+        saveBreak(undefined);
+        setOnBreak(undefined);
+    };
 
     /* Jump to Claude; for a thread, what its card says now is no longer new */
     const openNode = (url?: string, thread?: ClaudeThread) => {
@@ -715,6 +802,11 @@ export function ClaudeMap() {
                     <Tab value="events" label="Log"/>
                 </Tabs>
                 <LiveDot/>
+                <Tooltip title="Take a break">
+                    <IconButton color="inherit" aria-label="Take a break" onClick={takeBreak}>
+                        <BalloonIcon/>
+                    </IconButton>
+                </Tooltip>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
                 </IconButton>
@@ -802,6 +894,7 @@ export function ClaudeMap() {
                 cooldownTicks={120}
                 cooldownTime={Infinity}
                 onEngineTick={() => {
+                    lastTickAt.current = Date.now();
                     if (graphData.pins?.size) {
                         graphData.nodes.forEach(n => {
                             const pin = graphData.pins!.get(n.id);
@@ -819,9 +912,14 @@ export function ClaudeMap() {
                         n.fy = undefined;
                     });
                     // fit once; after that, leave the view where Jon put it
+                    // (with a project's card already open, fit its branch instead)
                     if (!fitted.current) {
                         fitted.current = true;
-                        graphRef.current?.zoomToFit(400, 40);
+                        if (focusedProjectId) {
+                            setSettled(n => n + 1);
+                        } else {
+                            graphRef.current?.zoomToFit(400, 40);
+                        }
                     }
                 }}
                 onNodeClick={n => {
@@ -938,6 +1036,7 @@ export function ClaudeMap() {
         </Paper>}
 
         {view === "map" && selected && selected.kind !== "root" && <Paper
+            ref={cardRef}
             elevation={6}
             sx={{
                 position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto",
@@ -961,6 +1060,12 @@ export function ClaudeMap() {
                 </Box>
                 <IconButton size="small" aria-label="Close" onClick={() => setSelectedId(undefined)}><Close fontSize="small"/></IconButton>
             </Stack>
+            {selected.kind === "project" && selected.project && <ProjectForYou
+                key={selected.id}
+                project={selected.project}
+                threadLinkProps={t => linkProps(t.url, openIn)}
+                onOpenThread={markOpened}
+            />}
             {selected.kind === "thread" && selected.thread && <ClaudeThreadGlance thread={selected.thread} project={selected.project!} onOpenArtifact={markArtifactOpened}/>}
             {selected.kind === "artifact" && selected.artifact && <ArtifactThreads
                 artifact={selected.artifact}
@@ -1002,5 +1107,7 @@ export function ClaudeMap() {
                     : "The project's latest sync didn't list this thread."}
             </Typography>}
         </Paper>}
+
+        {onBreak && <BreakVeil onBack={backFromBreak}/>}
     </Box>;
 }

@@ -25,7 +25,17 @@ export type ClaudeThread = {
     /* when Jon last opened it from the map */
     openedAt?: string,
     /* topics and keywords it had before, for search */
-    pastTopics?: string[]
+    pastTopics?: string[],
+    /* to-dos it left for Jon that he hasn't done yet (checklist items), newest first */
+    todos?: ClaudeTodo[]
+};
+
+/* A to-do a thread left for Jon (a checklist item at a place), as the Claude map shows it */
+export type ClaudeTodo = {
+    id: string,
+    text: string,
+    link?: string,
+    addedAt: string
 };
 
 /* What a thread needs from Jon, if anything */
