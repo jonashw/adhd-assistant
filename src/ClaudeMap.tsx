@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import ForceGraph2D, { ForceGraphMethods, NodeObject } from "react-force-graph-2d";
 import {
     Alert, AppBar, Box, Button, Chip, IconButton, List, ListItemButton, ListItemText, ListSubheader,
-    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Typography
+    InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Snackbar, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
 } from "@mui/material";
 import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
 import { Description } from "@mui/icons-material";
@@ -22,6 +22,7 @@ import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
 import { ProjectForYou } from "./ClaudeProjectFocus";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
+import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -569,9 +570,13 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
-    const [view, setView] = React.useState<"map" | "list" | "events">("map");
+    /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
+    const [onBreak, setOnBreak] = React.useState<BreakPlace | undefined>(readBreak);
+    const [welcomeBack, setWelcomeBack] = React.useState(false);
+    const [view, setView] = React.useState<"map" | "list" | "events">(() =>
+        onBreak && ["map", "list", "events"].includes(onBreak.tab) ? onBreak.tab as "map" | "list" | "events" : "map");
     const [showHidden, setShowHidden] = React.useState(false);
-    const [selectedId, setSelectedId] = React.useState<string>();
+    const [selectedId, setSelectedId] = React.useState<string | undefined>(() => onBreak?.selectedId);
     const [query, setQuery] = React.useState("");
     const [openIn, setOpenInState] = React.useState<OpenIn>(readOpenIn);
     const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
@@ -675,7 +680,9 @@ export function ClaudeMap() {
         const observer = new ResizeObserver(() => setCardHeight(card.getBoundingClientRect().height));
         observer.observe(card);
         return () => observer.disconnect();
-    }, [selectedId, view]);
+    }, [selectedId, view, !!selected]);
+    /* bumped when the first layout settles, so a card reopened on load (after a break) can fit its branch then */
+    const [settled, setSettled] = React.useState(0);
     React.useEffect(() => {
         const graph = graphRef.current;
         const box = (sizeRef as React.RefObject<HTMLDivElement>).current;
@@ -695,7 +702,8 @@ export function ClaudeMap() {
             }
             return;
         }
-        if (!card || cardHeight === 0) {
+        // the first layout is still finding its shape: wait for it rather than freeze it half-made
+        if (!card || cardHeight === 0 || !fitted.current) {
             return;
         }
         const branch = graphData.nodes.filter(n => n.id === focusedProjectId || (n.kind !== "project" && n.kind !== "root" && n.project?.id === focusedProjectId));
@@ -720,8 +728,24 @@ export function ClaudeMap() {
         graph.centerAt(target.x, target.y, 400);
         graph.zoom(target.k, 400);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [focusedProjectId, selectedId, cardHeight]);
+    }, [focusedProjectId, selectedId, cardHeight, settled]);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
+
+    const takeBreak = () => {
+        const place: BreakPlace = {
+            tab: view,
+            selectedId: view === "map" ? selectedId : undefined,
+            label: view === "map" ? selected?.label : view === "list" ? "the List" : "the Log"
+        };
+        saveBreak(place);
+        setOnBreak(place);
+        setWelcomeBack(false);
+    };
+    const backFromBreak = () => {
+        saveBreak(undefined);
+        setOnBreak(undefined);
+        setWelcomeBack(!!onBreak?.label);
+    };
 
     /* Jump to Claude; for a thread, what its card says now is no longer new */
     const openNode = (url?: string, thread?: ClaudeThread) => {
@@ -780,6 +804,11 @@ export function ClaudeMap() {
                     <Tab value="events" label="Log"/>
                 </Tabs>
                 <LiveDot/>
+                <Tooltip title="Take a break">
+                    <IconButton color="inherit" aria-label="Take a break" onClick={takeBreak}>
+                        <BalloonIcon/>
+                    </IconButton>
+                </Tooltip>
                 <IconButton color="inherit" edge="end" aria-label="Settings" onClick={e => setMenuAnchor(e.currentTarget)}>
                     <Settings/>
                 </IconButton>
@@ -885,9 +914,14 @@ export function ClaudeMap() {
                         n.fy = undefined;
                     });
                     // fit once; after that, leave the view where Jon put it
+                    // (with a project's card already open, fit its branch instead)
                     if (!fitted.current) {
                         fitted.current = true;
-                        graphRef.current?.zoomToFit(400, 40);
+                        if (focusedProjectId) {
+                            setSettled(n => n + 1);
+                        } else {
+                            graphRef.current?.zoomToFit(400, 40);
+                        }
                     }
                 }}
                 onNodeClick={n => {
@@ -1075,5 +1109,14 @@ export function ClaudeMap() {
                     : "The project's latest sync didn't list this thread."}
             </Typography>}
         </Paper>}
+
+        {onBreak && <BreakVeil place={onBreak} onBack={backFromBreak}/>}
+        <Snackbar
+            open={welcomeBack}
+            autoHideDuration={5000}
+            onClose={() => setWelcomeBack(false)}
+            anchorOrigin={{vertical: "top", horizontal: "center"}}
+            message="Welcome back. Your place is just as you left it."
+        />
     </Box>;
 }
