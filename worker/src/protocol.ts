@@ -27,6 +27,16 @@ export const protocolChanges: ProtocolChange[] = [
             + "that day, and sync_project with this_thread.set_aside_until the same day (YYYY-MM-DD), keeping your card's ask. "
             + "It leaves his Start here and comes back on that day. If he already deferred an ask you are still holding, "
             + "do this now."
+    },
+    {
+        version: 4,
+        on: "2026-11-07",
+        rule: "Where Jon has to be: give each to-do (add_checklist_items) and each ask on your card (sync_project "
+            + "this_thread.card.ask) a where: the spot from Jon's spots he must be at, such as At my Mac for laptop work, Garage, "
+            + "or Library (list_checklist_items lists the spots; the default tree is Anywhere › Home › At my Mac, In bed, Garage; "
+            + "Anywhere › Out › Library, Park, School, Supermarket, Costco, Home Depot). Leave it out when a phone will do. His "
+            + "Your move page shows only what he can do from where he says he is, and waits on a spot's opening hours. To tag a "
+            + "to-do you added before, add it again with the same text and a where."
     }
 ];
 

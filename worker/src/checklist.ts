@@ -3,6 +3,8 @@ import { HttpError } from "./http";
 import { checkTarget, checkUrl, PlaceRef } from "./items";
 import { ChecklistItem, checklistDoneDays, checklistMaxPerCall } from "../../src/TrailTypes";
 import { DelayClass, InterestAnswer, InterestGuess, TodoSize } from "../../src/ClaudeMapTypes";
+import { listSpots } from "./spots";
+import { byName } from "../../src/spots";
 
 /* To-dos a Claude thread leaves for Jon at a place. They are Jon's to do: each says which thread asked and links back
    to it. A thread whose place is only suggested can still leave them; they wait on the suggestion and move to the place
@@ -13,7 +15,8 @@ type Row = {
     item_group: string | null, link: string | null,
     thread_item_id: string | null, thread_title: string, thread_url: string | null,
     added_at: string, done_at: string | null, done_by: ChecklistItem["doneBy"] | null,
-    interest_guess: InterestGuess | null, interest_answer: InterestAnswer | null
+    interest_guess: InterestGuess | null, interest_answer: InterestAnswer | null,
+    where_spot: string | null, where_by: "claude" | "jon" | null
 };
 
 const toItem = (row: Row): ChecklistItem => {
@@ -73,7 +76,8 @@ export type ItemEstimates = {
     needs?: string[], done_when?: string[], waits_on?: string[],
     interest?: InterestGuess, interest_reason?: string
 };
-export type NewChecklistItem = {text: string, group?: string, link?: string} & ItemEstimates;
+/* where: the spot it needs (a name from Jon's spots: Anywhere, Home, At my Mac, Garage, Library…) */
+export type NewChecklistItem = {text: string, group?: string, link?: string, where?: string} & ItemEstimates;
 
 const shortList = (list: string[] | undefined, what: string) => {
     const clean = (list ?? []).map(s => s.trim()).filter(Boolean);
@@ -111,8 +115,18 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
         if (group && group.length > 40) {
             throw new HttpError(422, "A group name can have up to 40 characters.");
         }
-        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null, estimates: estimates(item)};
+        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null, estimates: estimates(item), where: null as string | null};
     });
+    const spots = items.some(i => i.where?.trim()) ? await listSpots(env) : [];
+    const wheres = items.map(item => {
+        if (!item.where?.trim()) return null;
+        const spot = byName(spots, item.where);
+        if (!spot) {
+            throw new HttpError(422, `where "${item.where}" isn't one of Jon's spots. Use one of: ${spots.map(s => s.name).join(", ")}.`);
+        }
+        return spot.name;
+    });
+    clean.forEach((item, i) => Object.assign(item, {where: wheres[i]}));
     const thread = await requireThread(env, threadId);
     const target = await targetFor(env, thread, place);
     const now = new Date().toISOString();
@@ -121,15 +135,21 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
     const results = await env.DB.batch(unique.map(item => env.DB.prepare(
         `INSERT OR IGNORE INTO checklist_items
             (id, map_id, note_id, text, text_key, item_group, link, thread_item_id, thread_title, thread_url, added_at,
-             worth, why, size, delay_class, due_on, needs, done_when, waits_on, interest_guess, interest_reason)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+             worth, why, size, delay_class, due_on, needs, done_when, waits_on, interest_guess, interest_reason, where_spot, where_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
     ).bind(crypto.randomUUID(), target.mapId, target.noteId, item.text, item.key, item.group, item.link,
-        thread.id, thread.title, thread.url, now, ...item.estimates)));
+        thread.id, thread.title, thread.url, now, ...item.estimates, item.where, item.where ? "claude" : null)));
     const addedKeys = new Set(unique.filter((_, i) => results[i].results.length > 0).map(item => item.key));
     const where = whereSql(target, thread.id);
     const stored = (await env.DB.prepare(`SELECT * FROM checklist_items WHERE ${where.sql} AND text_key IN (SELECT value FROM json_each(?))`)
         .bind(...where.binds, JSON.stringify(unique.map(i => i.key))).all<Row>()).results;
     const byKey = new Map(stored.map(r => [r.text_key, r]));
+    // sending an item again can tag where it is done, unless Jon already said
+    const retag = unique.filter(i => i.where && !addedKeys.has(i.key) && byKey.has(i.key) && byKey.get(i.key)!.where_by !== "jon");
+    if (retag.length) {
+        await env.DB.batch(retag.map(i => env.DB.prepare("UPDATE checklist_items SET where_spot = ?, where_by = 'claude' WHERE id = ?")
+            .bind(i.where, byKey.get(i.key)!.id)));
+    }
     const describe = (key: string) => {
         const row = byKey.get(key)!;
         return {id: row.id, text: row.text, done: row.done_at !== null};
@@ -161,6 +181,8 @@ export async function listChecklistItems(env: Env, input: {place?: PlaceRef, thr
         .bind(...where.binds).all<Row>()).results;
     return {
         place: target.label,
+        // the names a to-do's where can take
+        spots: (await listSpots(env)).map(s => s.name),
         items: rows.map(r => ({
             id: r.id, text: r.text, group: r.item_group ?? undefined, link: r.link ?? undefined,
             done: r.done_at !== null,
@@ -168,6 +190,8 @@ export async function listChecklistItems(env: Env, input: {place?: PlaceRef, thr
             added_by: r.thread_title, added_by_this_thread: input.threadId !== undefined && r.thread_item_id === input.threadId,
             // what Claude guessed about Jon's interest and what he said, so later guesses can learn
             interest: r.interest_guess ?? undefined,
+            where: r.where_spot ?? undefined,
+            where_set_by: r.where_by === "jon" ? "Jon" : undefined,
             jon_said: r.interest_answer === "up" ? "wants to" : r.interest_answer === "down" ? "would rather not" : undefined
         }))
     };

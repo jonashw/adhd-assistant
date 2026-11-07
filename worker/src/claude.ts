@@ -1,6 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import { resumeAnswered, setItemsAside } from "./items";
+import { spotNameMax } from "../../src/spots";
 import {
     ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
@@ -25,7 +26,8 @@ export type SnapshotArtifact = {
 /* What the sending thread says about itself; the whole card each time */
 export type SnapshotCard = {
     headline?: string,
-    ask?: {kind: ClaudeAskKind, text: string},
+    /* where: the spot Jon needs to be at to answer (a name from his spots), when it isn't Anywhere */
+    ask?: {kind: ClaudeAskKind, text: string, where?: string},
     progress?: {done: number, total: number, now?: string},
     /* the one it made or updated last */
     artifact?: {title: string, url: string},
@@ -74,7 +76,8 @@ type ThreadRow = {
     progress_done: number | null, progress_total: number | null, progress_now: string | null,
     artifact_title: string | null, artifact_url: string | null, topic: string | null, keywords: string | null,
     card_at: string | null, opened_at: string | null,
-    set_aside_until: string | null, set_aside_by: "thread" | "jon" | null
+    set_aside_until: string | null, set_aside_by: "thread" | "jon" | null,
+    ask_where: string | null, ask_where_jon: string | null, ask_where_jon_for: string | null
 };
 type PrRow = {
     project_id: string, repo: string, number: number, thread_id: string | null, title: string,
@@ -96,6 +99,9 @@ const isHttps = (value: string) => /^https:\/\/[^\s]{1,1990}$/.test(value);
 function checkCard(card: SnapshotCard) {
     if (card.ask && !claudeAskKinds.includes(card.ask.kind)) {
         fail("The card's ask has an unknown kind.");
+    }
+    if (card.ask?.where !== undefined && (typeof card.ask.where !== "string" || card.ask.where.trim().length > spotNameMax)) {
+        fail(`The ask's where is a spot name of up to ${spotNameMax} characters.`);
     }
     if (card.progress) {
         const {done, total} = card.progress;
@@ -335,7 +341,7 @@ function artifactStatements(env: Env, snapshot: Snapshot, now: string) {
 /* The card's columns, in order. A card that matches the stored one keeps its time, so a repeat isn't "New". */
 const cardColumns = [
     "headline", "ask_kind", "ask_text", "progress_done", "progress_total", "progress_now",
-    "artifact_title", "artifact_url", "topic", "keywords"
+    "artifact_title", "artifact_url", "topic", "keywords", "ask_where"
 ] as const;
 
 function cardValues(card: SnapshotCard): (string | number | null)[] {
@@ -344,7 +350,8 @@ function cardValues(card: SnapshotCard): (string | number | null)[] {
         card.headline ?? null, card.ask?.kind ?? null, card.ask?.text ?? null,
         card.progress?.done ?? null, card.progress?.total ?? null, card.progress?.now ?? null,
         card.artifact?.title ?? null, card.artifact?.url ?? null,
-        card.topic ?? null, keywords?.length ? JSON.stringify(keywords) : null
+        card.topic ?? null, keywords?.length ? JSON.stringify(keywords) : null,
+        card.ask?.where?.trim() || null
     ];
 }
 
@@ -384,7 +391,7 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC"),
         // to-dos threads left for Jon; a thread's link says which Claude thread it is
         env.DB.prepare(`SELECT id, text, link, added_at, thread_url, worth, why, size, delay_class, due_on, needs, done_when, waits_on,
-                interest_guess, interest_reason, interest_answer
+                interest_guess, interest_reason, interest_answer, where_spot, where_by
          FROM checklist_items WHERE done_at IS NULL AND thread_url IS NOT NULL ORDER BY added_at DESC`)
     ]);
     const todosBy = groupBy(todos.results as TodoRow[], r => claudeThreadIdOf(r.thread_url) ?? "");
@@ -444,7 +451,8 @@ type TodoRow = {
     id: string, text: string, link: string | null, added_at: string, thread_url: string,
     worth: 1 | 2 | 3 | null, why: string | null, size: TodoSize | null, delay_class: DelayClass | null, due_on: string | null,
     needs: string | null, done_when: string | null, waits_on: string | null,
-    interest_guess: InterestGuess | null, interest_reason: string | null, interest_answer: InterestAnswer | null
+    interest_guess: InterestGuess | null, interest_reason: string | null, interest_answer: InterestAnswer | null,
+    where_spot: string | null, where_by: "claude" | "jon" | null
 };
 
 const stringsOf = (json: string | null): string[] | undefined => {
@@ -477,6 +485,10 @@ function todoOf(r: TodoRow): ClaudeTodo {
     if (needs) todo.needs = needs;
     if (doneWhen) todo.doneWhen = doneWhen;
     if (waitsOn) todo.waitsOn = waitsOn;
+    if (r.where_spot) {
+        todo.where = r.where_spot;
+        todo.whereBy = r.where_by ?? "claude";
+    }
     if (r.interest_guess) {
         todo.interest = {guess: r.interest_guess};
         if (r.interest_reason) todo.interest.reason = r.interest_reason;
@@ -508,7 +520,17 @@ function cardOf(t: ThreadRow): ClaudeCard | undefined {
     }
     const card: ClaudeCard = {at: t.card_at};
     if (t.headline) card.headline = t.headline;
-    if (t.ask_kind && t.ask_text) card.ask = {kind: t.ask_kind, text: t.ask_text};
+    if (t.ask_kind && t.ask_text) {
+        card.ask = {kind: t.ask_kind, text: t.ask_text};
+        // Jon's correction holds for the ask he made it on; a new ask takes Claude's guess again
+        if (t.ask_where_jon && t.ask_where_jon_for === t.ask_text) {
+            card.ask.where = t.ask_where_jon;
+            card.ask.whereBy = "jon";
+        } else if (t.ask_where) {
+            card.ask.where = t.ask_where;
+            card.ask.whereBy = "claude";
+        }
+    }
     if (t.progress_done !== null && t.progress_total) {
         card.progress = {done: t.progress_done, total: t.progress_total};
         if (t.progress_now) card.progress.now = t.progress_now;

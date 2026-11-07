@@ -21,6 +21,12 @@ import { answerModes, askedBys, evidenceMaxChars, needMaxChars, needStates, need
 
 export type ConnectorProps = {email: string};
 
+/* Where Jon has to be (src/spots.ts): a spot name, so Your move can show only what he can do from where he is */
+const whereHelp = (verb: string) => `The spot Jon must be at to ${verb}, from his spots (list_checklist_items lists them): `
+    + "Anywhere (a phone will do, the default), Home, At my Mac (needs his MacBook), In bed, Garage, Out, Library, Park, School, "
+    + "Supermarket, Costco, Home Depot. Pick the widest spot that works: Home if anywhere in the house will do, At my Mac only "
+    + "for laptop work. Your best guess; Jon corrects it on the card";
+
 const instructions = `Protocol version ${protocolVersion}. Newer rules reach running threads as protocol_update in a tool reply; follow them over these.
 
 ADHD Assist is Jon's attention navigator: a map of the places (projects, areas, tasks) he cares about.
@@ -34,6 +40,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - When Jon defers your ask ("put a pin in it", "later", "remind me in a month"), it is no longer his move. Pick the day it comes back (the reminder day, if you set one), then report_state "waiting" with until set to that day, and sync_project with this_thread.set_aside_until the same day, keeping your card's ask. It leaves his Start here and comes back on that day.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
+- Where Jon has to be: give each to-do (add_checklist_items) and each ask on your card (sync_project this_thread.card.ask) a where: the spot from Jon's spots he must be at, such as At my Mac for laptop work, Garage, or Library. Leave it out when a phone will do. His Your move page shows only what he can do from where he says he is, and waits on a spot's opening hours. To tag a to-do you added before, add it again with the same text and a where.
 - Answer checklists: when you ask Jon a real question (not yes/no or one word), or he asks you one, call answer_checklist with the question and up to ${needsPerCall} short needs: what a full answer covers, the gaps in the asker's understanding. "finish" is a closed question to land; "expand" is an open interview (like "which apps do you love the feel of?") whose needs are facets to explore and may grow. After each of Jon's answers, mark what he covered, keep the still-open needs at the end of your reply and offer one to keep going on. Say "still open" and "covered", never "missing", "forgot" or "should"; no scores, percents or red. If Jon says a need doesn't matter, mark it set_aside without asking why. Covering everything never ends the talk: on an expand question only Jon decides he has dug deep enough. Never use it to mark your own answers.
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, at the start of every turn that brings Jon's answer, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
@@ -153,7 +160,8 @@ function buildServer(env: Env): McpServer {
                     headline: z.string().max(140).optional().describe("Your latest reply to Jon in one line"),
                     ask: z.object({
                         kind: z.enum(claudeAskKinds).describe("question to answer, decision to make, approval to go ahead, or review of finished work"),
-                        text: z.string().min(1).max(140).describe("What you need from Jon, in one line")
+                        text: z.string().min(1).max(140).describe("What you need from Jon, in one line"),
+                        where: z.string().max(40).optional().describe(whereHelp("answer it"))
                     }).optional().describe("Only while you are waiting on Jon"),
                     progress: z.object({
                         done: z.number().int().min(0).max(500),
@@ -241,6 +249,7 @@ function buildServer(env: Env): McpServer {
         text: z.string().min(1).max(300).describe("One step only Jon can do, in plain words, e.g. \"Add the CLOUDFLARE_API_TOKEN secret to the House Party environment\""),
         group: z.string().min(1).max(40).optional().describe("An optional heading Jon sorts by, like \"From home\" (needs his laptop or accounts) or \"Anytime\" (a phone will do)"),
         link: z.string().max(2000).optional().describe("Where he does it, if there is a page for it: the PR, the settings page, the sign-up page"),
+        where: z.string().max(40).optional().describe(whereHelp("do it")),
         // the Leverage estimates (src/leverage.ts); each is your best guess, and Jon can correct any
         worth: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional()
             .describe("1 nice to have, 2 helps, 3 matters (something he cares about stalls without it)"),

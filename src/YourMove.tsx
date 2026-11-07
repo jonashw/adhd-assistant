@@ -4,13 +4,19 @@ import { Close, OpenInNew, PushPin, PushPinOutlined, Snooze } from "@mui/icons-m
 import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, dayLabel, isSetAside, standingAsk } from "./ClaudeMapTypes";
 import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
 import { useClaudeColors } from "./theme";
+import { OpenState, Spot, byName, fits, hoursLine, openState } from "./spots";
+import { WhereChip, WherePicker } from "./WhereYouAre";
 
 /* The top of Your move: everything every project needs from Jon, in one Leverage order.
 
    Start here is one key and two alternates (Ramsay and Rostain: a long menu stalls an ADHD brain; a short one with a
    way out doesn't). Ready is the rest he can do now. Opens up later is what waits on another to-do, faded.
    One click opens an item's card: why it matters, what he needs, when it's done, what it opens. A double click goes
-   straight to its thread. Two cards can be pinned side by side, half and half. */
+   straight to its thread. Two cards can be pinned side by side, half and half.
+
+   Where Jon is (src/spots.ts): when he says where he is ("Right now I'm: In bed"), Start here only offers what he can
+   do from there, and Ready folds the rest into "Not from here". A spot that is closed now (the library after hours)
+   sends its items to Opens up later, with the time it opens. */
 
 export type MoveItem = ForYouItem & {project: ClaudeProject};
 
@@ -91,8 +97,12 @@ function Section({title, children}: {title: string, children: React.ReactNode}) 
     </Box>;
 }
 
-function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onOpenThread, onInterest, onSetAside, projectName}: {
+function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onOpenThread, onInterest, onSetAside, projectName, spots, hours, onWhere}: {
     item: MoveItem,
+    spots: Spot[],
+    /* the spot it needs, open or not right now */
+    hours: OpenState,
+    onWhere: (item: MoveItem, where: string) => void,
     /* sharing the screen with a pinned card: on a phone they stack, so each gets less height */
     half: boolean,
     all: MoveItem[],
@@ -121,6 +131,10 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
         </Stack>
         <Typography variant="caption" color="text.secondary" display="block">{projectName(item.project)} · {item.thread.title}</Typography>
         {item.reason && <Typography variant="body2" sx={{mt: 0.5}}>{item.reason}</Typography>}
+        {spots.length > 0 && <Section title="Where">
+            <WhereChip spots={spots} where={item.where} whereBy={item.whereBy} onChange={where => onWhere(item, where)}/>
+            {hoursLine(hours) && <Typography variant="body2" sx={{mt: 0.5}}>{hoursLine(hours)}</Typography>}
+        </Section>}
         {(todo?.why || (!todo && item.thread.card?.headline)) && <Section title="Why it matters">
             <Typography variant="body2">{todo?.why ?? item.thread.card?.headline}</Typography>
         </Section>}
@@ -247,8 +261,15 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     </Box>;
 }
 
-export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName}: {
+export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere}: {
     projects: ClaudeProject[],
+    /* where Jon can be, and where he said he is (until when) */
+    spots: Spot[],
+    here?: Spot,
+    hereUntil?: string,
+    onPick: (spot: Spot | undefined) => void,
+    onEditSpots: () => void,
+    onWhere: (item: MoveItem, where: string) => void,
     threadLinkProps: (t: ClaudeThread) => object,
     /* goes to the thread (a double click), the way Jon chose to open Claude */
     openThread: (t: ClaudeThread) => void,
@@ -258,8 +279,15 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     projectName: (p: ClaudeProject) => string
 }) {
     const all = moveItems(projects);
-    const ready = all.filter(i => i.ready);
-    const later = all.filter(i => !i.ready);
+    const clock = new Date();
+    const hoursOf = new Map(all.map(i => [i.key, openState(spots, i.where, clock)]));
+    const isOpen = (i: MoveItem) => hoursOf.get(i.key)!.open;
+    const ready = all.filter(i => i.ready && isOpen(i) && fits(spots, i.where, here));
+    // ready, but not from where Jon is: folded under "Not from here"
+    const elsewhere = all.filter(i => i.ready && isOpen(i) && !fits(spots, i.where, here));
+    // a closed spot's items wait with the to-dos that wait on other to-dos
+    const later = all.filter(i => !i.ready || !isOpen(i));
+    const [showElsewhere, setShowElsewhere] = React.useState(false);
     const [selected, setSelected] = React.useState<string>();
     const [pinned, setPinned] = React.useState<string[]>([]);
     const [allReady, setAllReady] = React.useState(false);
@@ -273,6 +301,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         if (selected === key) setSelected(undefined);
     };
 
+    const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots}/>;
     if (all.length === 0) {
         return <Box sx={{px: 2, py: 3}}>
             <Typography sx={{fontWeight: 600}}>Nothing waits on you right now.</Typography>
@@ -280,6 +309,11 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         </Box>;
     }
 
+    // the spot it needs, unless a phone will do; and the hours line when it matters
+    const whereWords = (item: MoveItem) => {
+        const spot = byName(spots, item.where);
+        return spot?.parentId ? spot.name : undefined;
+    };
     const row = (item: MoveItem, kind: "key" | "alt" | "ready" | "later") => <ListItemButton
         key={item.key}
         selected={cards.includes(item.key)}
@@ -297,7 +331,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         <Chip size="small" label={item.label} sx={{bgcolor: item.color, color: item.textColor, fontWeight: 600, mt: 0.25, flexShrink: 0}}/>
         <ListItemText
             primary={item.text}
-            secondary={[item.reason, projectName(item.project)].filter(Boolean).join(" · ")}
+            secondary={[hoursLine(hoursOf.get(item.key)!, clock), whereWords(item), item.reason, projectName(item.project)].filter(Boolean).join(" · ")}
             primaryTypographyProps={{sx: {overflowWrap: "anywhere", fontWeight: kind === "key" ? 600 : undefined}}}
             secondaryTypographyProps={{noWrap: true}}
             sx={{minWidth: 0, my: 0.25}}
@@ -307,7 +341,8 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     const start = ready.slice(0, 1 + alternates);
     const rest = ready.slice(1 + alternates);
     return <Box data-testid="your-move-sections">
-        <Stack direction="row" justifyContent="flex-end" sx={{px: 2, pt: 1}}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{px: 2, pt: 1}}>
+            {picker}
             <ToggleButtonGroup size="small" exclusive value={why ? "why" : "list"} onChange={(_, v) => v && setWhy(v === "why")}>
                 <ToggleButton value="list" sx={{textTransform: "none", py: 0.25}}>In order</ToggleButton>
                 <ToggleButton value="why" sx={{textTransform: "none", py: 0.25}}>Why this order</ToggleButton>
@@ -317,11 +352,19 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
         {!why && <List dense disablePadding>
             {start.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink"}}>Start here</ListSubheader>}
             {start.map((item, i) => row(item, i === 0 ? "key" : "alt"))}
+            {here && start.length === 0 && <Typography variant="body2" color="text.secondary" sx={{px: 2, py: 1.5}} data-testid="nothing-here">
+                Nothing waiting on you fits {here.name}.{elsewhere.length ? ` ${elsewhere.length} more can wait for another spot.` : ""}
+            </Typography>}
             {rest.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 1}}>Ready</ListSubheader>}
             {(allReady ? rest : rest.slice(0, readyShown)).map(item => row(item, "ready"))}
             {rest.length > readyShown && <Button size="small" sx={{ml: 2, color: "claude.ink"}} onClick={() => setAllReady(!allReady)}>
                 {allReady ? "Show fewer" : `Show ${rest.length - readyShown} more`}
             </Button>}
+            {elsewhere.length > 0 && <Button size="small" data-testid="not-from-here" sx={{ml: 2, mt: 0.5, color: "claude.ink", textTransform: "none"}}
+                onClick={() => setShowElsewhere(!showElsewhere)}>
+                {showElsewhere ? `Hide the ${elsewhere.length} not from here` : `Not from here (${elsewhere.length})`}
+            </Button>}
+            {showElsewhere && elsewhere.map(item => row(item, "later"))}
             {later.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 1}}>Opens up later</ListSubheader>}
             {later.map(item => row(item, "later"))}
         </List>}
@@ -342,6 +385,9 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
                 onInterest={onInterest}
                 onSetAside={onSetAside}
                 projectName={projectName}
+                spots={spots}
+                hours={hoursOf.get(key)!}
+                onWhere={onWhere}
             />)}
         </Box>}
     </Box>;

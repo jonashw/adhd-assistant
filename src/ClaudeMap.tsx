@@ -21,7 +21,9 @@ import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
 import { ProjectForYou, forYou, isQuiet, needsJon, lastMoved, quietDays } from "./ClaudeProjectFocus";
-import { YourMoveSections } from "./YourMove";
+import { MoveItem, YourMoveSections } from "./YourMove";
+import { SpotsEditor, useWhere } from "./WhereYouAre";
+import { Spot } from "./spots";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
 import { ClaudeTokens, useClaudeColors, useColorMode, ColorChoice } from "./theme";
@@ -395,7 +397,13 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
 /* Your move: what each project needs from Jon, and nothing he's done with. A project's asks and to-dos come first, then
    its stuck threads; the threads still working fold into one line. Resolved threads are left out (a search finds them).
    Projects that have gone quiet fold away at the bottom by themselves, and Hide sits in each project's ⋯ menu. */
-function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden}: {
+type WhereProps = {
+    spots: Spot[], here?: Spot, hereUntil?: string,
+    onPick: (spot: Spot | undefined) => void, onEditSpots: () => void, onWhere: (item: MoveItem, where: string) => void
+};
+
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
+    where: WhereProps,
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
     onSetAside: (t: ClaudeThread, until: string | null) => void,
     projects: ClaudeProject[],
@@ -492,6 +500,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
             onInterest={onInterest}
             onSetAside={onSetAside}
             projectName={projectLabel}
+            {...where}
         />
         <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 2, borderTop: 1, borderColor: "claude.link"}}>
             Projects
@@ -707,6 +716,8 @@ export function ClaudeMap() {
     const [params] = useSearchParams();
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
+    const where = useWhere(demo);
+    const [editingSpots, setEditingSpots] = React.useState(false);
     const colors = useClaudeColors();
     const colorMode = useColorMode();
     /* a break Jon took and didn't come back from yet, even if the app closed meanwhile */
@@ -925,6 +936,20 @@ export function ClaudeMap() {
         }
     };
 
+    /* Jon corrects where a to-do or an ask can be done: shown at once, and it sticks over Claude's guess */
+    const setItemWhere = (item: MoveItem, where: string) => {
+        setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => {
+            if (item.todo) {
+                return !t.todos?.some(x => x.id === item.todo!.id) ? t
+                    : {...t, todos: t.todos.map(x => x.id === item.todo!.id ? {...x, where, whereBy: "jon" as const} : x)};
+            }
+            return t.id !== item.thread.id || !t.card?.ask ? t : {...t, card: {...t.card, ask: {...t.card.ask, where, whereBy: "jon" as const}}};
+        })})));
+        if (!demo) {
+            (item.todo ? ServerApi.setTodoWhere(item.todo.id, where) : ServerApi.setAskWhere(item.thread.id, where)).catch(() => reload());
+        }
+    };
+
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
         setProjects(ps => ps?.map(p => p.id === project.id ? {...p, hidden} : p));
@@ -1115,6 +1140,10 @@ export function ClaudeMap() {
                 onToggleHidden={toggleHidden}
                 onInterest={answerInterest}
                 onSetAside={setAside}
+                where={{
+                    spots: where.spots, here: where.here, hereUntil: where.until, onPick: where.pick,
+                    onEditSpots: () => setEditingSpots(true), onWhere: setItemWhere
+                }}
                 hiddenCount={hiddenCount}
                 showHidden={showHidden}
                 onShowHidden={setShowHidden}
@@ -1244,5 +1273,6 @@ export function ClaudeMap() {
         </Paper>}
 
         {onBreak && <BreakVeil onBack={backFromBreak}/>}
+        <SpotsEditor open={editingSpots} spots={where.spots} onClose={() => setEditingSpots(false)} onSave={where.save}/>
     </Box>;
 }

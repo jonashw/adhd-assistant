@@ -10,6 +10,7 @@ import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, ma
 import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
+import { getWhere, saveSpots, setAskWhere, setTodoWhere, setWhere } from "./spots";
 
 export { LiveHub } from "./live";
 
@@ -70,6 +71,30 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (asideMatch && request.method === "POST") {
         const body = await request.json().catch(() => ({})) as {until?: unknown};
         await setThreadAside(env, decodeURIComponent(asideMatch[1]), typeof body.until === "string" ? body.until : null);
+        return new Response(null, {status: 204});
+    }
+    const askWhereMatch = /^\/api\/claude-map\/threads\/([^/]+)\/where$/.exec(url.pathname);
+    if (askWhereMatch && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {where?: unknown};
+        await setAskWhere(env, decodeURIComponent(askWhereMatch[1]), body.where);
+        return new Response(null, {status: 204});
+    }
+    // where Jon can be (his spots) and where he is now
+    if (url.pathname === "/api/where" && request.method === "GET") {
+        return json(await getWhere(env));
+    }
+    if (url.pathname === "/api/where" && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {spotId?: unknown, until?: unknown};
+        await setWhere(env, typeof body.spotId === "string" ? body.spotId : null, typeof body.until === "string" ? body.until : undefined);
+        return new Response(null, {status: 204});
+    }
+    if (url.pathname === "/api/where/spots" && request.method === "PUT") {
+        return json(await saveSpots(env, await request.json().catch(() => undefined)));
+    }
+    const todoWhereMatch = /^\/api\/checklist\/([^/]+)\/where$/.exec(url.pathname);
+    if (todoWhereMatch && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {where?: unknown};
+        await setTodoWhere(env, decodeURIComponent(todoWhereMatch[1]), body.where);
         return new Response(null, {status: 204});
     }
     const artifactMatch = /^\/api\/claude-map\/artifacts\/(\d{1,15})\/opened$/.exec(url.pathname);
