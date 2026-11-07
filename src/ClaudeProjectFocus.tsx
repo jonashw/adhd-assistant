@@ -51,10 +51,12 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
     return [...waiting, ...todos];
 }
 
-const firstShown = 4;
-
-export function ProjectForYou({project, threadLinkProps, onOpenThread}: {
+export function ProjectForYou({project, threadLinkProps, onOpenThread, firstShown = 4, heading = true}: {
     project: ClaudeProject,
+    /* how many rows show before "Show N more" */
+    firstShown?: number,
+    /* the "For you" heading and the empty line; Your move leaves both out, since its project header says it */
+    heading?: boolean,
     /* props that make a row a link to its thread, in the way Jon chose to open Claude */
     threadLinkProps: (thread: ClaudeThread) => object,
     onOpenThread: (thread: ClaudeThread) => void
@@ -62,11 +64,11 @@ export function ProjectForYou({project, threadLinkProps, onOpenThread}: {
     const items = forYou(project);
     const [all, setAll] = React.useState(false);
     if (items.length === 0) {
-        return <Typography variant="body2" color="text.secondary" sx={{mt: 1}}>Nothing here needs you.</Typography>;
+        return !heading ? null : <Typography variant="body2" color="text.secondary" sx={{mt: 1}}>Nothing here needs you.</Typography>;
     }
     const shown = all ? items : items.slice(0, firstShown);
-    return <Box data-testid="project-for-you" sx={{mt: 1}}>
-        <Typography variant="overline" sx={{lineHeight: 1.6}}>For you</Typography>
+    return <Box data-testid="project-for-you" sx={{mt: heading ? 1 : 0}}>
+        {heading && <Typography variant="overline" sx={{lineHeight: 1.6}}>For you</Typography>}
         <List dense disablePadding>
             {shown.map(item => <ListItem
                 key={item.key}
@@ -92,4 +94,18 @@ export function ProjectForYou({project, threadLinkProps, onOpenThread}: {
             {all ? "Show fewer" : `Show ${items.length - firstShown} more`}
         </Button>}
     </Box>;
+}
+
+/* A project goes quiet when nothing in it waits on Jon, nothing is stuck, and no thread has moved for two weeks.
+   Your move folds quiet projects away on its own, so Jon never has to hide one to tidy the list. */
+export const quietDays = 14;
+
+export function lastMoved(project: ClaudeProject): string {
+    return project.threads.map(t => t.lastActivityAt ?? t.lastSeenAt).filter(Boolean).sort().at(-1) ?? project.lastSyncedAt;
+}
+
+export function isQuiet(project: ClaudeProject, now = Date.now()): boolean {
+    return forYou(project, now).length === 0
+        && !project.threads.some(t => badgeFor(t, project, now) === "failed")
+        && now - Date.parse(lastMoved(project)) > quietDays * 864e5;
 }
