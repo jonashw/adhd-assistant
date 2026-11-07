@@ -163,8 +163,9 @@ const untilWords = (until: string) => {
 };
 
 /* "Right now I'm: In bed" — a chip that opens the tree */
-export function WherePicker({spots, here, until, onPick, onEdit, location}: {
-    spots: Spot[], here?: Spot, until?: string, onPick: (spot: Spot | undefined) => void, onEdit: () => void, location?: WhereLocation
+export function WherePicker({spots, here, until, onPick, onEdit, location, onAlerts}: {
+    spots: Spot[], here?: Spot, until?: string, onPick: (spot: Spot | undefined) => void, onEdit: () => void, location?: WhereLocation,
+    onAlerts?: () => void
 }) {
     const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
     if (spots.length === 0) return null;
@@ -207,6 +208,12 @@ export function WherePicker({spots, here, until, onPick, onEdit, location}: {
             }} data-testid="look-up-nearby">
                 <ListItemText primary={location.lookUpNearby ? "Stop looking up shops nearby" : "Also look up shops nearby"}
                     secondary="sends your rough location to OpenStreetMap"/>
+            </MenuItem>}
+            {onAlerts && <MenuItem data-testid="arrival-alerts" onClick={() => {
+                setAnchor(null);
+                onAlerts();
+            }}>
+                <ListItemText primary="Arrival alerts…" secondary="a notification when you get somewhere things wait"/>
             </MenuItem>}
             <MenuItem onClick={() => {
                 setAnchor(null);
