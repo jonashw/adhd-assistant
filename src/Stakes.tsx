@@ -75,6 +75,7 @@ export function StakeDialog({stakeId, graph, onChange, onClose}: {
                     {error && <Typography variant="body2" color="error" sx={{mt: 1}}>{error}</Typography>}
                 </DialogContent>
                 <DialogActions>
+                    <Button href={`/replay/${encodeURIComponent(stake.monologueId)}`} sx={{mr: "auto"}}>Replay what you said</Button>
                     <Button onClick={dismiss}>Not now</Button>
                     <Button variant="contained" onClick={chart} disabled={!onChange}>Chart it</Button>
                 </DialogActions>

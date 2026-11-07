@@ -287,6 +287,8 @@ export function GraphList() {
             <Link component={RouterLink} to="/crew" underline="hover" color="inherit">Meet the crew</Link>
             {' · '}
             <Link component={RouterLink} to="/templates" underline="hover" color="inherit">Starter maps</Link>
+            {' · '}
+            <Link component={RouterLink} to="/replay" underline="hover" color="inherit">What you said</Link>
         </Box>
 
         <input

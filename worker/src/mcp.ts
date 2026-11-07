@@ -89,7 +89,7 @@ async function run<T>(work: () => Promise<T>, after?: {env: Env, rings: LiveRing
     }
 }
 
-function buildServer(env: Env): McpServer {
+function buildServer(env: Env, origin: string): McpServer {
     const server = new McpServer(
         {name: "adhd-assist", title: "ADHD Assist", version: "1.0.0"},
         {instructions, jsonSchemaValidator: new CfWorkerJsonSchemaValidator()}
@@ -225,6 +225,7 @@ function buildServer(env: Env): McpServer {
             read: monologue.read.state === "read" ? "read" : `waiting to be read${monologue.read.note ? ` (${monologue.read.note})` : ""}`,
             topics,
             dashed_stakes: stakes,
+            replay: `${origin}/replay/${encodeURIComponent(monologue.id)}`,
             next: repeat ? "These words were already logged a moment ago; nothing new was stored."
                 : monologue.read.state === "read" ? `Logged and read.${stakes > 0 ? " New topics wait on his map as dashed stakes for him to chart." : ""} Tell Jon in one line, naming the topics if there are a few.`
                 : "Logged; the app will read it later. Tell Jon in one line that it's logged; don't make the wait sound like an error."
@@ -367,7 +368,7 @@ export const mcpHandler = {
         if (ctx.props?.email !== env.ALLOWED_EMAIL.toLowerCase()) {
             return new Response("This connection no longer has access.", {status: 403});
         }
-        const server = buildServer(env);
+        const server = buildServer(env, new URL(request.url).origin);
         const transport = new WebStandardStreamableHTTPServerTransport({sessionIdGenerator: undefined, enableJsonResponse: true});
         await server.connect(transport);
         return transport.handleRequest(request);
