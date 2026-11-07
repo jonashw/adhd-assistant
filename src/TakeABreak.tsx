@@ -1,5 +1,8 @@
 import React from "react";
 import { Box, Button, SvgIcon, Typography } from "@mui/material";
+import { Head } from "./crew/Jon";
+import { Fidget, useFidget } from "./crew/useFidget";
+import "./crew/crew.css";
 
 /* Take a break: the Sky loading screen comes back over the page and waits. It says only that he's on a break: no
    clock, no count, and no reminder of what he was doing (he knows the app remembers). The place is saved on the
@@ -42,18 +45,20 @@ export const readBreak = (): BreakPlace | undefined => {
 };
 export const saveBreak = (place: BreakPlace | undefined) => keepJson(breakKey, place);
 
-/* The balloon from the loading screen (art/you, face-calm), bobbing unless Jon asked for less motion */
+/* Balloon Head from the loading screen, animated as the crew draws it: a slow bob, and now and then a blink or a
+   look around (crew fidgets), all still when Jon asks for less motion */
+const fidgets: Fidget[] = [
+    {name: "is-blink", ms: 200, weight: 3},
+    {name: "is-look", ms: 1400, weight: 1}
+];
+
 function SkyBalloon() {
-    return <svg className="break-fly" viewBox="-14 -13 28 74" aria-hidden="true">
+    const fidget = useFidget(fidgets, [2000, 6000]);
+    return <svg className={["break-fly", "crew", "crew-jon", fidget].filter(Boolean).join(" ")} viewBox="-14 -13 28 74" aria-hidden="true">
         <path d="M0 11.6 C-3 24 4 36 -1 47 C-3 52 0 55 0 57.5" fill="none" stroke="#5a4636" strokeWidth=".55" strokeLinecap="round"/>
         <circle cx="0" cy="58" r="1.2" fill="#23313d"/>
         <g className="break-bob">
-            <path d="M-1.4 11.6 L0 9.6 L1.4 11.6 Z" fill="#b71c1c"/>
-            <ellipse cx="0" cy="0" rx="8.6" ry="10" fill="#d32f2f" stroke="#b71c1c" strokeWidth="0.6"/>
-            <ellipse cx="-3.6" cy="-4.5" rx="1.7" ry="3.2" transform="rotate(25 -3.6 -4.5)" fill="#ffffff" opacity="0.45"/>
-            <ellipse cx="-2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/>
-            <ellipse cx="2.7" cy="-1.6" rx="1.15" ry="1.55" fill="#ffffff"/>
-            <path d="M-3.4 2.5 Q0 4.6 3.4 2.5" fill="none" stroke="#ffffff" strokeWidth="1.25" strokeLinecap="round"/>
+            <Head x={0} y={1.5} r={10}/>
         </g>
     </svg>;
 }
@@ -81,7 +86,7 @@ export function BreakVeil({onBack}: {onBack: () => void}) {
             "@keyframes break-in": {from: {opacity: 0}},
             animation: "break-in .45s ease",
             "& .break-fly": {height: "min(42dvh, 340px)", width: "auto", mb: "-0.6dvh", position: "relative"},
-            "& .break-bob": {transformBox: "fill-box", transformOrigin: "50% 100%"},
+            "& .break-bob, & .jon-head": {transformBox: "fill-box", transformOrigin: "50% 100%"},
             "@keyframes break-bob": {"50%": {transform: "translateY(-1px) rotate(-2deg)"}},
             "@media (prefers-reduced-motion: no-preference)": {"& .break-bob": {animation: "break-bob 3.6s ease-in-out infinite"}}
         }}
