@@ -22,7 +22,7 @@ import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
 import { ProjectForYou, forYou, isQuiet, needsJon, lastMoved, quietDays } from "./ClaudeProjectFocus";
 import { MoveItem, YourMoveSections } from "./YourMove";
-import { SpotsEditor, useWhere } from "./WhereYouAre";
+import { SpotsEditor, WhereLocation, useWhere } from "./WhereYouAre";
 import { Spot } from "./spots";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
@@ -399,7 +399,8 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
    Projects that have gone quiet fold away at the bottom by themselves, and Hide sits in each project's ⋯ menu. */
 type WhereProps = {
     spots: Spot[], here?: Spot, hereUntil?: string,
-    onPick: (spot: Spot | undefined) => void, onEditSpots: () => void, onWhere: (item: MoveItem, where: string) => void
+    onPick: (spot: Spot | undefined) => void, onEditSpots: () => void, onWhere: (item: MoveItem, where: string) => void,
+    location: WhereLocation
 };
 
 function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
@@ -1142,7 +1143,7 @@ export function ClaudeMap() {
                 onSetAside={setAside}
                 where={{
                     spots: where.spots, here: where.here, hereUntil: where.until, onPick: where.pick,
-                    onEditSpots: () => setEditingSpots(true), onWhere: setItemWhere
+                    onEditSpots: () => setEditingSpots(true), onWhere: setItemWhere, location: where.location
                 }}
                 hiddenCount={hiddenCount}
                 showHidden={showHidden}
@@ -1273,6 +1274,6 @@ export function ClaudeMap() {
         </Paper>}
 
         {onBreak && <BreakVeil onBack={backFromBreak}/>}
-        <SpotsEditor open={editingSpots} spots={where.spots} onClose={() => setEditingSpots(false)} onSave={where.save}/>
+        <SpotsEditor open={editingSpots} spots={where.spots} onClose={() => setEditingSpots(false)} onSave={where.save} location={where.location}/>
     </Box>;
 }

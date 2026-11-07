@@ -25,8 +25,13 @@ export type Spot = {
     staysPut?: boolean,
     /* missing = always open */
     hours?: WeekHours,
+    /* a kind of place on OpenStreetMap it matches, as one tag: "brand=Costco", "amenity=library" (src/locate.ts) */
+    osm?: string,
     position: number
 };
+
+/* "key=value", as OpenStreetMap tags places */
+export const osmPattern = /^[a-z_:]{1,30}=[^"\\\n]{1,60}$/;
 
 /* Where Jon said he is, until the pick wears off */
 export type Whereabouts = {spotId: string, setAt: string, until: string};
@@ -186,12 +191,12 @@ export const startingSpots: Spot[] = [
     {id: "bed", parentId: "home", name: "In bed", staysPut: true, position: 1},
     {id: "garage", parentId: "home", name: "Garage", position: 2},
     {id: "out", parentId: "anywhere", name: "Out", position: 1},
-    {id: "library", parentId: "out", name: "Library", position: 0},
-    {id: "park", parentId: "out", name: "Park", position: 1},
-    {id: "school", parentId: "out", name: "School", position: 2},
-    {id: "supermarket", parentId: "out", name: "Supermarket", position: 3},
-    {id: "costco", parentId: "out", name: "Costco", position: 4},
-    {id: "home-depot", parentId: "out", name: "Home Depot", position: 5}
+    {id: "library", parentId: "out", name: "Library", osm: "amenity=library", position: 0},
+    {id: "park", parentId: "out", name: "Park", osm: "leisure=park", position: 1},
+    {id: "school", parentId: "out", name: "School", osm: "amenity=school", position: 2},
+    {id: "supermarket", parentId: "out", name: "Supermarket", osm: "shop=supermarket", position: 3},
+    {id: "costco", parentId: "out", name: "Costco", osm: "brand=Costco", position: 4},
+    {id: "home-depot", parentId: "out", name: "Home Depot", osm: "brand=The Home Depot", position: 5}
 ];
 
 /* What's wrong with a tree, if anything: one root, known parents, no loops, names unique */
@@ -209,6 +214,7 @@ export function treeProblem(spots: Spot[]): string | undefined {
         names.add(name.toLowerCase());
         if (s.parentId && !ids.has(s.parentId)) return `"${name}" sits under a spot that isn't there.`;
         if (s.hours !== undefined && !validHours(s.hours)) return `"${name}" has opening hours that don't read.`;
+        if (s.osm !== undefined && !osmPattern.test(s.osm)) return `"${name}" matches a map tag that doesn't read; write it like brand=Costco.`;
     }
     if (inOrder(spots).length !== spots.length) return "The spots loop back on themselves.";
     return undefined;

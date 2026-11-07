@@ -3,7 +3,11 @@ import {
     Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControlLabel, IconButton, ListItemText,
     Menu, MenuItem, Stack, Switch, TextField, Tooltip, Typography
 } from "@mui/material";
-import { Add, Delete, ExpandLess, Place, Tune } from "@mui/icons-material";
+import { Add, Delete, ExpandLess, MyLocation, Place, Tune } from "@mui/icons-material";
+import {
+    Pins, Position, currentPosition, defaultPinRadius, nearbySpot, pinnedSpot, readLookUpNearby, readPins, readUseLocation,
+    saveLookUpNearby, savePins, saveUseLocation, worthSuggesting
+} from "./locate";
 import { ServerApi } from "./ServerApi";
 import { useRing } from "./live";
 import {
@@ -50,7 +54,106 @@ export function useWhere(demo: boolean) {
         }
         setSpots(await ServerApi.saveSpots(next));
     };
-    return {spots, here: currentSpot(spots, now), until: now?.until, pick, save};
+    const here = currentSpot(spots, now);
+
+    /* Suggesting a spot from where the phone is (src/locate.ts): only once Jon turns it on, only while the app is open */
+    const [useLocation, setUseLocation] = React.useState(readUseLocation);
+    const [lookUpNearby, setLookUpNearby] = React.useState(readLookUpNearby);
+    const [pins, setPins] = React.useState<Pins>(readPins);
+    const [suggestion, setSuggestion] = React.useState<Spot>();
+    const [locationError, setLocationError] = React.useState<string>();
+    // "Not now" on a suggestion holds for a few hours, the way a pick does
+    const dismissed = React.useRef(new Map<string, number>());
+    const latest = React.useRef({spots, here, pins, lookUpNearby});
+    latest.current = {spots, here, pins, lookUpNearby};
+
+    const check = React.useCallback(async (maxAge?: number) => {
+        const {spots, pins, lookUpNearby} = latest.current;
+        if (spots.length === 0) return;
+        try {
+            const at: Position = await currentPosition(maxAge);
+            setLocationError(undefined);
+            let found = pinnedSpot(spots, pins, at);
+            if (!found && lookUpNearby) {
+                found = await nearbySpot(spots, at).catch(() => undefined);
+            }
+            const {here} = latest.current;
+            const quiet = found && (dismissed.current.get(found.id) ?? 0) > Date.now();
+            setSuggestion(worthSuggesting(spots, found, here) && !quiet ? found : undefined);
+        } catch (e) {
+            setLocationError(e instanceof Error ? e.message : "Couldn't get a location.");
+        }
+    }, []);
+    const ready = spots.length > 0;
+    React.useEffect(() => {
+        if (!useLocation || !ready) return;
+        check();
+        const timer = window.setInterval(() => document.visibilityState === "visible" && check(), 5 * 60000);
+        const onShow = () => document.visibilityState === "visible" && check();
+        document.addEventListener("visibilitychange", onShow);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", onShow);
+        };
+    }, [useLocation, ready, lookUpNearby, check]);
+    // picking a spot answers the suggestion
+    React.useEffect(() => {
+        if (suggestion && !worthSuggesting(spots, suggestion, here)) setSuggestion(undefined);
+    }, [spots, suggestion, here]);
+
+    const location = {
+        on: useLocation,
+        lookUpNearby,
+        pins,
+        suggestion,
+        error: locationError,
+        turnOn: (on: boolean) => {
+            saveUseLocation(on);
+            setUseLocation(on);
+            if (!on) setSuggestion(undefined);
+        },
+        setLookUpNearby: (on: boolean) => {
+            saveLookUpNearby(on);
+            setLookUpNearby(on);
+        },
+        accept: () => {
+            if (suggestion) pick(suggestion);
+            setSuggestion(undefined);
+        },
+        dismiss: () => {
+            if (suggestion) dismissed.current.set(suggestion.id, Date.now() + 3 * 3600000);
+            setSuggestion(undefined);
+        },
+        /* pin a spot to where the phone is now; it stays on this device */
+        pinHere: async (spot: Spot) => {
+            const at = await currentPosition(0);
+            const next = {...latest.current.pins, [spot.id]: {lat: at.lat, lng: at.lng, radius: Math.max(defaultPinRadius, Math.round(at.accuracy))}};
+            savePins(next);
+            setPins(next);
+        },
+        unpin: (spot: Spot) => {
+            const next = {...latest.current.pins};
+            delete next[spot.id];
+            savePins(next);
+            setPins(next);
+        }
+    };
+    return {spots, here, until: now?.until, pick, save, location};
+}
+
+export type WhereLocation = ReturnType<typeof useWhere>["location"];
+
+/* "Looks like you're at Costco." One tap picks it; Not now keeps quiet about it for a few hours. */
+export function WhereSuggestion({location}: {location: WhereLocation}) {
+    if (!location.suggestion) return null;
+    return <Alert severity="info" icon={<MyLocation/>} data-testid="where-suggestion" sx={{mx: 2, mt: 1}}
+        action={<Stack direction="row" gap={0.5}>
+            <Button size="small" color="inherit" onClick={location.dismiss} sx={{textTransform: "none", whiteSpace: "nowrap"}}>Not now</Button>
+            <Button size="small" variant="contained" onClick={location.accept}
+                sx={{textTransform: "none", whiteSpace: "nowrap", bgcolor: "claude.ring", "&:hover": {bgcolor: "claude.ringHover"}}}>Show what fits</Button>
+        </Stack>}>
+        Looks like you're at {location.suggestion.name}.
+    </Alert>;
 }
 
 const untilWords = (until: string) => {
@@ -60,8 +163,8 @@ const untilWords = (until: string) => {
 };
 
 /* "Right now I'm: In bed" — a chip that opens the tree */
-export function WherePicker({spots, here, until, onPick, onEdit}: {
-    spots: Spot[], here?: Spot, until?: string, onPick: (spot: Spot | undefined) => void, onEdit: () => void
+export function WherePicker({spots, here, until, onPick, onEdit, location}: {
+    spots: Spot[], here?: Spot, until?: string, onPick: (spot: Spot | undefined) => void, onEdit: () => void, location?: WhereLocation
 }) {
     const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
     if (spots.length === 0) return null;
@@ -91,6 +194,20 @@ export function WherePicker({spots, here, until, onPick, onEdit}: {
                 <ListItemText primary="Show everything" secondary="no filter"/>
             </MenuItem>
             <Divider/>
+            {location && <MenuItem onClick={() => {
+                setAnchor(null);
+                location.turnOn(!location.on);
+            }} data-testid="use-location">
+                <ListItemText primary={location.on ? "Stop suggesting from my location" : "Suggest from my location"}
+                    secondary={location.error ?? "only while this page is open; pins stay on this phone"}/>
+            </MenuItem>}
+            {location?.on && <MenuItem onClick={() => {
+                setAnchor(null);
+                location.setLookUpNearby(!location.lookUpNearby);
+            }} data-testid="look-up-nearby">
+                <ListItemText primary={location.lookUpNearby ? "Stop looking up shops nearby" : "Also look up shops nearby"}
+                    secondary="sends your rough location to OpenStreetMap"/>
+            </MenuItem>}
             <MenuItem onClick={() => {
                 setAnchor(null);
                 onEdit();
@@ -132,7 +249,10 @@ const rootName = (spots: Spot[]) => spots.find(s => !s.parentId)?.name ?? "Anywh
 const dayNames: Record<typeof weekDays[number], string> = {sun: "Sun", mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat"};
 
 /* A spot's details: what it sits under, whether Jon stays put there, and its opening hours */
-function SpotDetails({spot, spots, onChange}: {spot: Spot, spots: Spot[], onChange: (s: Spot) => void}) {
+function SpotDetails({spot, spots, onChange, location}: {spot: Spot, spots: Spot[], onChange: (s: Spot) => void, location?: WhereLocation}) {
+    const [pinError, setPinError] = React.useState<string>();
+    const [pinning, setPinning] = React.useState(false);
+    const pin = location?.pins[spot.id];
     const [texts, setTexts] = React.useState<Record<string, string>>(() =>
         Object.fromEntries(weekDays.map(d => [d, dayHoursText(spot.hours?.[d])])));
     const below = new Set(inOrder(spots).filter(({spot: s}) => {
@@ -161,6 +281,29 @@ function SpotDetails({spot, spots, onChange}: {spot: Spot, spots: Spot[], onChan
             control={<Switch size="small" checked={!!spot.staysPut} onChange={e => onChange({...spot, staysPut: e.target.checked})}/>}
             label={<Typography variant="body2">Staying put here: only things tagged here or {rootName(spots)} fit</Typography>}
         />}
+        {spot.parentId && location && <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{my: 1}}>
+            <Button size="small" variant="outlined" startIcon={<MyLocation/>} disabled={pinning} sx={{color: "claude.ink", borderColor: "claude.line"}}
+                onClick={async () => {
+                    setPinning(true);
+                    setPinError(undefined);
+                    try {
+                        await location.pinHere(spot);
+                    } catch (e) {
+                        setPinError(e instanceof Error ? e.message : "Couldn't get a location.");
+                    } finally {
+                        setPinning(false);
+                    }
+                }}>
+                {pin ? "Pin again here" : "Pin to where I am now"}
+            </Button>
+            {pin && <Button size="small" onClick={() => location.unpin(spot)} sx={{color: "claude.ink"}}>Unpin</Button>}
+            <Typography variant="caption" color={pinError ? "error" : "text.secondary"}>
+                {pinError ?? (pin ? `Pinned on this phone, within ${pin.radius} m` : "Not pinned")}
+            </Typography>
+        </Stack>}
+        {spot.parentId && <TextField size="small" label="Or any place tagged" placeholder="brand=Costco" value={spot.osm ?? ""}
+            helperText="An OpenStreetMap tag, like brand=Costco or amenity=library. Used when looking up shops nearby."
+            onChange={e => onChange({...spot, osm: e.target.value.trim() ? e.target.value : undefined})} sx={{mb: 1, maxWidth: 360}} fullWidth/>}
         <FormControlLabel
             control={<Switch size="small" checked={!!spot.hours} onChange={e => {
                 if (e.target.checked) {
@@ -186,8 +329,8 @@ function SpotDetails({spot, spots, onChange}: {spot: Spot, spots: Spot[], onChan
 }
 
 /* The tree of spots, edited as a whole and saved at once */
-export function SpotsEditor({open, spots, onClose, onSave}: {
-    open: boolean, spots: Spot[], onClose: () => void, onSave: (spots: Spot[]) => Promise<void>
+export function SpotsEditor({open, spots, onClose, onSave, location}: {
+    open: boolean, spots: Spot[], onClose: () => void, onSave: (spots: Spot[]) => Promise<void>, location?: WhereLocation
 }) {
     const [draft, setDraft] = React.useState<Spot[]>(spots);
     const [openDetails, setOpenDetails] = React.useState<string>();
@@ -262,7 +405,7 @@ export function SpotsEditor({open, spots, onClose, onSave}: {
                         <IconButton size="small" aria-label={`Remove ${spot.name}`} onClick={() => remove(spot)}><Delete fontSize="small"/></IconButton>
                     </Tooltip> : <Box sx={{width: 34}}/>}
                 </Stack>
-                {openDetails === spot.id && <SpotDetails spot={spot} spots={draft} onChange={update}/>}
+                {openDetails === spot.id && <SpotDetails spot={spot} spots={draft} onChange={update} location={location}/>}
             </Box>)}
             {error && <Alert severity="warning" sx={{mt: 1}}>{error}</Alert>}
         </DialogContent>
