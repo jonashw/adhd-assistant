@@ -26,9 +26,10 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Name the place this thread serves: call find_places with a few words, and pass the best match as place. Regions right under HOME can't be targets; pick a place inside one.
 - If no place fits, check in without one, then call suggest_place with new names under the closest existing place (a map's HOME if nothing is close). Don't force the work into a place that doesn't fit; Jon charts the suggestion himself.
 - Call report_state whenever your state changes: "waiting" when you end a turn needing Jon's answer, review or approval; "working" when you resume; "done" when the work is finished; "failed" when you are stuck on an error. Add a one-line note in plain words.
+- When Jon answers you (a reply, a go-ahead, a decision, a review), make it the first thing you do in that turn, before the work itself: report_state "working" if you had reported "waiting", and sync_project with a fresh thread list and your card without its ask. That is how his Needs you or Go-ahead item clears; until then it still reads as waiting on him, and he can't tell his answer landed.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
-- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, whenever you call check_in or report_state, and as the last step of every turn.
+- Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, at the start of every turn that brings Jon's answer, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
   - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
   - this_thread: your own thread id and card (headline, ask, progress, artifact, artifacts, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
@@ -75,7 +76,6 @@ function buildServer(env: Env): McpServer {
     // what each kind of write changed, for the tabs that are open
     const trail = {env, rings: [{topic: "trail"}] as LiveRing[]};
     const threads = {env, rings: [{topic: "trail"}, {topic: "claude"}] as LiveRing[]};
-    const claude = {env, rings: [{topic: "claude"}] as LiveRing[]};
     const monologues = {env, rings: [{topic: "monologues"}] as LiveRing[]};
     const place = z.string().describe("A place value from find_places, like \"<map id>/<place id>\"");
 
@@ -165,7 +165,8 @@ function buildServer(env: Env): McpServer {
             })).max(200).optional().describe("The project's artifacts as list_project_artifacts gives them, when they changed since your last sync; added to what the map has, never a replacement")
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
-    }, args => run(() => syncProject(env, args), claude));
+    // a sync can take down an answered thread's flare, so the trail rings too
+    }, args => run(() => syncProject(env, args), threads));
 
     server.registerTool("log_monologue", {
         title: "Log a monologue",

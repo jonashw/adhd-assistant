@@ -84,10 +84,17 @@ This repo's `CLAUDE.md` opts in every project that has the repo attached. For an
 into its project instructions (or into Settings → Your Claude → Instructions to cover every project):
 
 > ADHD Assist Claude map: if you are a thread in a Claude project and have both a list_threads tool and the
-> ADHD Assist sync_project tool, call sync_project when you start work, whenever you call check_in or
-> report_state, and as the last step of every turn, with the project's id and name and every one of its
-> threads as list_threads gives them (id, title, state, created and last-activity times). If either tool is
-> missing, skip this silently.
+> ADHD Assist sync_project tool, call sync_project when you start work, first thing in any turn where I
+> answer you (a reply, go-ahead, decision or review), whenever you call check_in or report_state, and as the
+> last step of every turn, with the project's id and name and every one of its threads as list_threads gives
+> them (id, title, state, created and last-activity times). In that first sync after my answer, leave the ask
+> off your card. If either tool is missing, skip this silently.
+
+**When Jon answers.** An ask (Needs you, Go-ahead, Review) clears as soon as any sync shows its thread working
+again, and the open page updates live. The thread Jon answered is the one that wakes, so the connector tells it to
+sync first thing in that turn, before the work. That same sync also takes down the thread's flare on Jon's map:
+a checked-in thread still marked "waiting" whose Claude thread went from waiting to working goes back to working,
+as if it had called `report_state` itself.
 
 **What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
 so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours
