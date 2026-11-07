@@ -13,6 +13,7 @@ import { logMonologue, monologueMaxChars } from "./monologues";
 import { LiveRing, ring } from "./live";
 import { addChecklistItems, completeChecklistItem, listChecklistItems } from "./checklist";
 import { checklistMaxPerCall } from "../../src/TrailTypes";
+import { answerModes, askedBys, evidenceMaxChars, needMaxChars, needStates, needsPerCall, questionMaxChars, readChecklist, startChecklist, updateChecklist } from "./answers";
 
 /* The Claude connector: a stateless MCP server at /mcp. Claude can check a thread in, report its state, log Jon's dictation,
    leave Jon to-dos at a place, and read Jon's map. It can't change places, statuses or links. */
@@ -29,6 +30,7 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - When Jon answers you (a reply, a go-ahead, a decision, a review), make it the first thing you do in that turn, before the work itself: report_state "working" if you had reported "waiting", and sync_project with a fresh thread list and your card without its ask. That is how his Needs you or Go-ahead item clears; until then it still reads as waiting on him, and he can't tell his answer landed.
 - Never report on Jon's behalf, and never report "waiting" just to get attention.
 - To-dos for Jon: when your work leaves steps only Jon can do (create an account, add a secret, merge a PR), call list_checklist_items, then add_checklist_items with the ones not there yet, at this thread's place (or its suggested place). They show in his What's next until he checks them off. Never add your own steps. Check one off with complete_checklist_item only when you saw it happen yourself, like a PR merged.
+- Answer checklists: when you ask Jon a real question (not yes/no or one word), or he asks you one, call answer_checklist with the question and up to ${needsPerCall} short needs: what a full answer covers, the gaps in the asker's understanding. "finish" is a closed question to land; "expand" is an open interview (like "which apps do you love the feel of?") whose needs are facets to explore and may grow. After each of Jon's answers, mark what he covered, keep the still-open needs at the end of your reply and offer one to keep going on. Say "still open" and "covered", never "missing", "forgot" or "should"; no scores, percents or red. If Jon says a need doesn't matter, mark it set_aside without asking why. Covering everything never ends the talk: on an expand question only Jon decides he has dug deep enough. Never use it to mark your own answers.
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, at the start of every turn that brings Jon's answer, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
   - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
@@ -257,6 +259,45 @@ function buildServer(env: Env): McpServer {
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(() => completeChecklistItem(env, args.thread_id, args.id), trail));
+
+    const need = z.object({
+        id: z.string().max(100).optional().describe("A need's id from an earlier answer_checklist result, to mark it; leave out to add a new need"),
+        text: z.string().max(200).optional().describe(`A new need in plain words, up to ${needMaxChars} characters, e.g. "why it feels good" or "an example"`),
+        state: z.enum(needStates).optional().describe("open, partly, covered, or set_aside (Jon said it doesn't matter)"),
+        evidence: z.string().max(400).optional().describe(`What covered it: a short quote of Jon's words, up to ${evidenceMaxChars} characters`)
+    });
+
+    server.registerTool("answer_checklist", {
+        title: "Answer checklist",
+        description: `Keep a checklist of what a full answer to a question needs, and tick it off as Jon answers. Start one with question and 1 to ${needsPerCall} needs (no question_id); the result has question_id and each need's id. Later, send question_id with needs to mark (id + state + evidence) or, on an expand question, to add (text). Send question_id alone to read it back. Marks are only ever added and the newest counts, so repeating a call is safe. Only Jon's words count as evidence; never mark your own answers.`,
+        inputSchema: {
+            claude_thread_id: z.string().max(100).optional().describe("This thread's id in a Claude project (cmsg_...), as list_threads gives it, so the Claude map can show the open needs"),
+            thread_id: z.string().optional().describe("The thread_id check_in returned, if this thread checked in"),
+            url: z.string().max(2000).optional().describe("This thread's link, if you know it"),
+            question_id: z.string().max(100).optional().describe("The question_id from an earlier call; leave out to start a new question"),
+            question: z.object({
+                text: z.string().max(questionMaxChars * 2).describe("The question, in the asker's words"),
+                asked_by: z.enum(askedBys).describe("Who asked it"),
+                asked_of: z.string().max(120).optional().describe("Who it was asked of, in plain words, e.g. \"Jon\""),
+                mode: z.enum(answerModes).describe("finish: a closed question with a fixed set of needs; expand: an open interview whose needs can grow")
+            }).optional().describe("A new question; leave out when you send question_id"),
+            needs: z.array(need).max(needsPerCall).optional().describe(`Up to ${needsPerCall} needs to add or mark`)
+        },
+        annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+    }, args => run(async () => {
+        if (args.question_id && args.question) {
+            throw new HttpError(422, "Send question_id to update a question, or question to start a new one, not both.");
+        }
+        if (args.question) {
+            const q = args.question;
+            return startChecklist(env, {claudeThreadId: args.claude_thread_id, threadItemId: args.thread_id, url: args.url},
+                {text: q.text, askedBy: q.asked_by, askedOf: q.asked_of, mode: q.mode}, args.needs ?? []);
+        }
+        if (args.question_id) {
+            return args.needs?.length ? updateChecklist(env, args.question_id, args.needs) : readChecklist(env, args.question_id);
+        }
+        throw new HttpError(422, "Send question (with its needs) to start a checklist, or question_id to update one.");
+    }));
 
     server.registerTool("find_places", {
         title: "Find places",
