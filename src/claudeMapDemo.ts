@@ -88,6 +88,11 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
                 topic: "Rail passes for the summer trip"
             }, 3, [{repo: "demo/trip", number: 4, title: "Fare table", state: "open", ci: "pending", url: "https://github.com/demo/trip/pull/4"}]),
             thread("demo_trip", "demo_t2", "Book the first two nights", "blocked", 40),
+            // Jon put a pin in this one: it waits under Opens up later until its day
+            {...glance(thread("demo_trip", "demo_t5", "Decide on travel insurance", "blocked", 30), {
+                headline: "Pinned until next month, with the criteria to revisit",
+                ask: {kind: "decision", text: "Decide whether to buy annual travel insurance"}
+            }, 30), setAsideUntil: new Date(now + 30 * 864e5).toISOString().slice(0, 10), setAsideBy: "thread"},
             thread("demo_trip", "demo_t3", "Packing list", "failed", 90),
             thread("demo_trip", "demo_t4", "Old itinerary idea", "stopped", 400, false),
             ...extraTrips(tick).map((title, i) => thread("demo_trip", `demo_t_new${i}`, title, "working", 0))

@@ -18,6 +18,15 @@ export const protocolChanges: ProtocolChange[] = [
             + "thread list and your card without its ask. That is how his Needs you or Go-ahead item clears; until then it "
             + "still reads as waiting on him. Also: newer rules reach you like this one, as protocol_update in a tool reply. "
             + "Follow them over the instructions you started with."
+    },
+    {
+        version: 3,
+        on: "2026-11-07",
+        rule: "When Jon defers your ask (\"put a pin in it\", \"later\", \"remind me in a month\"), it is no longer his move. "
+            + "Pick the day it comes back (the reminder day, if you set one), then report_state \"waiting\" with until set to "
+            + "that day, and sync_project with this_thread.set_aside_until the same day (YYYY-MM-DD), keeping your card's ask. "
+            + "It leaves his Start here and comes back on that day. If he already deferred an ask you are still holding, "
+            + "do this now."
     }
 ];
 

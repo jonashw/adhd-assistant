@@ -20,7 +20,7 @@ import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
-import { ProjectForYou, forYou, isQuiet, lastMoved, quietDays } from "./ClaudeProjectFocus";
+import { ProjectForYou, forYou, isQuiet, needsJon, lastMoved, quietDays } from "./ClaudeProjectFocus";
 import { YourMoveSections } from "./YourMove";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
@@ -395,8 +395,9 @@ function ProjectArtifacts({project, all, onAll, onOpen}: {
 /* Your move: what each project needs from Jon, and nothing he's done with. A project's asks and to-dos come first, then
    its stuck threads; the threads still working fold into one line. Resolved threads are left out (a search finds them).
    Projects that have gone quiet fold away at the bottom by themselves, and Hide sits in each project's ⋯ menu. */
-function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, hiddenCount, showHidden, onShowHidden}: {
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden}: {
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
+    onSetAside: (t: ClaudeThread, until: string | null) => void,
     projects: ClaudeProject[],
     searching: boolean,
     openIn: OpenIn,
@@ -417,7 +418,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         if (next.has(id)) next.delete(id); else next.add(id);
         return next;
     };
-    const needs = (p: ClaudeProject) => forYou(p, now).length + p.threads.filter(t => badgeFor(t, p, now) === "failed").length;
+    const needs = (p: ClaudeProject) => needsJon(forYou(p, now)).length + p.threads.filter(t => badgeFor(t, p, now) === "failed").length;
     // the project holding the highest-Leverage thing you can do now comes first
     const top = (p: ClaudeProject) => Math.max(0, ...forYou(p, now).filter(i => i.ready).map(i => i.leverage));
     const ordered = [...projects].sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || top(b) - top(a) || lastMoved(b).localeCompare(lastMoved(a)));
@@ -489,6 +490,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
             }}
             onOpenThread={onOpenThread}
             onInterest={onInterest}
+            onSetAside={onSetAside}
             projectName={projectLabel}
         />
         <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 2, borderTop: 1, borderColor: "claude.link"}}>
@@ -915,6 +917,14 @@ export function ClaudeMap() {
         }
     };
 
+    const setAside = (thread: ClaudeThread, until: string | null) => {
+        setProjects(ps => ps?.map(p => ({...p, threads: p.threads.map(t => t.id !== thread.id ? t
+            : {...t, setAsideUntil: until ?? undefined, setAsideBy: until ? "jon" as const : undefined})})));
+        if (!demo) {
+            ServerApi.setClaudeThreadAside(thread.id, until).catch(() => reload());
+        }
+    };
+
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
         setProjects(ps => ps?.map(p => p.id === project.id ? {...p, hidden} : p));
@@ -1104,6 +1114,7 @@ export function ClaudeMap() {
                 onOpenArtifact={markArtifactOpened}
                 onToggleHidden={toggleHidden}
                 onInterest={answerInterest}
+                onSetAside={setAside}
                 hiddenCount={hiddenCount}
                 showHidden={showHidden}
                 onShowHidden={setShowHidden}

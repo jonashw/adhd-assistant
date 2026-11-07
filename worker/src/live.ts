@@ -87,7 +87,8 @@ export function ringsFor(method: string, pathname: string): LiveRing[] {
         return [{topic: "trail"}];
     }
     if (pathname.startsWith("/api/claude-map/")) {
-        return [{topic: "claude"}];
+        // setting a thread aside also takes its flare down on the map
+        return pathname.endsWith("/set-aside") ? [{topic: "claude"}, {topic: "trail"}] : [{topic: "claude"}];
     }
     return [];
 }

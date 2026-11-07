@@ -101,6 +101,14 @@ sync first thing in that turn, before the work. That same sync also takes down t
 a checked-in thread still marked "waiting" whose Claude thread went from waiting to working goes back to working,
 as if it had called `report_state` itself.
 
+**When Jon defers.** "Put a pin in it" isn't Jon's move any more. A thread that hears it picks the day the ask comes
+back and sends `report_state` "waiting" with `until`, and `sync_project` with `this_thread.set_aside_until` (protocol
+version 3). Jon can do the same from Your move: an ask's card has **Later** (tomorrow, a week, a month or a day he
+picks) and, once set aside, **Bring it back now**. A set-aside ask shows as "Later" under Opens up later, doesn't count
+as needing him, and its flare on the map stays down; on the morning of that day it is back in Start here. It clears
+when the thread works again. Stored in `claude_threads.set_aside_until` / `set_aside_by` and
+`linked_items.set_aside_until` (migration 0020); the Log shows each change.
+
 **What that covers.** A project syncs only while one of its threads is working. Each sync carries every thread,
 so one active thread refreshes all of them. When a project goes quiet, its last snapshot stays, and after 4 hours
 its open threads read "Not heard lately". A thread's last sync comes just before its turn ends, so it may still

@@ -41,7 +41,12 @@ export async function getTrail(env: Env, mapId: string): Promise<Trail> {
     const [recent, last, signals] = await env.DB.batch([
         env.DB.prepare("SELECT id, note_id, kind, at FROM visits WHERE map_id = ? AND at >= ? ORDER BY at, id LIMIT 2000").bind(mapId, since),
         env.DB.prepare("SELECT note_id, MAX(at) AS at FROM visits WHERE map_id = ? AND kind = 'arrive' GROUP BY note_id").bind(mapId),
-        env.DB.prepare(`SELECT * FROM signals WHERE map_id = ? AND ${openSignalsSql} ORDER BY raised_at`).bind(mapId, now)
+        // a flare whose thread is set aside until a later day stays down until that day
+        env.DB.prepare(
+            `SELECT * FROM signals WHERE map_id = ? AND ${openSignalsSql}
+             AND NOT EXISTS (SELECT 1 FROM linked_items li WHERE li.id = signals.item_id AND li.set_aside_until > ?)
+             ORDER BY raised_at`
+        ).bind(mapId, now, now.slice(0, 10))
     ]);
     // the tether needs the last tie-off or untie even when it is older than a day
     const tether = await env.DB.prepare(

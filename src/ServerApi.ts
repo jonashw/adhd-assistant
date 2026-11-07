@@ -97,6 +97,10 @@ export const ServerApi = {
         request<void>(`/api/checklist/${encodeURIComponent(id)}/interest/${answer ?? "clear"}`, {method: "POST"}),
     markClaudeArtifactOpened: (id: number) =>
         request<void>(`/api/claude-map/artifacts/${id}/opened`, {method: "POST"}),
+    setClaudeThreadAside: (id: string, until: string | null) =>
+        request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/set-aside`, {
+            method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({until})
+        }),
     markClaudeThreadOpened: (id: string) =>
         request<void>(`/api/claude-map/threads/${encodeURIComponent(id)}/opened`, {method: "POST"}),
     signOut: () => fetch("/auth/logout", {method: "POST", credentials: "same-origin"}),

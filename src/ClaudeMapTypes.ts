@@ -27,8 +27,19 @@ export type ClaudeThread = {
     /* topics and keywords it had before, for search */
     pastTopics?: string[],
     /* to-dos it left for Jon that he hasn't done yet (checklist items), newest first */
-    todos?: ClaudeTodo[]
+    todos?: ClaudeTodo[],
+    /* "put a pin in it": its ask is set aside until this day (YYYY-MM-DD), by the thread when Jon deferred, or by Jon */
+    setAsideUntil?: string,
+    setAsideBy?: "thread" | "jon"
 };
+
+/* Set aside until a day still to come: not Jon's move yet. It comes back on the morning of that day. */
+export const isSetAside = (thread: ClaudeThread, now = Date.now()) =>
+    !!thread.setAsideUntil && Date.parse(`${thread.setAsideUntil}T00:00:00`) > now;
+
+/* "Dec 7" */
+export const dayLabel = (day: string) =>
+    new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {month: "short", day: "numeric"});
 
 /* How long a to-do takes, kept coarse on purpose: time estimates are a known ADHD weak spot */
 export const todoSizes = ["minutes", "half_hour", "longer"] as const;
@@ -167,7 +178,7 @@ export const claudeThreadUrl = (projectId: string, threadId: string) =>
 
 /* What a badge says and its colour, by state. "stale", "gone" and "someday" are the app's own: no word from the
    project lately, left out of its latest sync, or an ask that has waited over a week. */
-export type ClaudeBadgeKind = ClaudeThreadState | "stale" | "gone" | "someday";
+export type ClaudeBadgeKind = ClaudeThreadState | "stale" | "gone" | "someday" | "later";
 export const claudeBadges: Record<ClaudeBadgeKind, {label: string, color: string, text: string}> = {
     blocked: {label: "Needs you", color: "#F59E0B", text: "#1F1300"},
     review_ready: {label: "Ready to review", color: "#16A34A", text: "#FFFFFF"},
@@ -177,11 +188,12 @@ export const claudeBadges: Record<ClaudeBadgeKind, {label: string, color: string
     done: {label: "Resolved", color: "#9CA3AF", text: "#FFFFFF"},
     stale: {label: "Not heard lately", color: "#E5E7EB", text: "#374151"},
     gone: {label: "Not seen lately", color: "#E5E7EB", text: "#374151"},
-    someday: {label: "Someday?", color: "#FDE9C4", text: "#7C4A03"}
+    someday: {label: "Someday?", color: "#FDE9C4", text: "#7C4A03"},
+    later: {label: "Later", color: "#E0E7FF", text: "#3730A3"}
 };
 
 /* Badges drawn faded and dashed: the map isn't sure, or the thing can wait */
-export const quietBadges: ClaudeBadgeKind[] = ["stale", "gone", "someday"];
+export const quietBadges: ClaudeBadgeKind[] = ["stale", "gone", "someday", "later"];
 
 /* The badge a thread shows now: its own state, unless the map has lost track of it */
 export function badgeFor(thread: ClaudeThread, project: ClaudeProject, now = Date.now()): ClaudeBadgeKind {
@@ -190,6 +202,9 @@ export function badgeFor(thread: ClaudeThread, project: ClaudeProject, now = Dat
     }
     // an ask only changes when Jon acts, so a quiet project doesn't make it stale; it just gets old
     if (thread.state === "blocked" || thread.state === "review_ready") {
+        if (isSetAside(thread, now)) {
+            return "later";
+        }
         const since = Date.parse(thread.lastActivityAt ?? thread.createdAt ?? "");
         return now - since > claudeSomedayDays * 864e5 ? "someday" : thread.state;
     }
@@ -198,7 +213,7 @@ export function badgeFor(thread: ClaudeThread, project: ClaudeProject, now = Dat
 }
 
 /* Most urgent first, for lists and for a project's summary */
-export const badgeOrder: ClaudeBadgeKind[] = ["blocked", "failed", "review_ready", "working", "stale", "gone", "someday", "stopped", "done"];
+export const badgeOrder: ClaudeBadgeKind[] = ["blocked", "failed", "review_ready", "working", "stale", "gone", "someday", "later", "stopped", "done"];
 
 export const askLabels: Record<ClaudeAskKind, string> = {
     question: "Question",
@@ -217,7 +232,7 @@ export function glanceLine(thread: ClaudeThread): string | undefined {
    Times are when the map heard of it, which can trail the change itself until a thread in the project syncs. */
 export const claudeEventKinds = [
     "project_new", "project_renamed", "short_name", "thread_new", "thread_renamed", "thread_state",
-    "thread_unlisted", "ask", "reply", "pr_new", "pr_state", "pr_ci", "artifact_new", "artifact_updated"
+    "thread_unlisted", "ask", "reply", "set_aside", "pr_new", "pr_state", "pr_ci", "artifact_new", "artifact_updated"
 ] as const;
 export type ClaudeEventKind = typeof claudeEventKinds[number];
 export type ClaudeEvent = {

@@ -158,16 +158,42 @@ export async function checkIn(env: Env, input: CheckIn): Promise<LinkedItem> {
 }
 
 /* A thread says how it is doing; its signal follows */
-export async function reportState(env: Env, threadId: string, state: ThreadState, note?: string): Promise<LinkedItem> {
+export async function reportState(env: Env, threadId: string, state: ThreadState, note?: string, until?: string): Promise<LinkedItem> {
     const text = note?.trim().slice(0, 240) || null;
+    if (until !== undefined && (state !== "waiting" || !/^\d{4}-\d{2}-\d{2}$/.test(until))) {
+        throw new HttpError(422, "until goes with \"waiting\", as a day like 2026-12-07.");
+    }
+    // any new report replaces an old set-aside; only "waiting" with until sets one
     const result = await env.DB.prepare(
-        "UPDATE linked_items SET state = ?, state_note = ?, last_heard_at = ? WHERE id = ? AND kind = 'claude.thread'"
-    ).bind(state, text, new Date().toISOString(), threadId).run();
+        "UPDATE linked_items SET state = ?, state_note = ?, last_heard_at = ?, set_aside_until = ? WHERE id = ? AND kind = 'claude.thread'"
+    ).bind(state, text, new Date().toISOString(), until ?? null, threadId).run();
     if (!result.meta.changes) {
         throw new HttpError(404, "No thread has that id. Check in first.");
     }
     await raiseFor(env, threadId);
     return (await getItem(env, threadId))!;
+}
+
+/* The checked-in items whose link points at these Claude threads (claude.ai/...?thread=<id>) */
+async function itemsOf(env: Env, claudeThreadIds: string[], where = ""): Promise<{id: string, url: string}[]> {
+    const wanted = new Set(claudeThreadIds);
+    const rows = await env.DB.prepare(
+        `SELECT id, url FROM linked_items WHERE kind = 'claude.thread' AND url IS NOT NULL ${where}`
+    ).all<{id: string, url: string}>();
+    return rows.results.filter(r => {
+        try {
+            return wanted.has(new URL(r.url).searchParams.get("thread") ?? "");
+        } catch {
+            return false;
+        }
+    });
+}
+
+/* Jon set a Claude thread's ask aside (or brought it back) from Your move: its flare follows */
+export async function setItemsAside(env: Env, claudeThreadId: string, until: string | null): Promise<void> {
+    for (const item of await itemsOf(env, [claudeThreadId])) {
+        await env.DB.prepare("UPDATE linked_items SET set_aside_until = ? WHERE id = ?").bind(until, item.id).run();
+    }
 }
 
 /* Jon answered: the platform shows these Claude threads (claude.ai thread ids) working again after they waited on him.
@@ -177,21 +203,11 @@ export async function resumeAnswered(env: Env, claudeThreadIds: string[]): Promi
     if (claudeThreadIds.length === 0) {
         return 0;
     }
-    const wanted = new Set(claudeThreadIds);
-    const waiting = await env.DB.prepare(
-        "SELECT id, url FROM linked_items WHERE kind = 'claude.thread' AND state = 'waiting' AND url IS NOT NULL"
-    ).all<{id: string, url: string}>();
-    const answered = waiting.results.filter(r => {
-        try {
-            return wanted.has(new URL(r.url).searchParams.get("thread") ?? "");
-        } catch {
-            return false;
-        }
-    });
+    const answered = await itemsOf(env, claudeThreadIds, "AND state = 'waiting'");
     const now = new Date().toISOString();
     for (const item of answered) {
         await env.DB.prepare(
-            "UPDATE linked_items SET state = 'working', state_note = NULL, last_heard_at = ? WHERE id = ? AND state = 'waiting'"
+            "UPDATE linked_items SET state = 'working', state_note = NULL, last_heard_at = ?, set_aside_until = NULL WHERE id = ? AND state = 'waiting'"
         ).bind(now, item.id).run();
         await raiseFor(env, item.id);
     }

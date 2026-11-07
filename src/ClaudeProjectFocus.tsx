@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Button, Chip, IconButton, List, ListItem, ListItemButton, ListItemText, Tooltip, Typography } from "@mui/material";
 import { OpenInNew } from "@mui/icons-material";
 import { ThumbDown, ThumbDownOffAlt, ThumbUp, ThumbUpOffAlt } from "@mui/icons-material";
-import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, askLabels, badgeFor, claudeBadges, standingAsk } from "./ClaudeMapTypes";
+import { ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, askLabels, badgeFor, claudeBadges, dayLabel, isSetAside, standingAsk } from "./ClaudeMapTypes";
 import { LeverageInput, reasonLine, scoreAll } from "./leverage";
 
 /* What a project needs from Jon, for its card on the Claude map and on Your move: the questions, decisions and reviews
@@ -23,8 +23,13 @@ export type ForYouItem = {
     /* "a few minutes · opens 2 · a Claude thread waits": the page shows this, never the number */
     reason: string,
     leverage: number,
-    ready: boolean
+    ready: boolean,
+    /* an ask set aside until a later day: shown under Opens up later, and not counted as needing Jon */
+    setAside?: boolean
 };
+
+/* What needs Jon now: everything but asks set aside for later */
+export const needsJon = (items: ForYouItem[]) => items.filter(i => !i.setAside);
 
 const askChip = {
     question: claudeBadges.blocked, decision: claudeBadges.blocked, approval: claudeBadges.working, review: claudeBadges.review_ready
@@ -50,6 +55,21 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
             const ask = standingAsk(t);
             const style = ask ? askChip[ask.kind] : t.state === "review_ready" ? claudeBadges.review_ready : claudeBadges.blocked;
             const scored = scores.get(asks[i].id)!;
+            // set aside ("put a pin in it"): not his move until the day comes, so it waits under Opens up later
+            if (isSetAside(t, now)) {
+                return {
+                    key: `ask:${t.id}`,
+                    label: claudeBadges.later.label,
+                    color: claudeBadges.later.color,
+                    textColor: claudeBadges.later.text,
+                    text: ask?.text ?? t.title,
+                    thread: t,
+                    reason: `set aside until ${dayLabel(t.setAsideUntil!)}${t.setAsideBy === "thread" ? ", Claude brings it back" : ""}`,
+                    leverage: 0,
+                    ready: false,
+                    setAside: true
+                };
+            }
             return {
                 key: `ask:${t.id}`,
                 label: ask ? askLabels[ask.kind] : claudeBadges[t.state].label,
@@ -172,7 +192,7 @@ export function lastMoved(project: ClaudeProject): string {
 }
 
 export function isQuiet(project: ClaudeProject, now = Date.now()): boolean {
-    return forYou(project, now).length === 0
+    return needsJon(forYou(project, now)).length === 0
         && !project.threads.some(t => badgeFor(t, project, now) === "failed")
         && now - Date.parse(lastMoved(project)) > quietDays * 864e5;
 }

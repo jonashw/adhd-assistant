@@ -1,6 +1,6 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
-import { resumeAnswered } from "./items";
+import { resumeAnswered, setItemsAside } from "./items";
 import {
     ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
@@ -50,7 +50,7 @@ export type Snapshot = {
     /* left out = the list hasn't changed since the last sync (only once the project is on the map) */
     threads?: SnapshotThread[],
     /* state: what the thread leaves itself as when this turn ends; the platform's own list only catches up later */
-    this_thread?: {thread_id: string, card: SnapshotCard, state?: ClaudeThreadState},
+    this_thread?: {thread_id: string, card: SnapshotCard, state?: ClaudeThreadState, set_aside_until?: string},
     /* left out = unchanged; sent = the project's whole PR list */
     prs?: SnapshotPr[],
     /* the project's artifacts as the platform lists them (newest first, maybe cut short). Added to what the map
@@ -73,7 +73,8 @@ type ThreadRow = {
     headline: string | null, ask_kind: ClaudeAskKind | null, ask_text: string | null,
     progress_done: number | null, progress_total: number | null, progress_now: string | null,
     artifact_title: string | null, artifact_url: string | null, topic: string | null, keywords: string | null,
-    card_at: string | null, opened_at: string | null
+    card_at: string | null, opened_at: string | null,
+    set_aside_until: string | null, set_aside_by: "thread" | "jon" | null
 };
 type PrRow = {
     project_id: string, repo: string, number: number, thread_id: string | null, title: string,
@@ -149,6 +150,9 @@ export function checkSnapshot(input: Snapshot): Snapshot {
         if (input.this_thread.state !== undefined && !claudeThreadStates.includes(input.this_thread.state)) {
             fail("this_thread has an unknown state.");
         }
+        if (input.this_thread.set_aside_until !== undefined && !isDay(input.this_thread.set_aside_until)) {
+            fail("set_aside_until must be a day like 2026-12-07.");
+        }
     }
     if (input.prs) {
         checkPrs(input.prs);
@@ -179,6 +183,9 @@ async function sha256(text: string): Promise<string> {
 }
 
 export type SyncResult = {project: string, threads: number, needsYou: number};
+
+const isDay = (day: unknown): day is string =>
+    typeof day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(day) && !isNaN(Date.parse(`${day}T00:00:00Z`));
 
 export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult> {
     const snapshot = checkSnapshot(input);
@@ -240,6 +247,10 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
             `UPDATE claude_threads SET state = ?, last_activity_at = ? WHERE id = ? AND project_id = ?`
         ).bind(snapshot.this_thread.state, now, snapshot.this_thread.thread_id, snapshot.project_id)] : []),
         ...(snapshot.this_thread ? cardStatements(env, snapshot.project_id, snapshot.this_thread.thread_id, snapshot.this_thread.card, now) : []),
+        // Jon deferred: the thread sets its ask aside until a day
+        ...(snapshot.this_thread?.set_aside_until ? [env.DB.prepare(
+            "UPDATE claude_threads SET set_aside_until = ?, set_aside_by = 'thread' WHERE id = ? AND project_id = ?"
+        ).bind(snapshot.this_thread.set_aside_until, snapshot.this_thread.thread_id, snapshot.project_id)] : []),
         ...artifactStatements(env, snapshot, now),
         ...(snapshot.prs ? [
             env.DB.prepare("DELETE FROM claude_prs WHERE project_id = ?").bind(snapshot.project_id),
@@ -261,9 +272,16 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
         console.error("Couldn't write the Claude event log", e);
     }
 
-    // 4. a thread that waited on Jon and now works again got his answer: its flare on the map comes down too
+    // 4. a thread that waited on Jon and now works again got his answer: its flare on the map comes down too,
+    // and whatever set its ask aside is over
     try {
-        await resumeAnswered(env, answeredBetween(before, after));
+        const answered = answeredBetween(before, after);
+        await resumeAnswered(env, answered);
+        if (answered.length) {
+            await env.DB.batch(answered.map(id => env.DB.prepare(
+                "UPDATE claude_threads SET set_aside_until = NULL, set_aside_by = NULL WHERE id = ?"
+            ).bind(id)));
+        }
     } catch (e) {
         console.error("Couldn't take down answered flares", e);
     }
@@ -398,6 +416,8 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
                 if (t.created_at) thread.createdAt = t.created_at;
                 if (t.last_activity_at) thread.lastActivityAt = t.last_activity_at;
                 if (t.opened_at) thread.openedAt = t.opened_at;
+                if (t.set_aside_until) thread.setAsideUntil = t.set_aside_until;
+                if (t.set_aside_by) thread.setAsideBy = t.set_aside_by;
                 const card = cardOf(t);
                 if (card) thread.card = card;
                 const threadPrs = prsBy.get(t.id)?.filter(r => r.project_id === p.id);
@@ -522,6 +542,28 @@ export async function markThreadOpened(env: Env, threadId: string): Promise<void
     }
 }
 
+/* Jon puts a pin in an ask from Your move (until a day), or brings it back (null). The thread's flare on his map
+   follows, so the two never disagree. */
+export async function setThreadAside(env: Env, threadId: string, until: string | null): Promise<void> {
+    if (until !== null && !isDay(until)) {
+        throw new HttpError(422, "Set it aside until a day like 2026-12-07.");
+    }
+    const before = await env.DB.prepare("SELECT * FROM claude_threads WHERE id = ?").bind(threadId).first<ThreadRow>();
+    if (!before) {
+        throw new HttpError(404, "There is no such thread on the Claude map.");
+    }
+    const now = new Date().toISOString();
+    await env.DB.prepare("UPDATE claude_threads SET set_aside_until = ?, set_aside_by = ? WHERE id = ?")
+        .bind(until, until ? "jon" : null, threadId).run();
+    await setItemsAside(env, threadId, until);
+    if ((before.set_aside_until ?? null) !== until) {
+        await env.DB.prepare(
+            `INSERT INTO claude_events (at, kind, project_id, thread_id, from_value, to_value, snapshot_hash, by_thread)
+             VALUES (?, 'set_aside', ?, ?, ?, ?, '', NULL)`
+        ).bind(now, before.project_id, threadId, before.set_aside_until, until).run();
+    }
+}
+
 /* Jon opened it from the map: it stops reading "New" or "Updated" until it changes again */
 export async function markArtifactOpened(env: Env, artifactId: number): Promise<void> {
     const result = await env.DB.prepare("UPDATE claude_artifacts SET opened_at = ? WHERE id = ?")
@@ -603,6 +645,7 @@ export function changesBetween(before: MapState, after: MapState): Change[] {
         if (t.title !== old.title) changes.push({kind: "thread_renamed", threadId: id, from: old.title, to: t.title});
         if (t.state !== old.state) changes.push({kind: "thread_state", threadId: id, from: old.state, to: t.state});
         if (askOf(t) !== askOf(old)) changes.push({kind: "ask", threadId: id, from: askOf(old), to: askOf(t)});
+        if (t.set_aside_until !== old.set_aside_until) changes.push({kind: "set_aside", threadId: id, from: old.set_aside_until, to: t.set_aside_until});
         if (t.headline !== old.headline && t.headline) changes.push({kind: "reply", threadId: id, from: old.headline, to: t.headline});
         if (listed(old, b) && !listed(t, a)) changes.push({kind: "thread_unlisted", threadId: id, to: t.title});
     }
