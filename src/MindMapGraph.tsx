@@ -16,6 +16,8 @@ import { YouStrip } from "./YouStrip";
 import { RabbitBurrow } from "./Crew";
 import { BalloonTrail } from "./crew/BalloonTrail";
 import { HomeSymbol, MapScene, homeSymbols } from "./MindMap";
+import { StakeDialog } from "./Stakes";
+import { isStakeNodeId, mentionsAt, stakePrefix, withStakes } from "./stakeGraph";
 
 /* the symbols HOME can wear in the graph, the old ones from the app's first days */
 const symbolImage: Record<HomeSymbol, string> = {
@@ -145,6 +147,10 @@ export default function MindMapGraph({
     React.useEffect(() => {
         if (syncedWithTrail.current && selectedNodeId && value.nodes.some(n => n.id === selectedNodeId)) {
             nav.arrive(selectedNodeId);
+            //going to a place Jon spoke about settles the mention: he has seen it
+            for (const mention of mentionsAt(nav.trail.stakes, selectedNodeId)) {
+                nav.settleStake(mention.id, {charted: selectedNodeId}).catch(e => console.warn("couldn't settle the mention", e));
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedNodeId]);
@@ -156,9 +162,11 @@ export default function MindMapGraph({
         () => {
             //only the tree is drawn; ties across it (BLOCKED_BY, ALSO_IN, labelled) get their own view later
             const visible = MindMap.visibleGraph(value, revealHidden);
-            return MindMap.clone({...visible, links: visible.links.filter(l => l.type === 'PART_OF')});
+            //dashed stakes from what Jon said hang beside the real places, drawn but never saved
+            return MindMap.clone(withStakes({...visible, links: visible.links.filter(l => l.type === 'PART_OF')}, nav.trail.stakes));
         },
-        [value, revealHidden]);
+        [value, revealHidden, nav.trail.stakes]);
+    const [pickedStake, setPickedStake] = React.useState<string>();
 
     const utilizeNativePrompt = false;
 
@@ -285,7 +293,9 @@ export default function MindMapGraph({
         smoke: dark ? 'hsl(0 0 70)' : 'hsl(0 0 35)',
         tracks: dark ? 'hsl(140 40 62)' : 'hsl(140 40 30)',
         node: dark ? 'hsl(40 4 36)' : 'hsl(0 0 30)',
-        sky: dark ? '#1f2530' : '#dcefff'
+        sky: dark ? '#1f2530' : '#dcefff',
+        stake: dark ? 'hsl(40 60 70)' : 'hsl(30 70 32)',
+        stakeFill: dark ? 'hsl(40 20 18)' : 'hsl(40 60 96)'
     };
 
     //which nodes would show with hidden nodes tucked away; the rest are drawn muted when revealed
@@ -302,7 +312,9 @@ export default function MindMapGraph({
         : 'white';
 
     const nodeColor = (node:MindMapGraphNode) =>
-        node.type === 'HOME'
+        isStakeNodeId(node.id)
+        ? ink.stakeFill
+        : node.type === 'HOME'
         ? 'white'
         : isMuted(node)
         ? node.id === selectedNodeId ? 'hsl(220 30 70)' : 'hsl(0 0 75)'
@@ -357,6 +369,11 @@ export default function MindMapGraph({
                     </Button>
                 }
             />
+
+            <StakeDialog stakeId={pickedStake} graph={graph} onChange={change} onClose={placeId => {
+                setPickedStake(undefined);
+                if (placeId) selectNodeId(placeId);
+            }}/>
 
             {rabbitHoleModalVisible && <MultiModalPrompt
                 title={"Go Down a Rabbit Hole"}
@@ -419,7 +436,7 @@ export default function MindMapGraph({
                             carrying={nav.tether.state === "tied"} onPick={placeClicked}/>
                     </div>}
                     {view === "graph" && homeImage && <ForceGraph2D
-                        onNodeClick={node => placeClicked(node.id)}
+                        onNodeClick={node => isStakeNodeId(node.id) ? setPickedStake(node.id.slice(stakePrefix.length)) : placeClicked(node.id)}
                         onBackgroundClick={() => {
                             selectNodeId(undefined);
                         }}
@@ -436,6 +453,33 @@ export default function MindMapGraph({
                         nodeColor={nodeColor}
                         nodeRelSize={nodeRadius}
                         nodeCanvasObject={(node, ctx, globalScale) => {
+                            if (isStakeNodeId(node.id)) {
+                                //a dashed stake: a proposed place, dashed until Jon charts it
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.arc(node.x!, node.y!, nodeRadius, 0, Math.PI * 2);
+                                ctx.closePath();
+                                ctx.fillStyle = ink.stakeFill;
+                                ctx.fill();
+                                ctx.setLineDash([4, 3]);
+                                ctx.lineWidth = 1.5;
+                                ctx.strokeStyle = ink.stake;
+                                ctx.stroke();
+                                ctx.restore();
+                                fillTextInsideCircle(ctx, globalScale, node.x!, node.y!, nodeRadius, node.label, ink.stake);
+                                return;
+                            }
+                            if (node.type !== 'HOME' && mentionsAt(nav.trail.stakes, node.id).length > 0) {
+                                //Jon spoke about this place: a dashed halo until he goes there
+                                ctx.save();
+                                ctx.beginPath();
+                                ctx.arc(node.x!, node.y!, nodeRadius * 1.3, 0, Math.PI * 2);
+                                ctx.setLineDash([4, 3]);
+                                ctx.lineWidth = 1.5;
+                                ctx.strokeStyle = ink.stake;
+                                ctx.stroke();
+                                ctx.restore();
+                            }
                             if (node.type === 'HOME') {
                                 //
                                 if (homeImage) {
@@ -529,6 +573,7 @@ export default function MindMapGraph({
                             }
                         }}
                         linkColor={() => ink.link}
+                        linkLineDash={link => isStakeNodeId(typeof link.source === "object" ? String((link.source as {id?: string}).id) : String(link.source)) ? [4, 3] : null}
                         linkCanvasObjectMode={() => "after"}
                         linkCanvasObject={(link,ctx,globalScale) => {
                             ctx.save();

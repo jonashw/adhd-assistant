@@ -33,6 +33,8 @@ export type Navigator = {
     checklistAt: (noteId: string) => ChecklistItem[],
     setChecklistDone: (id: string, done: boolean) => Promise<void>,
     removeChecklistItem: (id: string) => Promise<void>,
+    /* dashed stakes from what Jon said: he charts one (the place it became) or says "Not now" */
+    settleStake: (stakeId: string, settled: {charted: string} | "dismissed") => Promise<void>,
     refresh: () => void
 };
 
@@ -224,6 +226,16 @@ export function NavigatorProvider({graph, children, trailStore}: {
         refresh();
     }, [store, refresh]);
 
+    //gone from view at once; the server copy follows, and a failure brings it back
+    const settleStake = React.useCallback(async (stakeId: string, settled: {charted: string} | "dismissed") => {
+        setTrail(t => ({...t, stakes: t.stakes.filter(s => s.id !== stakeId)}));
+        try {
+            await store.settleStake(mapId, stakeId, settled);
+        } finally {
+            refresh();
+        }
+    }, [store, mapId, refresh]);
+
     const checklistAt = React.useCallback((noteId: string) =>
         trail.checklist.filter(c => c.noteId === noteId).sort((a, b) => Number(!!a.doneAt) - Number(!!b.doneAt)),
         [trail.checklist]);
@@ -252,7 +264,7 @@ export function NavigatorProvider({graph, children, trailStore}: {
         mapId, loaded, trail, tether, now, weatherAnswer,
         arrive, tieOff, untie, answerWeather, flagOf, plantFlag, clearFlag,
         signalsAt, itemsAt, linksSupported: store.linksSupported, addLink, removeLink, placeItem, forgetItem,
-        checklistAt, setChecklistDone, removeChecklistItem, refresh
+        checklistAt, setChecklistDone, removeChecklistItem, settleStake, refresh
     };
     return <NavigatorContext.Provider value={value}>{children}</NavigatorContext.Provider>;
 }
