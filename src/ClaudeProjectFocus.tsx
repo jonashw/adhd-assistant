@@ -74,7 +74,7 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
 }
 
 /* Claude's guess at whether Jon wants to do it, dashed until he answers with a thumb */
-function InterestThumbs({todo, onAnswer}: {todo: ClaudeTodo, onAnswer: (answer: InterestAnswer | undefined) => void}) {
+export function InterestThumbs({todo, onAnswer}: {todo: ClaudeTodo, onAnswer: (answer: InterestAnswer | undefined) => void}) {
     const interest = todo.interest;
     if (!interest) {
         return null;

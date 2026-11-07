@@ -21,6 +21,7 @@ import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
 import { ProjectForYou, forYou, isQuiet, lastMoved, quietDays } from "./ClaudeProjectFocus";
+import { YourMoveSections } from "./YourMove";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
 import { BalloonIcon, BreakPlace, BreakVeil, readBreak, saveBreak } from "./TakeABreak";
 
@@ -465,12 +466,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
                     <MoreHoriz fontSize="small"/>
                 </IconButton>
             </ListSubheader>
-            <Box sx={{px: 1}}>
-                <ProjectForYou project={p} heading={false} firstShown={6} threadLinkProps={t => linkProps(t.url, openIn)} onOpenThread={onOpenThread} onInterest={onInterest}/>
-            </Box>
             {stuck.map(t => threadRow(t, p))}
-            {needs(p) === 0 &&
-                <Typography variant="body2" color="text.secondary" sx={{px: 2, py: 0.5}}>Nothing here needs you.</Typography>}
             {foldWords && !searching && <ListItemButton onClick={() => setUnfolded(u => toggle(u, p.id))} sx={{py: 0.25}}>
                 <ListItemIcon sx={{minWidth: 28}}>{open ? <ExpandLess fontSize="small"/> : <ExpandMore fontSize="small"/>}</ListItemIcon>
                 <ListItemText secondary={foldWords}/>
@@ -485,7 +481,21 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         </React.Fragment>;
     };
 
-    return <List dense data-testid="your-move" sx={{bgcolor: "#fff", pb: 10}}>
+    return <List dense data-testid="your-move" sx={{bgcolor: "#fff", pb: "45dvh"}}>
+        <YourMoveSections
+            projects={active}
+            threadLinkProps={t => linkProps(t.url, openIn)}
+            openThread={t => {
+                const link = linkProps(t.url, openIn) as {href?: string, target?: string};
+                if (link.href) window.open(link.href, link.target ?? "_self", "noopener");
+            }}
+            onOpenThread={onOpenThread}
+            onInterest={onInterest}
+            projectName={projectLabel}
+        />
+        <ListSubheader sx={{bgcolor: "#fff", lineHeight: "32px", fontWeight: 600, color: claudeStyle.ink, mt: 2, borderTop: `1px solid ${claudeStyle.link}`}}>
+            Projects
+        </ListSubheader>
         {active.map(projectBlock)}
         {quiet.length > 0 && <>
             <ListItemButton onClick={() => setQuietOpen(o => !o)} sx={{bgcolor: claudeStyle.fill, mt: 1}}>
