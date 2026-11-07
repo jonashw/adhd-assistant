@@ -109,6 +109,9 @@ export async function chartMonologue(env: Env, monologue: Monologue): Promise<nu
     if (already) return 0;
     const start = await startingPlace(env, monologue.threadItemId);
     if (!start) return 0;
+    // replay starts where charting did
+    await env.DB.prepare("INSERT OR IGNORE INTO monologue_starts (monologue_id, map_id, note_id) VALUES (?, ?, ?)")
+        .bind(monologue.id, start.mapId, start.noteId).run();
     const {results: notes} = await env.DB.prepare("SELECT id, label, type, parent_id FROM notes WHERE map_id = ?")
         .bind(start.mapId).all<NoteRow>();
     const planted = plant(monologue, notes, start.noteId, () => crypto.randomUUID());
@@ -166,4 +169,42 @@ export async function settleStake(env: Env, mapId: string, stakeId: string, inpu
         return;
     }
     throw new HttpError(422, "Say charted or dismissed.");
+}
+
+type ReplayStakeRow = StakeRow & {settled: "charted" | "dismissed" | null, charted_note_id: string | null};
+
+/* Everything replay needs beside the monologue: the map and place it started at, all its stakes (settled ones
+   too, with the place each became), and the scene switches Jon saved while watching */
+export async function replayOf(env: Env, monologueId: string) {
+    // monologues charted before replay existed have no start: begin at HOME of the map their stakes are on
+    const start = await env.DB.prepare("SELECT map_id, note_id FROM monologue_starts WHERE monologue_id = ?")
+        .bind(monologueId).first<{map_id: string, note_id: string}>()
+        ?? await env.DB.prepare(
+            "SELECT s.map_id, n.id AS note_id FROM stakes s JOIN notes n ON n.map_id = s.map_id AND n.type = 'HOME' WHERE s.monologue_id = ? LIMIT 1"
+        ).bind(monologueId).first<{map_id: string, note_id: string}>();
+    const [stakes, scenes] = await env.DB.batch([
+        env.DB.prepare("SELECT * FROM stakes WHERE monologue_id = ? ORDER BY seq").bind(monologueId),
+        env.DB.prepare("SELECT seq, scene FROM scene_changes WHERE monologue_id = ? ORDER BY seq, id").bind(monologueId)
+    ]);
+    return {
+        start: start ? {mapId: start.map_id, noteId: start.note_id} : null,
+        stakes: (stakes.results as ReplayStakeRow[]).map(r => ({
+            id: r.id, seq: r.seq, topic: r.topic, move: r.move,
+            underNoteId: r.under_note_id ?? undefined, underStakeId: r.under_stake_id ?? undefined, noteId: r.note_id ?? undefined,
+            settled: r.settled ?? undefined, chartedNoteId: r.charted_note_id ?? undefined
+        })),
+        scenes: scenes.results as {seq: number, scene: "crew" | "burrow"}[]
+    };
+}
+
+/* Jon switched scene while watching: from this sentence on, replays use it */
+export async function saveSceneChange(env: Env, monologueId: string, input: unknown): Promise<void> {
+    const body = input as {seq?: unknown, scene?: unknown};
+    if (!Number.isInteger(body?.seq) || (body.seq as number) < 0 || (body.scene !== "crew" && body.scene !== "burrow")) {
+        throw new HttpError(422, "A scene switch needs a sentence number and a scene (crew or burrow).");
+    }
+    const found = await env.DB.prepare("SELECT 1 FROM monologues WHERE id = ?").bind(monologueId).first();
+    if (!found) throw new HttpError(404, "No such monologue.");
+    await env.DB.prepare("INSERT INTO scene_changes (monologue_id, seq, scene, made_at) VALUES (?, ?, ?, ?)")
+        .bind(monologueId, body.seq, body.scene, new Date().toISOString()).run();
 }

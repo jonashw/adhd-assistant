@@ -13,6 +13,7 @@ import { SignInGate } from './SignInGate';
 import { CrewPreview } from './CrewPreview';
 import { TemplatePicker } from './templates/TemplatePicker';
 import { ClaudeMap } from './ClaudeMap';
+import { Replay } from './Replay';
 import { hideSplash } from './splash';
 import { ColorModeContext, useColorModeState } from './theme';
 import './theme.css';
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
       {
         path: "/claude",
         element: <ClaudeMap />
+      },
+      {
+        path: "/replay/:monologueId?",
+        element: <Replay />
       }
     ]
   },

@@ -3,7 +3,7 @@ import { Env } from "./env";
 import { HttpError, json } from "./http";
 import { deleteMap, listMaps, listRevisions, saveMap } from "./maps";
 import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
-import { settleStake } from "./stakes";
+import { replayOf, saveSceneChange, settleStake } from "./stakes";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
@@ -52,6 +52,18 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (monologueMatch && request.method === "GET") {
         const monologue = await getMonologue(env, decodeURIComponent(monologueMatch[1]));
         return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
+    }
+    const replayMatch = /^\/api\/monologues\/([^/]+)\/(replay|scenes)$/.exec(url.pathname);
+    if (replayMatch) {
+        const id = decodeURIComponent(replayMatch[1]);
+        if (replayMatch[2] === "replay" && request.method === "GET") {
+            const monologue = await getMonologue(env, id);
+            return monologue ? json({monologue, ...await replayOf(env, id)}) : json({error: "No such monologue."}, 404);
+        }
+        if (replayMatch[2] === "scenes" && request.method === "POST") {
+            await saveSceneChange(env, id, await request.json().catch(() => null));
+            return new Response(null, {status: 204});
+        }
     }
     const rereadMatch = /^\/api\/monologues\/([^/]+)\/read$/.exec(url.pathname);
     if (rereadMatch && request.method === "POST") {
