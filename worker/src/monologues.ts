@@ -1,6 +1,7 @@
 import { Env } from "./env";
 import { HttpError, sha256 } from "./http";
 import { checkUrl } from "./items";
+import { chartMonologue } from "./stakes";
 import { latestReadings, readMonologue, ReadState, readStateOf, Reading } from "./readings";
 
 /* The spoken map (PRD v1.0, E7): something Jon said, kept exactly as sent and split into sentence-sized
@@ -69,7 +70,7 @@ export function splitUtterances(text: string): Utterance[] {
 export type LogMonologue = {text: string, threadUrl?: string, threadItemId?: string};
 
 /* Store what Jon said, then have Claude read it. Sending the same words again from the same thread within a minute returns the first copy. */
-export async function logMonologue(env: Env, input: LogMonologue): Promise<{monologue: Monologue, repeat: boolean}> {
+export async function logMonologue(env: Env, input: LogMonologue): Promise<{monologue: Monologue, repeat: boolean, stakes: number}> {
     const text = input.text.trim();
     if (text.length === 0) {
         throw new HttpError(422, "There are no words to log. Send the dictated text exactly as Jon said it.");
@@ -95,7 +96,7 @@ export async function logMonologue(env: Env, input: LogMonologue): Promise<{mono
          ORDER BY received_at LIMIT 1`
     ).bind(textHash, since, threadUrl ?? null, threadItemId ?? null).first<{id: string}>();
     if (earlier) {
-        return {monologue: (await getMonologue(env, earlier.id))!, repeat: true};
+        return {monologue: (await getMonologue(env, earlier.id))!, repeat: true, stakes: 0};
     }
 
     const utterances = splitUtterances(text);
@@ -112,7 +113,10 @@ export async function logMonologue(env: Env, input: LogMonologue): Promise<{mono
     ]);
     // read inline: the thread gets the topics back, and a failure only leaves the monologue waiting to be read
     await readMonologue(env, id, utterances);
-    return {monologue: (await getMonologue(env, id))!, repeat: false};
+    const monologue = (await getMonologue(env, id))!;
+    // then autopilot plants dashed stakes from the readings (E7.S3)
+    const stakes = await chartMonologue(env, monologue);
+    return {monologue, repeat: false, stakes};
 }
 
 type MonologueRow = {
@@ -172,5 +176,7 @@ export async function rereadMonologue(env: Env, id: string): Promise<Monologue |
         return monologue;
     }
     await readMonologue(env, id, monologue.utterances);
-    return getMonologue(env, id);
+    const read = (await getMonologue(env, id))!;
+    await chartMonologue(env, read);
+    return read;
 }

@@ -57,6 +57,23 @@ export const checklistMaxPerCall = 10;
 /* Done items stay in view (struck through) this many days */
 export const checklistDoneDays = 7;
 
+/* A dashed stake: a topic Jon spoke about (E7, the spoken map) that autopilot proposes as a place. It sits beside the
+   map, under a place or another stake, until Jon charts it or says "Not now". With noteId it mentions a place already
+   on the map instead. */
+export type Stake = {
+    id: string,
+    mapId: string,
+    monologueId: string,
+    /* the sentence that first named it */
+    seq: number,
+    topic: string,
+    move: "stay" | "drill" | "surface" | "sideways" | "jump" | "return" | "ask",
+    underNoteId?: string,
+    underStakeId?: string,
+    noteId?: string,
+    madeAt: string
+};
+
 export type TrailData = {
     /* recent visits, oldest first, always including the last tie-off or untie */
     recent: Visit[],
@@ -67,7 +84,9 @@ export type TrailData = {
     /* Claude threads that checked in without naming a place yet (on any map) */
     unplaced: LinkedItem[],
     /* to-dos Claude threads left at this map's places (open, and done lately), and those waiting on a suggested place */
-    checklist: ChecklistItem[]
+    checklist: ChecklistItem[],
+    /* dashed stakes from what Jon said, still waiting for him to chart them */
+    stakes: Stake[]
 };
 
 /* A working thread silent this long reads "check in?" */

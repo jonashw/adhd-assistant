@@ -97,7 +97,7 @@ function buildServer(env: Env): McpServer {
     // what each kind of write changed, for the tabs that are open
     const trail = {env, rings: [{topic: "trail"}] as LiveRing[]};
     const threads = {env, rings: [{topic: "trail"}, {topic: "claude"}] as LiveRing[]};
-    const monologues = {env, rings: [{topic: "monologues"}] as LiveRing[]};
+    const monologues = {env, rings: [{topic: "monologues"}, {topic: "trail"}] as LiveRing[]};
     const place = z.string().describe("A place value from find_places, like \"<map id>/<place id>\"");
 
     server.registerTool("check_in", {
@@ -216,7 +216,7 @@ function buildServer(env: Env): McpServer {
         },
         annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false}
     }, args => run(async () => {
-        const {monologue, repeat} = await logMonologue(env, {text: args.text, threadUrl: args.url, threadItemId: args.thread_id});
+        const {monologue, repeat, stakes} = await logMonologue(env, {text: args.text, threadUrl: args.url, threadItemId: args.thread_id});
         const topics = [...new Set(monologue.utterances.flatMap(u => u.reading ? [u.reading.topic] : []))];
         return {
             monologue_id: monologue.id,
@@ -224,8 +224,9 @@ function buildServer(env: Env): McpServer {
             repeat,
             read: monologue.read.state === "read" ? "read" : `waiting to be read${monologue.read.note ? ` (${monologue.read.note})` : ""}`,
             topics,
+            dashed_stakes: stakes,
             next: repeat ? "These words were already logged a moment ago; nothing new was stored."
-                : monologue.read.state === "read" ? "Logged and read. Tell Jon in one line, naming the topics if there are a few."
+                : monologue.read.state === "read" ? `Logged and read.${stakes > 0 ? " New topics wait on his map as dashed stakes for him to chart." : ""} Tell Jon in one line, naming the topics if there are a few.`
                 : "Logged; the app will read it later. Tell Jon in one line that it's logged; don't make the wait sound like an error."
         };
     }, monologues));

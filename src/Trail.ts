@@ -5,7 +5,7 @@ import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 import { LinkedItem, Signal, TrailData, Visit, VisitKind } from "./TrailTypes";
 export * from "./TrailTypes";
 
-export const emptyTrail: TrailData = {recent: [], lastArrivedAt: {}, signals: [], items: [], unplaced: [], checklist: []};
+export const emptyTrail: TrailData = {recent: [], lastArrivedAt: {}, signals: [], items: [], unplaced: [], checklist: [], stakes: []};
 
 export interface TrailStore {
     load(mapId: string): Promise<TrailData>;
@@ -21,6 +21,8 @@ export interface TrailStore {
     /* Jon checks off (or back on) a to-do a Claude thread left, or removes it */
     setChecklistDone(id: string, done: boolean): Promise<void>;
     removeChecklistItem(id: string): Promise<void>;
+    /* Jon charts a dashed stake (the place it became) or says "Not now" */
+    settleStake(mapId: string, stakeId: string, settled: {charted: string} | "dismissed"): Promise<void>;
 }
 
 async function send<T>(path: string, body?: unknown): Promise<T> {
@@ -57,7 +59,9 @@ export const serverTrailStore: TrailStore = {
     placeItem: (itemId, mapId, noteId) => send(`/api/items/${encodeURIComponent(itemId)}/place`, {mapId, noteId}),
     forgetItem: itemId => send(`/api/items/${encodeURIComponent(itemId)}/forget`, {}),
     setChecklistDone: (id, done) => send(`/api/checklist/${encodeURIComponent(id)}/${done ? "check" : "uncheck"}`, {}),
-    removeChecklistItem: id => send(`/api/checklist/${encodeURIComponent(id)}/remove`, {})
+    removeChecklistItem: id => send(`/api/checklist/${encodeURIComponent(id)}/remove`, {}),
+    settleStake: (mapId, stakeId, settled) => send(`${mapPath(mapId)}/stakes/${encodeURIComponent(stakeId)}/settle`,
+        settled === "dismissed" ? {settled} : {settled: "charted", noteId: settled.charted})
 };
 
 const needsServer = () => Promise.reject(new Error("Linked items need you to be signed in."));
@@ -97,7 +101,7 @@ export const localTrailStore: TrailStore = {
                 lastArrivedAt[v.noteId] = v.at;
             }
         }
-        return {recent: visits, lastArrivedAt, signals: signals.filter(s => !s.clearedAt), items: [], unplaced: [], checklist: []};
+        return {recent: visits, lastArrivedAt, signals: signals.filter(s => !s.clearedAt), items: [], unplaced: [], checklist: [], stakes: []};
     },
     async addVisit(mapId, noteId, kind) {
         const trail = readLocal(mapId);
@@ -125,7 +129,8 @@ export const localTrailStore: TrailStore = {
     placeItem: needsServer,
     forgetItem: needsServer,
     setChecklistDone: needsServer,
-    removeChecklistItem: needsServer
+    removeChecklistItem: needsServer,
+    settleStake: needsServer
 };
 
 /* A trail that lives only in memory: for previewing a starter map without saving anything */
@@ -134,7 +139,7 @@ export function memoryTrailStore(): TrailStore {
     let signals: Signal[] = [];
     return {
         async load() {
-            return {recent: visits, lastArrivedAt: {}, signals, items: [], unplaced: [], checklist: []};
+            return {recent: visits, lastArrivedAt: {}, signals, items: [], unplaced: [], checklist: [], stakes: []};
         },
         async addVisit(_mapId, noteId, kind) {
             const visit: Visit = {id: visits.length + 1, noteId, kind, at: new Date().toISOString()};
@@ -155,6 +160,7 @@ export function memoryTrailStore(): TrailStore {
         placeItem: needsServer,
         forgetItem: needsServer,
         setChecklistDone: needsServer,
-        removeChecklistItem: needsServer
+        removeChecklistItem: needsServer,
+        settleStake: needsServer
     };
 }

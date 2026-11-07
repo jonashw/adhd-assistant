@@ -3,6 +3,7 @@ import { Env } from "./env";
 import { HttpError, json } from "./http";
 import { deleteMap, listMaps, listRevisions, saveMap } from "./maps";
 import { addVisit, clearSignal, getTrail, plantFlag } from "./trail";
+import { settleStake } from "./stakes";
 import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
@@ -157,6 +158,11 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
             throw new HttpError(422, "Pick a place.");
         }
         return json(await placeItem(env, itemId, {mapId: body.mapId, noteId: body.noteId}));
+    }
+    const stakeMatch = /^\/api\/maps\/([^/]+)\/stakes\/([^/]+)\/settle$/.exec(url.pathname);
+    if (stakeMatch && request.method === "POST") {
+        await settleStake(env, decodeURIComponent(stakeMatch[1]), decodeURIComponent(stakeMatch[2]), await readJson());
+        return new Response(null, {status: 204});
     }
     const trailMatch = /^\/api\/maps\/([^/]+)\/(trail|visits|signals)(?:\/([^/]+)\/clear)?$/.exec(url.pathname);
     if (trailMatch) {
