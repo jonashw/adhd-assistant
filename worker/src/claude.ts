@@ -1,7 +1,7 @@
 import { Env } from "./env";
 import { HttpError } from "./http";
 import {
-    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState,
+    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
@@ -347,14 +347,17 @@ const listedNotOlder = `(excluded.listed_activity_at IS NULL OR claude_threads.l
     OR excluded.listed_activity_at >= claude_threads.listed_activity_at)`;
 
 export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
-    const [projects, threads, prs, topics, artifacts, claims] = await env.DB.batch([
+    const [projects, threads, prs, topics, artifacts, claims, todos] = await env.DB.batch([
         env.DB.prepare("SELECT * FROM claude_projects ORDER BY last_synced_at DESC"),
         env.DB.prepare("SELECT * FROM claude_threads ORDER BY created_at"),
         env.DB.prepare("SELECT * FROM claude_prs WHERE thread_id IS NOT NULL ORDER BY number DESC"),
         env.DB.prepare("SELECT * FROM claude_topics ORDER BY at DESC"),
         env.DB.prepare("SELECT * FROM claude_artifacts ORDER BY COALESCE(updated_at, first_seen_at) DESC, id DESC"),
-        env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC")
+        env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC"),
+        // to-dos threads left for Jon; a thread's link says which Claude thread it is
+        env.DB.prepare("SELECT id, text, link, added_at, thread_url FROM checklist_items WHERE done_at IS NULL AND thread_url IS NOT NULL ORDER BY added_at DESC")
     ]);
+    const todosBy = groupBy(todos.results as TodoRow[], r => claudeThreadIdOf(r.thread_url) ?? "");
     const threadRows = threads.results as ThreadRow[];
     const prsBy = groupBy(prs.results as PrRow[], r => r.thread_id!);
     const topicsBy = groupBy(topics.results as TopicRow[], r => r.thread_id);
@@ -393,6 +396,8 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
                 const past = (topicsBy.get(t.id) ?? []).filter(r => r.topic !== t.topic)
                     .map(r => [r.topic, ...parseKeywords(r.keywords)].join(" "));
                 if (past.length) thread.pastTopics = past;
+                const threadTodos = todosBy.get(t.id);
+                if (threadTodos?.length) thread.todos = threadTodos.map(todoOf);
                 return thread;
             })
         };
@@ -401,6 +406,23 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         if (projectArtifacts.length) project.artifacts = projectArtifacts;
         return project;
     });
+}
+
+type TodoRow = {id: string, text: string, link: string | null, added_at: string, thread_url: string};
+
+/* The Claude thread a checked-in thread's link points at: claude.ai/code/project/<project>?thread=<id> */
+export function claudeThreadIdOf(url: string): string | undefined {
+    try {
+        return new URL(url).searchParams.get("thread") ?? undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+function todoOf(r: TodoRow): ClaudeTodo {
+    const todo: ClaudeTodo = {id: r.id, text: r.text, addedAt: r.added_at};
+    if (r.link) todo.link = r.link;
+    return todo;
 }
 
 function groupBy<T>(rows: T[], key: (row: T) => string): Map<string, T[]> {

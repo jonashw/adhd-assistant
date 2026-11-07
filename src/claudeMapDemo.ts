@@ -57,6 +57,10 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
                 topic: "Hardy perennials for the front border"
             }, 2000, [pr(9, "Perennial planting plan", "merged")], 1500),
             thread("demo_garden", "demo_g5", "Choose a compost bin", "blocked", 60 * 24 * 10),
+            {...thread("demo_garden", "demo_g7", "Set up the drip timer", "working", 20), todos: [
+                {id: "demo_todo1", text: "Turn the outdoor tap's water back on", addedAt: at(25)},
+                {id: "demo_todo2", text: "Add the timer's Wi-Fi password in its app", link: "https://example.com/timer", addedAt: at(90)}
+            ]},
             thread("demo_garden", "demo_g6", "Measure the patio", "done", 60 * 5),
             thread("demo_garden", "demo_g7", "Find a hedge trimmer", "done", 60 * 26),
             thread("demo_garden", "demo_g8", "Test the soil pH", "done", 60 * 24 * 4)

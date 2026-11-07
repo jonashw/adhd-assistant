@@ -20,6 +20,8 @@ import { useElementSize } from "./useContainerWidth";
 import { demoClaudeMap } from "./claudeMapDemo";
 import { ClaudeEventLog } from "./ClaudeEventLog";
 import { LiveDot } from "./LiveDot";
+import { ProjectForYou } from "./ClaudeProjectFocus";
+import { branchBox, fitIntoBand, View } from "./focusCamera";
 
 /* The Claude map: Claude keeps it, Jon reads it. One region per Claude project, one node per thread,
    each with a badge for what it needs. Double-click a node (or tap Open) to jump to it in Claude. */
@@ -656,6 +658,69 @@ export function ClaudeMap() {
         return () => window.clearTimeout(timer);
     }, [query, showingGraph]);
     const selected = graphData.nodes.find(n => n.id === selectedId);
+
+    /* Clicking a project: the camera glides so the project's branch fits between the top of the map and the top of its
+       card. Only the camera moves; no node does. Closing the card glides back to the view Jon had before. */
+    const cardRef = React.useRef<HTMLDivElement>(null);
+    const [cardHeight, setCardHeight] = React.useState(0);
+    const savedView = React.useRef<View>();
+    const lastTickAt = React.useRef(0);
+    const focusedProjectId = selected?.kind === "project" && view === "map" ? selected.id : undefined;
+    React.useEffect(() => {
+        const card = cardRef.current;
+        if (!card) {
+            setCardHeight(0);
+            return;
+        }
+        const observer = new ResizeObserver(() => setCardHeight(card.getBoundingClientRect().height));
+        observer.observe(card);
+        return () => observer.disconnect();
+    }, [selectedId, view]);
+    React.useEffect(() => {
+        const graph = graphRef.current;
+        const box = (sizeRef as React.RefObject<HTMLDivElement>).current;
+        const card = cardRef.current;
+        if (!graph || !box) {
+            return;
+        }
+        if (!focusedProjectId) {
+            // card closed (or something else selected): back to where Jon was
+            if (savedView.current && !selectedId) {
+                const {k, x, y} = savedView.current;
+                graph.centerAt(x, y, 400);
+                graph.zoom(k, 400);
+            }
+            if (!selectedId) {
+                savedView.current = undefined;
+            }
+            return;
+        }
+        if (!card || cardHeight === 0) {
+            return;
+        }
+        const branch = graphData.nodes.filter(n => n.id === focusedProjectId || (n.kind !== "project" && n.kind !== "root" && n.project?.id === focusedProjectId));
+        const bounds = branchBox(branch);
+        if (!bounds) {
+            return;
+        }
+        if (!savedView.current) {
+            const centre = graph.centerAt() as unknown as {x: number, y: number};
+            savedView.current = {k: graph.zoom() as unknown as number, x: centre.x, y: centre.y};
+        }
+        // still settling: hold every node where it is, so the fit stays true (the engine lets go when it stops)
+        if (Date.now() - lastTickAt.current < 200) {
+            graphData.nodes.forEach(n => {
+                n.fx = n.x;
+                n.fy = n.y;
+            });
+        }
+        const boxRect = box.getBoundingClientRect();
+        const target = fitIntoBand(bounds, {width: boxRect.width, height: boxRect.height},
+            {top: 0, bottom: card.getBoundingClientRect().top - boxRect.top});
+        graph.centerAt(target.x, target.y, 400);
+        graph.zoom(target.k, 400);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [focusedProjectId, selectedId, cardHeight]);
     const hiddenCount = (projects ?? []).filter(p => p.hidden).length;
 
     /* Jump to Claude; for a thread, what its card says now is no longer new */
@@ -802,6 +867,7 @@ export function ClaudeMap() {
                 cooldownTicks={120}
                 cooldownTime={Infinity}
                 onEngineTick={() => {
+                    lastTickAt.current = Date.now();
                     if (graphData.pins?.size) {
                         graphData.nodes.forEach(n => {
                             const pin = graphData.pins!.get(n.id);
@@ -938,6 +1004,7 @@ export function ClaudeMap() {
         </Paper>}
 
         {view === "map" && selected && selected.kind !== "root" && <Paper
+            ref={cardRef}
             elevation={6}
             sx={{
                 position: "fixed", left: 16, right: 16, bottom: 16, p: 2, borderTop: `4px solid ${claudeStyle.ring}`, maxWidth: 560, mx: "auto",
@@ -961,6 +1028,12 @@ export function ClaudeMap() {
                 </Box>
                 <IconButton size="small" aria-label="Close" onClick={() => setSelectedId(undefined)}><Close fontSize="small"/></IconButton>
             </Stack>
+            {selected.kind === "project" && selected.project && <ProjectForYou
+                key={selected.id}
+                project={selected.project}
+                threadLinkProps={t => linkProps(t.url, openIn)}
+                onOpenThread={markOpened}
+            />}
             {selected.kind === "thread" && selected.thread && <ClaudeThreadGlance thread={selected.thread} project={selected.project!} onOpenArtifact={markArtifactOpened}/>}
             {selected.kind === "artifact" && selected.artifact && <ArtifactThreads
                 artifact={selected.artifact}
