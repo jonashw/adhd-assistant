@@ -91,7 +91,7 @@ export function forYou(project: ClaudeProject, now = Date.now()): ForYouItem[] {
             const scored = scores.get(todo.id)!;
             return {
                 key: `todo:${todo.id}`, label: "To-do", color: "claude.todoBg", textColor: "claude.ink", text: todo.text, thread: t, link: todo.link,
-                todo, reason: reasonLine(todo, scored), leverage: scored.leverage, ready: scored.ready,
+                todo, reason: reasonLine(todo, scored, now), leverage: scored.leverage, ready: scored.ready,
                 where: todo.where, whereBy: todo.whereBy
             };
         })

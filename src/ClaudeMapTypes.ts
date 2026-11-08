@@ -70,6 +70,8 @@ export type ClaudeTodo = {
     doneWhen?: string[],
     /* other to-dos (ids) that must be done first */
     waitsOn?: string[],
+    /* someone outside Jon's list it waits on (Netlify support), until the day to chase them */
+    waitingFor?: {who: string, checkBackOn?: string},
     interest?: {guess: InterestGuess, reason?: string, answer?: InterestAnswer},
     /* the spot it needs (src/spots.ts): Claude's guess until Jon corrects it */
     where?: string,

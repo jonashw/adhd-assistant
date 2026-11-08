@@ -10,7 +10,8 @@ import { WhereChip, WhereLocation, WherePicker, WhereSuggestion } from "./WhereY
 /* The top of Your move: everything every project needs from Jon, in one Leverage order.
 
    Start here is one key and two alternates (Ramsay and Rostain: a long menu stalls an ADHD brain; a short one with a
-   way out doesn't). Ready is the rest he can do now. Opens up later is what waits on another to-do, faded.
+   way out doesn't). Ready is the rest he can do now. Opens up later is what waits on another to-do,
+   or on someone outside the list (Netlify support) until the day to check on them, faded.
    One click opens an item's card: why it matters, what he needs, when it's done, what it opens. A double click goes
    straight to its thread. Two cards can be pinned side by side, half and half.
 
@@ -156,8 +157,13 @@ function ItemCard({item, all, pinned, half, onPin, onClose, threadLinkProps, onO
         {opens.length > 0 && <Section title="Opens up">
             <Box component="ul" sx={{m: 0, pl: 2.5}}>{opens.map((n, i) => <Typography component="li" variant="body2" key={i}>{n}</Typography>)}</Box>
         </Section>}
-        {waitsOn.length > 0 && <Section title="Waits on">
-            <Box component="ul" sx={{m: 0, pl: 2.5}}>{waitsOn.map((n, i) => <Typography component="li" variant="body2" key={i}>{n}</Typography>)}</Box>
+        {(waitsOn.length > 0 || todo?.waitingFor) && <Section title="Waits on">
+            <Box component="ul" sx={{m: 0, pl: 2.5}}>
+                {todo?.waitingFor && <Typography component="li" variant="body2">
+                    {todo.waitingFor.who}, outside your list{todo.waitingFor.checkBackOn ? ` (check on them ${dayLabel(todo.waitingFor.checkBackOn)})` : ""}
+                </Typography>}
+                {waitsOn.map((n, i) => <Typography component="li" variant="body2" key={i}>{n}</Typography>)}
+            </Box>
         </Section>}
         {todo && <Box sx={{mt: 1}}><InterestThumbs todo={todo} onAnswer={answer => onInterest(todo, answer)}/></Box>}
         <Stack direction="row" gap={1} sx={{mt: 1.5}} flexWrap="wrap">

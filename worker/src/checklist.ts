@@ -16,7 +16,8 @@ type Row = {
     thread_item_id: string | null, thread_title: string, thread_url: string | null,
     added_at: string, done_at: string | null, done_by: ChecklistItem["doneBy"] | null,
     interest_guess: InterestGuess | null, interest_answer: InterestAnswer | null,
-    where_spot: string | null, where_by: "claude" | "jon" | null
+    where_spot: string | null, where_by: "claude" | "jon" | null,
+    waits_on: string | null, waiting_for: string | null, check_back_on: string | null
 };
 
 const toItem = (row: Row): ChecklistItem => {
@@ -74,7 +75,9 @@ const whereSql = (target: Target, threadId: string) => target.noteId
 export type ItemEstimates = {
     worth?: 1 | 2 | 3, why?: string, size?: TodoSize, delay_class?: DelayClass, due_on?: string,
     needs?: string[], done_when?: string[], waits_on?: string[],
-    interest?: InterestGuess, interest_reason?: string
+    interest?: InterestGuess, interest_reason?: string,
+    /* someone outside Jon's list it waits on, and the day to chase them; "" clears it */
+    waiting_for?: string, check_back_on?: string
 };
 /* where: the spot it needs (a name from Jon's spots: Anywhere, Home, At my Mac, Garage, Library…) */
 export type NewChecklistItem = {text: string, group?: string, link?: string, where?: string} & ItemEstimates;
@@ -86,6 +89,24 @@ const shortList = (list: string[] | undefined, what: string) => {
     }
     return clean.length ? JSON.stringify(clean) : null;
 };
+
+/* An outside wait as stored: who (null clears it) and the check-back day. undefined: not sent, leave it as it is. */
+function outsideWait(item: ItemEstimates): {who: string | null, on: string | null} | undefined {
+    if (item.check_back_on !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(item.check_back_on)) {
+        throw new HttpError(422, "check_back_on is a date like 2026-11-10.");
+    }
+    if (item.waiting_for === undefined) {
+        if (item.check_back_on !== undefined) {
+            throw new HttpError(422, "check_back_on goes with waiting_for: say who it waits on.");
+        }
+        return undefined;
+    }
+    const who = item.waiting_for.trim();
+    if (who.length > 80) {
+        throw new HttpError(422, "waiting_for: a few words, up to 80 characters.");
+    }
+    return who ? {who, on: item.check_back_on ?? null} : {who: null, on: null};
+}
 
 function estimates(item: ItemEstimates) {
     if (item.due_on !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(item.due_on)) {
@@ -115,7 +136,8 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
         if (group && group.length > 40) {
             throw new HttpError(422, "A group name can have up to 40 characters.");
         }
-        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null, estimates: estimates(item), where: null as string | null};
+        return {text, key: textKey(text), group, link: item.link?.trim() ? checkUrl(item.link) : null, estimates: estimates(item),
+            waitsOn: item.waits_on, outside: outsideWait(item), where: null as string | null};
     });
     const spots = items.some(i => i.where?.trim()) ? await listSpots(env) : [];
     const wheres = items.map(item => {
@@ -135,10 +157,12 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
     const results = await env.DB.batch(unique.map(item => env.DB.prepare(
         `INSERT OR IGNORE INTO checklist_items
             (id, map_id, note_id, text, text_key, item_group, link, thread_item_id, thread_title, thread_url, added_at,
-             worth, why, size, delay_class, due_on, needs, done_when, waits_on, interest_guess, interest_reason, where_spot, where_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
+             worth, why, size, delay_class, due_on, needs, done_when, waits_on, interest_guess, interest_reason, where_spot, where_by,
+             waiting_for, check_back_on)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
     ).bind(crypto.randomUUID(), target.mapId, target.noteId, item.text, item.key, item.group, item.link,
-        thread.id, thread.title, thread.url, now, ...item.estimates, item.where, item.where ? "claude" : null)));
+        thread.id, thread.title, thread.url, now, ...item.estimates, item.where, item.where ? "claude" : null,
+        item.outside?.who ?? null, item.outside?.on ?? null)));
     const addedKeys = new Set(unique.filter((_, i) => results[i].results.length > 0).map(item => item.key));
     const where = whereSql(target, thread.id);
     const stored = (await env.DB.prepare(`SELECT * FROM checklist_items WHERE ${where.sql} AND text_key IN (SELECT value FROM json_each(?))`)
@@ -149,6 +173,21 @@ export async function addChecklistItems(env: Env, threadId: string, place: Place
     if (retag.length) {
         await env.DB.batch(retag.map(i => env.DB.prepare("UPDATE checklist_items SET where_spot = ?, where_by = 'claude' WHERE id = ?")
             .bind(i.where, byKey.get(i.key)!.id)));
+    }
+    // sending an item again updates what it waits on, inside the list and out, when the thread sends those
+    const rewait = unique.filter(i => !addedKeys.has(i.key) && byKey.has(i.key) && (i.waitsOn !== undefined || i.outside !== undefined));
+    if (rewait.length) {
+        await env.DB.batch(rewait.map(i => env.DB.prepare(
+            `UPDATE checklist_items SET
+                waits_on = CASE WHEN ? THEN ? ELSE waits_on END,
+                waiting_for = CASE WHEN ? THEN ? ELSE waiting_for END,
+                check_back_on = CASE WHEN ? THEN ? ELSE check_back_on END
+             WHERE id = ?`
+        ).bind(
+            i.waitsOn !== undefined ? 1 : 0, i.waitsOn?.length ? JSON.stringify(i.waitsOn.slice(0, 20)) : null,
+            i.outside !== undefined ? 1 : 0, i.outside?.who ?? null,
+            i.outside !== undefined ? 1 : 0, i.outside?.on ?? null,
+            byKey.get(i.key)!.id)));
     }
     const describe = (key: string) => {
         const row = byKey.get(key)!;
@@ -190,6 +229,9 @@ export async function listChecklistItems(env: Env, input: {place?: PlaceRef, thr
             added_by: r.thread_title, added_by_this_thread: input.threadId !== undefined && r.thread_item_id === input.threadId,
             // what Claude guessed about Jon's interest and what he said, so later guesses can learn
             interest: r.interest_guess ?? undefined,
+            waits_on: r.waits_on ? JSON.parse(r.waits_on) as string[] : undefined,
+            waiting_for: r.waiting_for ?? undefined,
+            check_back_on: r.check_back_on ?? undefined,
             where: r.where_spot ?? undefined,
             where_set_by: r.where_by === "jon" ? "Jon" : undefined,
             jon_said: r.interest_answer === "up" ? "wants to" : r.interest_answer === "down" ? "would rather not" : undefined
