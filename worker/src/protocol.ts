@@ -37,6 +37,15 @@ export const protocolChanges: ProtocolChange[] = [
             + "Anywhere › Out › Library, Park, School, Supermarket, Costco, Home Depot). Leave it out when a phone will do. His "
             + "Your move page shows only what he can do from where he says he is, and waits on a spot's opening hours. To tag a "
             + "to-do you added before, add it again with the same text and a where."
+    },
+    {
+        version: 5,
+        on: "2026-11-08",
+        rule: "Outside waits: when a to-do can't start until someone outside Jon's list comes through (a support ticket, a "
+            + "delivery, another person), give it waiting_for (\"Netlify support\") and a check_back_on day (YYYY-MM-DD), and "
+            + "chain the steps after it with waits_on, so none of them sits in his Start here. Sending a to-do again with the "
+            + "same text now updates its waits_on, waiting_for and check_back_on; send waiting_for \"\" when they come through. "
+            + "If a to-do you added waits on an outside party today, fix it now."
     }
 ];
 

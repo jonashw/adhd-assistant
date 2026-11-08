@@ -391,7 +391,7 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         env.DB.prepare("SELECT * FROM claude_artifact_threads ORDER BY at DESC"),
         // to-dos threads left for Jon; a thread's link says which Claude thread it is
         env.DB.prepare(`SELECT id, text, link, added_at, thread_url, worth, why, size, delay_class, due_on, needs, done_when, waits_on,
-                interest_guess, interest_reason, interest_answer, where_spot, where_by
+                interest_guess, interest_reason, interest_answer, where_spot, where_by, waiting_for, check_back_on
          FROM checklist_items WHERE done_at IS NULL AND thread_url IS NOT NULL ORDER BY added_at DESC`)
     ]);
     const todosBy = groupBy(todos.results as TodoRow[], r => claudeThreadIdOf(r.thread_url) ?? "");
@@ -452,7 +452,8 @@ type TodoRow = {
     worth: 1 | 2 | 3 | null, why: string | null, size: TodoSize | null, delay_class: DelayClass | null, due_on: string | null,
     needs: string | null, done_when: string | null, waits_on: string | null,
     interest_guess: InterestGuess | null, interest_reason: string | null, interest_answer: InterestAnswer | null,
-    where_spot: string | null, where_by: "claude" | "jon" | null
+    where_spot: string | null, where_by: "claude" | "jon" | null,
+    waiting_for: string | null, check_back_on: string | null
 };
 
 const stringsOf = (json: string | null): string[] | undefined => {
@@ -485,6 +486,10 @@ function todoOf(r: TodoRow): ClaudeTodo {
     if (needs) todo.needs = needs;
     if (doneWhen) todo.doneWhen = doneWhen;
     if (waitsOn) todo.waitsOn = waitsOn;
+    if (r.waiting_for) {
+        todo.waitingFor = {who: r.waiting_for};
+        if (r.check_back_on) todo.waitingFor.checkBackOn = r.check_back_on;
+    }
     if (r.where_spot) {
         todo.where = r.where_spot;
         todo.whereBy = r.where_by ?? "claude";

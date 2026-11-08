@@ -1,4 +1,4 @@
-import { ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize } from "./ClaudeMapTypes";
+import { ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize, dayLabel } from "./ClaudeMapTypes";
 
 /* Leverage: the order Your move puts Jon's to-dos and asks in.
 
@@ -7,7 +7,10 @@ import { ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize } from 
    It is Reinertsen's CD3 (cost of delay ÷ duration), with one addition Jon asked for: an item's cost of delay includes
    everything waiting on it. Value flows back along waits_on, in full one step back and halving each step after, and a
    to-do that several others wait on shares their value between it and their other open waits. A Claude thread
-   waiting on Jon adds worth, because what it delivers reaches him later. Missing estimates count as middling. */
+   waiting on Jon adds worth, because what it delivers reaches him later. Missing estimates count as middling.
+
+   A to-do can also wait on someone outside the list (Netlify support): it isn't ready, and neither is anything that
+   waits on it, until the check-back day, when it comes back as "check on Netlify support" so Jon can chase them. */
 
 export type LeverageInput = {
     id: string,
@@ -16,6 +19,7 @@ export type LeverageInput = {
     delayClass?: DelayClass,
     dueOn?: string,
     waitsOn?: string[],
+    waitingFor?: ClaudeTodo["waitingFor"],
     interest?: {guess: InterestGuess, answer?: InterestAnswer},
     /* a Claude thread is waiting on this (an ask), so finishing it sets work going */
     claudeWaits?: boolean
@@ -45,6 +49,12 @@ export function interestFactor(interest?: LeverageInput["interest"]): number {
     return interest?.answer ? full : 1 + (full - 1) / 2;
 }
 
+/* Still waiting on someone outside: no check-back day, or that day hasn't come yet in Jon's time */
+export function outsideHolds(waitingFor: ClaudeTodo["waitingFor"], now = Date.now()): boolean {
+    if (!waitingFor) return false;
+    return !waitingFor.checkBackOn || now < new Date(`${waitingFor.checkBackOn}T00:00:00`).getTime();
+}
+
 export type Scored = {leverage: number, opens: number, ready: boolean};
 
 export function scoreAll(items: LeverageInput[], now = Date.now()): Map<string, Scored> {
@@ -60,20 +70,25 @@ export function scoreAll(items: LeverageInput[], now = Date.now()): Map<string, 
     return new Map(items.map(i => [i.id, {
         leverage: (own(i) + opensValue(i, new Set([i.id]))) * interestFactor(i.interest) / sizeFactor[i.size ?? "half_hour"],
         opens: dependents.get(i.id)?.length ?? 0,
-        ready: openWaits(i).length === 0
+        ready: openWaits(i).length === 0 && !outsideHolds(i.waitingFor, now)
     }]));
 }
 
 const sizeWords: Record<TodoSize, string> = {minutes: "a few minutes", half_hour: "about half an hour", longer: "longer"};
 
 /* The one-line reason the page shows instead of the number: "a few minutes · opens 2 · a Claude thread waits" */
-export function reasonLine(todo: Pick<ClaudeTodo, "size" | "delayClass" | "dueOn"> & {claudeWaits?: boolean}, scored?: Scored): string {
+export function reasonLine(todo: Pick<ClaudeTodo, "size" | "delayClass" | "dueOn" | "waitingFor"> & {claudeWaits?: boolean}, scored?: Scored,
+    now = Date.now()): string {
+    const outside = todo.waitingFor;
+    const holds = outsideHolds(outside, now);
     return [
+        outside && holds && `waiting for ${outside.who}${outside.checkBackOn ? ` until ${dayLabel(outside.checkBackOn)}` : ""}`,
+        outside && !holds && `check on ${outside.who}`,
         todo.size && sizeWords[todo.size],
         scored?.opens ? `opens ${scored.opens}` : undefined,
         todo.claudeWaits && "a Claude thread waits",
         todo.delayClass === "expedite" && "urgent",
         todo.delayClass === "fixed_date" && todo.dueOn && `by ${todo.dueOn}`,
-        scored && !scored.ready && "waits on another to-do"
+        scored && !scored.ready && !holds && "waits on another to-do"
     ].filter(Boolean).join(" · ");
 }
