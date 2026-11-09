@@ -169,7 +169,8 @@ class MainActivity : Activity() {
         transcript = TextView(this).apply {
             textSize = 20f
             setTextColor(Color.BLACK)
-            setTextIsSelectable(true)
+            // Not selectable: a focusable text view made the scroll view jump to its top on every update
+            isFocusable = false
         }
         scroll = ScrollView(this).apply { addView(transcript) }
         root.addView(buttons)
@@ -458,6 +459,9 @@ class MainActivity : Activity() {
     }
 
     private fun render() {
+        // Follow the newest words only if the reader was already at the bottom
+        val slack = (48 * resources.displayMetrics.density).toInt()
+        val atBottom = scroll.scrollY + scroll.height >= transcript.height - slack
         val shown = SpannableStringBuilder(committed)
         if (partial.isNotEmpty()) {
             val start = shown.length
@@ -465,7 +469,7 @@ class MainActivity : Activity() {
             shown.setSpan(ForegroundColorSpan(Color.GRAY), start, shown.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         transcript.text = shown
-        scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
+        if (atBottom) scroll.post { scroll.scrollTo(0, maxOf(0, transcript.height - scroll.height)) }
     }
 
     private fun summary(): String {

@@ -12,8 +12,8 @@ android {
         // createOnDeviceSpeechRecognizer needs Android 12; segmented sessions need 13
         minSdk = 31
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
     }
 
     // A fixed key, committed on purpose: it guards nothing, and it lets each new build install over the last
