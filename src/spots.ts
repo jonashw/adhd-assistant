@@ -9,7 +9,7 @@
    Opening hours gate a spot and everything under it, whether or not Jon picked anywhere: while the library is closed,
    its items wait under Opens up later with the time it opens.
 
-   The lineage: GTD's contexts (choose by context first, then time, energy and priority), and if-then plans
+   Part of the attention field, our own method (see src/leverage.ts). The lineage: GTD's contexts (choose by context first, then time, energy and priority), and if-then plans
    ("when I'm at the library, I'll test the thick acrylic"), which have good evidence for ADHD. */
 
 export const weekDays = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;

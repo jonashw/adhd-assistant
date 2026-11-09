@@ -167,7 +167,7 @@ function stalenessScore(lastArrivedAt: string | undefined, now: Date): number {
     return days < 1 ? 1 : days < 3 ? 2 : days < 7 ? 3 : days < 30 ? 4 : 5;
 }
 
-/* The places that can be done here and now (the GTD check) */
+/* The places that can be done here and now (the attention field's here-and-now check) */
 export function candidates(graph: MindMapGraphData): MindMapGraphNode[] {
     const visible = new Set(MindMap.visibleGraph(graph, false).nodes.map(n => n.id));
     return graph.nodes.filter(n =>

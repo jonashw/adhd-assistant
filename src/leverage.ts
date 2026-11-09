@@ -2,6 +2,11 @@ import { ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize, dayLab
 
 /* Leverage: the order Your move puts Jon's to-dos and asks in.
 
+   The attention field is our name for the whole method (instead of GTD, a David Allen Co. trademark): Jon's mind is
+   Balloon Head at the centre, resting by default; what waits on him arranges itself around him by Leverage, where he
+   is and what's ready; he pulls one thing in when he chooses, or pulls nothing. Leverage is the number; the attention
+   field is how he chooses.
+
    Leverage = (urgency of its delay class + its worth + the value waiting on it) × interest ÷ size
 
    It is Reinertsen's CD3 (cost of delay ÷ duration), with one addition Jon asked for: an item's cost of delay includes
