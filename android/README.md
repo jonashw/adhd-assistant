@@ -10,7 +10,9 @@ It only listens and logs, and sends nothing anywhere:
 - an orange `⏎ 240 ms` mark shows each restart and how long the recogniser was deaf;
 - **Restart at pauses** is the classic mode: each session ends at a silence and starts again;
 - **Segmented session** (Android 13+) asks for one long session that hands back a segment at each pause;
-- **Copy log** puts the events and a summary on the clipboard.
+- **Own mic, no gaps** (Android 13+) records the mic itself and holds audio across restarts, so words at the edge of a pause should survive;
+- **Punctuation** asks the recogniser for punctuation and capitals;
+- **Save log** writes the events and a summary to Downloads (and copies them), since a long log is too big to paste.
 
 ## The test
 

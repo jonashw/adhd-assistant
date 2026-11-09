@@ -41,4 +41,4 @@ jobs:
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Listen test (Android)" \
-            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Open this page on the Pixel, tap listen-test.apk, and allow installing from the browser. Each build is signed with a fresh debug key, so uninstall the old one before installing a newer build."
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Open this page on the Pixel, tap listen-test.apk, and allow installing from the browser. From build 2 on, each build installs over the last one (uninstall build 1 first)."
