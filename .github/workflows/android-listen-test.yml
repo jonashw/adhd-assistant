@@ -1,0 +1,44 @@
+# Builds the Android listen test (E7 phase 2 engine test) and publishes the APK as a prerelease,
+# so Jon can download and install it on his Pixel straight from the phone.
+name: Android listen test
+
+on:
+  push:
+    paths:
+      - "android/**"
+      - ".github/workflows/android-listen-test.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - name: Build the debug APK
+        run: gradle -p android assembleDebug --no-daemon
+      - name: Name it
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk listen-test.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: listen-test-apk
+          path: listen-test.apk
+      - name: Publish as the android-listen-test prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-listen-test --yes --cleanup-tag || true
+          gh release create android-listen-test listen-test.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Listen test (Android)" \
+            --notes "Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. Open this page on the Pixel, tap listen-test.apk, and allow installing from the browser. From build 2 on, each build installs over the last one (uninstall build 1 first)."
