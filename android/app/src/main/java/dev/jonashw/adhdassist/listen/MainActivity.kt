@@ -29,7 +29,10 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import java.io.ByteArrayOutputStream
@@ -59,15 +62,13 @@ class MainActivity : Activity() {
     private enum class Mode(val label: String) {
         RESTART("Restart at pauses"),
         SEGMENTED("Segmented session"),
-        OWN_MIC("Own mic, no gaps");
-
-        fun next() = values()[(ordinal + 1) % values().size]
+        OWN_MIC("Own mic, no gaps")
     }
 
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
-    private var mode = Mode.RESTART
+    private var mode = Mode.OWN_MIC
     private var onDevice = false
     private var punctuation = true
 
@@ -98,7 +99,9 @@ class MainActivity : Activity() {
     private val log = StringBuilder()
 
     private lateinit var startButton: Button
-    private lateinit var modeButton: Button
+    private lateinit var modeLabel: TextView
+    private lateinit var modeGroup: RadioGroup
+    private lateinit var punctuationSwitch: Switch
     private lateinit var stats: TextView
     private lateinit var transcript: TextView
     private lateinit var scroll: ScrollView
@@ -125,27 +128,31 @@ class MainActivity : Activity() {
             text = "Start"
             setOnClickListener { if (listening) stop() else start() }
         }
-        modeButton = Button(this).apply {
-            text = mode.label
-            setOnClickListener {
-                if (listening) {
-                    toast("Stop first to change the mode")
-                } else {
-                    mode = mode.next()
-                    text = mode.label
-                }
+        // Settings show their current state: a radio list for the mode, a switch for punctuation.
+        // Both are locked while listening.
+        modeLabel = TextView(this).apply {
+            text = "Mode"
+            textSize = 14f
+            setPadding(0, pad / 2, 0, 0)
+        }
+        modeGroup = RadioGroup(this).apply {
+            orientation = RadioGroup.VERTICAL
+            Mode.values().forEach { m ->
+                addView(RadioButton(this@MainActivity).apply {
+                    id = View.generateViewId()
+                    text = m.label
+                    tag = m
+                    isChecked = m == mode
+                })
+            }
+            setOnCheckedChangeListener { group, checkedId ->
+                mode = group.findViewById<RadioButton>(checkedId).tag as Mode
             }
         }
-        val punctuationButton = Button(this).apply {
-            text = "Punctuation: on"
-            setOnClickListener {
-                if (listening) {
-                    toast("Stop first to change punctuation")
-                } else {
-                    punctuation = !punctuation
-                    text = if (punctuation) "Punctuation: on" else "Punctuation: off"
-                }
-            }
+        punctuationSwitch = Switch(this).apply {
+            text = "Punctuation"
+            isChecked = punctuation
+            setOnCheckedChangeListener { _, on -> punctuation = on }
         }
         val copyButton = Button(this).apply {
             text = "Save log"
@@ -153,7 +160,6 @@ class MainActivity : Activity() {
         }
         val weight = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
         buttons.addView(startButton, weight)
-        buttons.addView(modeButton, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.6f))
         buttons.addView(copyButton, weight)
         stats = TextView(this).apply {
             typeface = Typeface.MONOSPACE
@@ -167,7 +173,9 @@ class MainActivity : Activity() {
         }
         scroll = ScrollView(this).apply { addView(transcript) }
         root.addView(buttons)
-        root.addView(punctuationButton)
+        root.addView(modeLabel)
+        root.addView(modeGroup)
+        root.addView(punctuationSwitch)
         root.addView(stats)
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
@@ -302,12 +310,19 @@ class MainActivity : Activity() {
         startedAt = SystemClock.elapsedRealtime()
         sessionEndedAt = 0L
         startButton.text = "Stop"
+        lockSettings(true)
         note("START mode=${mode.label} engine=${if (onDevice) "on-device" else "default"} punctuation=${if (punctuation) "on" else "off"}")
         recognizer = (if (onDevice) SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
                       else SpeechRecognizer.createSpeechRecognizer(this)).also {
             it.setRecognitionListener(listener)
         }
         listen()
+    }
+
+    private fun lockSettings(locked: Boolean) {
+        for (i in 0 until modeGroup.childCount) modeGroup.getChildAt(i).isEnabled = !locked
+        punctuationSwitch.isEnabled = !locked
+        modeLabel.text = if (locked) "Mode (stop to change)" else "Mode"
     }
 
     private fun listen() {
@@ -318,6 +333,7 @@ class MainActivity : Activity() {
     private fun stop() {
         listening = false
         startButton.text = "Start"
+        lockSettings(false)
         recognizer?.stopListening()
         recognizer?.destroy()
         recognizer = null
