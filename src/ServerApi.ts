@@ -1,6 +1,7 @@
 import { MindMapGraphDataRecord } from "./MindMap";
 import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
 import { Spot, Whereabouts } from "./spots";
+import { Domain, Focus } from "./focus";
 import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 
 /* A map as the server holds it: the app's graph plus the revision last saved */
@@ -94,6 +95,14 @@ export const ServerApi = {
     claudeSync: (hash: string) => request<unknown>(`/api/claude-map/syncs/${encodeURIComponent(hash)}`),
     setClaudeProjectHidden: (id: string, hidden: boolean) =>
         request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    setClaudeProjectDomain: (id: string, domainId: string) =>
+        request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/domain`, {
+            method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({domainId})
+        }),
+    /* what Jon is focused on today (src/focus.ts) */
+    focus: () => request<{domains: Domain[], now?: Focus}>("/api/focus"),
+    setFocus: (focus: Pick<Focus, "workShare" | "scope" | "until"> | null) =>
+        request<void>("/api/focus", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(focus ?? {clear: true})}),
     setChecklistInterest: (id: string, answer: "up" | "down" | undefined) =>
         request<void>(`/api/checklist/${encodeURIComponent(id)}/interest/${answer ?? "clear"}`, {method: "POST"}),
     markClaudeArtifactOpened: (id: number) =>

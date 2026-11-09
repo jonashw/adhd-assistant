@@ -6,6 +6,8 @@ import { ForYouItem, InterestThumbs, forYou } from "./ClaudeProjectFocus";
 import { useClaudeColors } from "./theme";
 import { OpenState, Spot, byName, fits, hoursLine, openState } from "./spots";
 import { WhereChip, WhereLocation, WherePicker, WhereSuggestion } from "./WhereYouAre";
+import { FocusChips, FocusState } from "./FocusPicker";
+import { domainOf, inScope, modeWeight, scopeName } from "./focus";
 
 /* The top of Your move: everything every project needs from Jon, in one Leverage order.
 
@@ -17,16 +19,21 @@ import { WhereChip, WhereLocation, WherePicker, WhereSuggestion } from "./WhereY
 
    Where Jon is (src/spots.ts): when he says where he is ("Right now I'm: In bed"), Start here only offers what he can
    do from there, and Ready folds the rest into "Not from here". A spot that is closed now (the library after hours)
-   sends its items to Opens up later, with the time it opens. */
+   sends its items to Opens up later, with the time it opens.
+
+   What Jon is focused on (src/focus.ts): the mode ("Mostly work mode") lifts one domain's Leverage and sinks the other's;
+   the focus (Work, or one project) narrows the page to that slice, and Start here and Ready come from it alone. */
 
 export type MoveItem = ForYouItem & {project: ClaudeProject};
 
 const alternates = 2;
-const readyShown = 8;
+/* Fewer options is the rule: Ready shows as many as Start here does, and the rest wait behind "Show more" */
+const readyShown = 3;
 
-export function moveItems(projects: ClaudeProject[], now = Date.now()): MoveItem[] {
+/* weight: how much the mode lifts or sinks a project's items (src/focus.ts), 1 for no lean */
+export function moveItems(projects: ClaudeProject[], now = Date.now(), weight: (p: ClaudeProject) => number = () => 1): MoveItem[] {
     return projects
-        .flatMap(project => forYou(project, now).map(item => ({...item, project})))
+        .flatMap(project => forYou(project, now).map(item => ({...item, project, leverage: item.leverage * weight(project)})))
         .sort((a, b) => Number(b.ready) - Number(a.ready) || b.leverage - a.leverage);
 }
 
@@ -267,8 +274,12 @@ function OrderGraph({all, keyItem, selected, onSelect}: {
     </Box>;
 }
 
-export function YourMoveSections({projects, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere, location, onArrivalAlerts}: {
+export function YourMoveSections({projects, allProjects, focus, threadLinkProps, openThread, onOpenThread, onInterest, onSetAside, projectName, spots, here, hereUntil, onPick, onEditSpots, onWhere, location, onArrivalAlerts}: {
+    /* the projects in view (not quiet, not hidden), before the focus narrows them */
     projects: ClaudeProject[],
+    /* every project there is, for the focus menu */
+    allProjects: ClaudeProject[],
+    focus: FocusState,
     /* where Jon can be, and where he said he is (until when) */
     spots: Spot[],
     here?: Spot,
@@ -287,7 +298,12 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     onSetAside: (t: ClaudeThread, until: string | null) => void,
     projectName: (p: ClaudeProject) => string
 }) {
-    const all = moveItems(projects);
+    const {domains, workShare, scope} = focus;
+    const all = moveItems(projects.filter(p => inScope(domains, p, scope)), Date.now(),
+        p => modeWeight(domainOf(domains, p).kind, workShare));
+    // what the focus leaves out, so it never silently hides work
+    const outside = scope ? moveItems(projects.filter(p => !inScope(domains, p, scope))).filter(i => i.ready).length : 0;
+    const focusName = scopeName(domains, allProjects, scope, projectName);
     const clock = new Date();
     const hoursOf = new Map(all.map(i => [i.key, openState(spots, i.where, clock)]));
     const isOpen = (i: MoveItem) => hoursOf.get(i.key)!.open;
@@ -311,10 +327,20 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     };
 
     const picker = <WherePicker spots={spots} here={here} until={hereUntil} onPick={onPick} onEdit={onEditSpots} location={location} onAlerts={onArrivalAlerts}/>;
+    const chips = <Box sx={{px: 2, pt: 1}}><FocusChips focus={focus} projects={allProjects} projectName={projectName}/></Box>;
+    const outsideLine = outside > 0 && <Typography variant="body2" color="text.secondary" sx={{px: 2, pt: 1}} data-testid="outside-focus">
+        {outside} more ready outside {focusName ?? "this focus"}.{" "}
+        <Button size="small" sx={{color: "claude.ink", textTransform: "none", p: 0, minWidth: 0, verticalAlign: "baseline"}}
+            onClick={() => focus.setScope(undefined)}>Show everything</Button>
+    </Typography>;
     if (all.length === 0) {
-        return <Box sx={{px: 2, py: 3}}>
-            <Typography sx={{fontWeight: 600}}>Nothing waits on you right now.</Typography>
-            <Typography variant="body2" color="text.secondary">When a thread asks you something or leaves you a to-do, it shows up here.</Typography>
+        return <Box>
+            {chips}
+            <Box sx={{px: 2, py: 3}}>
+                <Typography sx={{fontWeight: 600}}>{focusName ? `Nothing in ${focusName} waits on you right now.` : "Nothing waits on you right now."}</Typography>
+                <Typography variant="body2" color="text.secondary">When a thread asks you something or leaves you a to-do, it shows up here.</Typography>
+            </Box>
+            {outsideLine}
         </Box>;
     }
 
@@ -350,6 +376,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     const start = ready.slice(0, 1 + alternates);
     const rest = ready.slice(1 + alternates);
     return <Box data-testid="your-move-sections">
+        {chips}
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{px: 2, pt: 1}}>
             {picker}
             <ToggleButtonGroup size="small" exclusive value={why ? "why" : "list"} onChange={(_, v) => v && setWhy(v === "why")}>
@@ -358,6 +385,7 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
             </ToggleButtonGroup>
         </Stack>
         {location && <WhereSuggestion location={location}/>}
+        {outsideLine}
         {why && <OrderGraph all={all} keyItem={start[0]?.key} selected={cards} onSelect={setSelected}/>}
         {!why && <List dense disablePadding>
             {start.length > 0 && <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink"}}>Start here</ListSubheader>}

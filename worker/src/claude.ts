@@ -62,7 +62,7 @@ export type Snapshot = {
 
 type ProjectRow = {
     id: string, name: string, short_name: string | null, hidden: number, first_seen_at: string, last_synced_at: string,
-    artifacts_since: string | null
+    artifacts_since: string | null, domain_id: string | null
 };
 type ArtifactRow = {
     id: number, project_id: string, url: string, title: string, updated_at: string | null,
@@ -442,6 +442,7 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         };
         if (p.short_name) project.shortName = p.short_name;
         if (p.artifacts_since) project.artifactsSince = p.artifacts_since;
+        if (p.domain_id) project.domainId = p.domain_id;
         if (projectArtifacts.length) project.artifacts = projectArtifacts;
         return project;
     });

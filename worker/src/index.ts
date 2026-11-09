@@ -13,6 +13,7 @@ import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./c
 import { openLive, ring, ringsFor } from "./live";
 import { getWhere, saveSpots, setAskWhere, setTodoWhere, setWhere } from "./spots";
 import { addStretch, addTalkQuestion, getTalk, listTalks, readTalk, recentQuestions, removeTalkQuestion, startTalk } from "./talks";
+import { getFocus, setFocus, setProjectDomain } from "./focus";
 import { createHookToken, handleHook, latestArrival, listHookTokens, pushCount, pushKey, revokeHookToken, subscribePush, unsubscribePush } from "./arrivals";
 
 export { LiveHub } from "./live";
@@ -112,6 +113,20 @@ async function handleApi(request: Request, env: Env, url: URL, ctx: ExecutionCon
     const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);
     if (hideMatch && request.method === "POST") {
         await setProjectHidden(env, decodeURIComponent(hideMatch[1]), hideMatch[2] === "hide");
+        return new Response(null, {status: 204});
+    }
+    const domainMatch = /^\/api\/claude-map\/projects\/([^/]+)\/domain$/.exec(url.pathname);
+    if (domainMatch && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {domainId?: unknown};
+        await setProjectDomain(env, decodeURIComponent(domainMatch[1]), body.domainId);
+        return new Response(null, {status: 204});
+    }
+    // what Jon is focused on today: work or personal mode, one domain or one project
+    if (url.pathname === "/api/focus" && request.method === "GET") {
+        return json(await getFocus(env));
+    }
+    if (url.pathname === "/api/focus" && request.method === "POST") {
+        await setFocus(env, await request.json().catch(() => undefined));
         return new Response(null, {status: 204});
     }
     const openedMatch = /^\/api\/claude-map\/threads\/([^/]+)\/opened$/.exec(url.pathname);

@@ -125,6 +125,8 @@ export type ClaudeProject = {
     shortName?: string,
     url: string,
     hidden: boolean,
+    /* the domain it belongs to (src/focus.ts): Personal or Work; left out = Personal */
+    domainId?: string,
     firstSeenAt: string,
     lastSyncedAt: string,
     /* artifacts first seen before this aren't news (when the map started counting them, or the project joined) */
