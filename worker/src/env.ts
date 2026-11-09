@@ -16,6 +16,8 @@ export interface Env {
     VIEWER_TOKEN?: string;
     /* Optional: lets the Worker ask Claude to read monologues (E7). Without it, monologues wait to be read. */
     ANTHROPIC_API_KEY?: string;
+    /* Optional, local development only (.dev.vars): send the live screen's reads to a stand-in instead of Claude's API */
+    ANTHROPIC_BASE_URL?: string;
     /* Optional: Web Push keys for arrival alerts (worker/src/arrivals.ts), base64url: the uncompressed P-256 public key
        and the private key's d. Without them the app says notifications aren't set up. */
     VAPID_PUBLIC_KEY?: string;

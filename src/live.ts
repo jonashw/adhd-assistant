@@ -5,7 +5,8 @@
 
 import React from "react";
 
-export type LiveTopic = "maps" | "trail" | "claude" | "monologues";
+/* "talks" uses mapId for the talk's id */
+export type LiveTopic = "maps" | "trail" | "claude" | "monologues" | "talks";
 /* mapId narrows "maps" and "trail" to one map; without it, every map counts */
 export type LiveRing = {topic: LiveTopic, mapId?: string, from?: string};
 export type LiveStatus = "off" | "connecting" | "live" | "down";
@@ -84,7 +85,7 @@ function setStatus(next: LiveStatus) {
 }
 
 /* Every topic at once: after a reconnect or a long sleep, nobody knows what was missed */
-const everything = (): LiveRing[] => (["maps", "trail", "claude", "monologues"] as const).map(topic => ({topic}));
+const everything = (): LiveRing[] => (["maps", "trail", "claude", "monologues", "talks"] as const).map(topic => ({topic}));
 
 /* --- tabs in this browser --- */
 const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("adhd-assist-live") : undefined;

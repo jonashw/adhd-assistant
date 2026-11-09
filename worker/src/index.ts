@@ -12,11 +12,12 @@ import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
 import { getWhere, saveSpots, setAskWhere, setTodoWhere, setWhere } from "./spots";
+import { addStretch, addTalkQuestion, getTalk, listTalks, readTalk, recentQuestions, removeTalkQuestion, startTalk } from "./talks";
 import { createHookToken, handleHook, latestArrival, listHookTokens, pushCount, pushKey, revokeHookToken, subscribePush, unsubscribePush } from "./arrivals";
 
 export { LiveHub } from "./live";
 
-async function handleApi(request: Request, env: Env, url: URL): Promise<Response> {
+async function handleApi(request: Request, env: Env, url: URL, ctx: ExecutionContext): Promise<Response> {
     // reads may use the viewer token; writes always need a signed-in session
     const email = request.method === "GET" ? await requireReader(request, env) : await requireUser(request, env);
     // writes must come from this site's own pages
@@ -70,6 +71,43 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
     if (rereadMatch && request.method === "POST") {
         const monologue = await rereadMonologue(env, decodeURIComponent(rereadMatch[1]));
         return monologue ? json(monologue) : json({error: "No such monologue."}, 404);
+    }
+    // the live screen (E7 phase 2): talks, their stretches and the questions they answer
+    if (url.pathname === "/api/talks" && request.method === "GET") {
+        return json(await listTalks(env));
+    }
+    if (url.pathname === "/api/talks" && request.method === "POST") {
+        return json(await startTalk(env, await request.json().catch(() => ({}))), 201);
+    }
+    if (url.pathname === "/api/answer-questions" && request.method === "GET") {
+        return json(await recentQuestions(env));
+    }
+    const talkMatch = /^\/api\/talks\/([^/]+)(?:\/(stretches|read|questions)(?:\/([^/]+))?)?$/.exec(url.pathname);
+    if (talkMatch) {
+        const talkId = decodeURIComponent(talkMatch[1]);
+        const what = talkMatch[2];
+        if (!what && request.method === "GET") {
+            return json(await getTalk(env, talkId));
+        }
+        if (what === "stretches" && request.method === "POST" && !talkMatch[3]) {
+            const added = await addStretch(env, talkId, await request.json().catch(() => ({})));
+            // the read runs after the answer, so the stretch shows grey at once; it rings again when the read lands
+            ctx.waitUntil(readTalk(env, talkId));
+            return json(added, 201);
+        }
+        if (what === "read" && request.method === "POST" && !talkMatch[3]) {
+            ctx.waitUntil(readTalk(env, talkId));
+            return new Response(null, {status: 202});
+        }
+        if (what === "questions" && request.method === "POST" && !talkMatch[3]) {
+            const added = await addTalkQuestion(env, talkId, url.origin, await request.json().catch(() => ({})));
+            ctx.waitUntil(readTalk(env, talkId));
+            return json(added, 201);
+        }
+        if (what === "questions" && request.method === "DELETE" && talkMatch[3]) {
+            await removeTalkQuestion(env, talkId, decodeURIComponent(talkMatch[3]));
+            return new Response(null, {status: 204});
+        }
     }
     const hideMatch = /^\/api\/claude-map\/projects\/([^/]+)\/(hide|show)$/.exec(url.pathname);
     if (hideMatch && request.method === "POST") {
@@ -250,7 +288,7 @@ async function handleApi(request: Request, env: Env, url: URL): Promise<Response
 }
 
 const app = {
-    async fetch(request: Request, env: Env): Promise<Response> {
+    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
         try {
             if (url.pathname.startsWith("/auth/")) {
@@ -263,7 +301,7 @@ const app = {
                 return json(result);
             }
             if (url.pathname.startsWith("/api/")) {
-                const response = await handleApi(request, env, url);
+                const response = await handleApi(request, env, url, ctx);
                 // every open tab hears what this write changed, and says it back so this tab can tell its neighbours
                 const rings = response.ok ? ringsFor(request.method, url.pathname) : [];
                 if (rings.length > 0) {

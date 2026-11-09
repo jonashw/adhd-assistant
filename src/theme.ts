@@ -49,6 +49,10 @@ export type ClaudeTokens = {
     todoBg: string,
     /* a thin ring that lifts a dot off whatever it sits on */
     halo: string,
+    /* the live screen (src/talk): heard-not-read text, the glow on a changed node, you-are-here, rabbit holes, thin
+       branches, and need chips (outlined open, half filled partly, quiet filled covered; never red) */
+    talk: {heard: string, glow: string, here: string, hereText: string, rabbit: string, rabbitText: string, thin: string,
+        need: string, needFill: string, needCoveredText: string, box: string, boxEdge: string, cueBg: string, cueText: string},
     badges: Record<"blocked" | "review_ready" | "working" | "failed" | "stopped" | "done" | "stale" | "gone" | "someday" | "later", BadgeColors>,
     ci: Record<"success" | "failure" | "pending" | "none", string>
 };
@@ -95,6 +99,11 @@ const claudeLight: ClaudeTokens = {
     track: "#F1E4DA",
     todoBg: "#F3ECE2",
     halo: "#FFFFFF",
+    talk: {
+        heard: "#9C8B7A", glow: "#FCE3D3", here: "#D97757", hereText: "#FFFFFF", rabbit: "#E0E7FF", rabbitText: "#3730A3",
+        thin: "#B49A86", need: "#C4623F", needFill: "#F3D6C6", needCoveredText: "#7A5A47", box: "#FFFFFF", boxEdge: "#E7D9CB",
+        cueBg: "#FFF8F3", cueText: "#3D2B1F"
+    },
     badges: lightBadges,
     ci: {success: "#16A34A", failure: "#DC2626", pending: "#F59E0B", none: "#9CA3AF"}
 };
@@ -143,6 +152,11 @@ const claudeDarkTokens: ClaudeTokens = {
     track: "#45403B",
     todoBg: "#3A3633",
     halo: claudeDark.page,
+    talk: {
+        heard: claudeDark.textFaint, glow: "#5A3A2C", here: claudeDark.clay, hereText: "#FFFFFF", rabbit: "#2E3150", rabbitText: "#C7CCF5",
+        thin: "#8A7F74", need: "#E08A6D", needFill: "#5A3A2C", needCoveredText: claudeDark.textSoft, box: claudeDark.card,
+        boxEdge: "#4A4843", cueBg: "#3A2E28", cueText: claudeDark.text
+    },
     badges: {
         ...lightBadges,
         done: {color: "#5F5E5A", text: "#E8E6DC"},
