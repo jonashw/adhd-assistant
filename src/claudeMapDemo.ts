@@ -108,6 +108,21 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
             ]},
             thread("demo_taxes", "demo_x2", "Estimate quarterly payment", "done", 60 * 30)
         ]),
+        // a day-job project, filed under Work: "I'm in Work mode" lifts it, "focused on Work" shows only it
+        {...project("demo_rules", "Governable Business Rules & Workflows", "Rules engine", 15, [
+            glance(thread("demo_rules", "demo_r1", "Compare rule engines that run in-process", "blocked", 15), {
+                headline: "Three engines fit; one is CMS-conformant out of the box",
+                ask: {kind: "decision", text: "Which rule engine do we prototype first?", where: "At my Mac"},
+                progress: {done: 3, total: 4, now: "Pick an engine"},
+                topic: "Declarative, in-process business rules"
+            }, 15),
+            {...thread("demo_rules", "demo_r2", "Draft the workflow schema", "working", 40), todos: [
+                {id: "demo_todo7", text: "Ask the CMS team for their content-type export", addedAt: at(60), worth: 3, size: "minutes",
+                    where: "At my Mac", why: "The schema has to match their types", interest: {guess: "neutral"}},
+                {id: "demo_todo8", text: "Read the governance checklist from compliance", addedAt: at(80), worth: 2, size: "half_hour",
+                    where: "At my Mac", interest: {guess: "reluctant", reason: "policy reading"}}
+            ]}
+        ]), domainId: "work"},
         // nothing waiting and nothing in weeks: Your move folds it away
         project("demo_bike", "Fix up the old bike", "Bike", 60 * 24 * 20, [
             thread("demo_bike", "demo_b1", "Find a chain that fits", "done", 60 * 24 * 21),

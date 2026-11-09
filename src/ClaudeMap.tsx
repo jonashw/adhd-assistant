@@ -6,7 +6,7 @@ import {
     InputAdornment, ListItem, ListItemIcon, Menu, MenuItem, Paper, Stack, Tab, Tabs, TextField, Toolbar, Tooltip, Typography
 } from "@mui/material";
 import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, ExpandLess, ExpandMore, MoreHoriz, OpenInNew, Search, Settings, Visibility, VisibilityOff } from "@mui/icons-material";
-import { Description } from "@mui/icons-material";
+import { Description, Home, Work } from "@mui/icons-material";
 import {
     ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, artifactFlag, badgeFor, badgeOrder, byLatestChange, claudeBadges,
     claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
@@ -23,6 +23,8 @@ import { LiveDot } from "./LiveDot";
 import { ProjectForYou, forYou, isQuiet, needsJon, lastMoved, quietDays } from "./ClaudeProjectFocus";
 import { MoveItem, YourMoveSections } from "./YourMove";
 import { SpotsEditor, WhereLocation, useWhere } from "./WhereYouAre";
+import { FocusState, useFocus } from "./FocusPicker";
+import { domainOf, inScope } from "./focus";
 import { ArrivalAlerts } from "./ArrivalAlerts";
 import { Spot } from "./spots";
 import { branchBox, fitIntoBand, View } from "./focusCamera";
@@ -405,8 +407,10 @@ type WhereProps = {
     onArrivalAlerts: () => void
 };
 
-function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onSetDomain, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where, focus}: {
     where: WhereProps,
+    focus: FocusState,
+    onSetDomain: (p: ClaudeProject, domainId: string) => void,
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
     onSetAside: (t: ClaudeThread, until: string | null) => void,
     projects: ClaudeProject[],
@@ -434,7 +438,9 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
     const top = (p: ClaudeProject) => Math.max(0, ...forYou(p, now).filter(i => i.ready).map(i => i.leverage));
     const ordered = [...projects].sort((a, b) => Number(needs(b) > 0) - Number(needs(a) > 0) || top(b) - top(a) || lastMoved(b).localeCompare(lastMoved(a)));
     const active = searching ? ordered : ordered.filter(p => !isQuiet(p, now));
-    const quiet = searching ? [] : ordered.filter(p => isQuiet(p, now));
+    // a focus on one domain or project narrows the project list too; a search looks everywhere
+    const focused = (p: ClaudeProject) => searching || inScope(focus.domains, p, focus.scope);
+    const quiet = searching ? [] : ordered.filter(p => isQuiet(p, now) && focused(p));
 
     const threadRow = (t: ClaudeThread, p: ClaudeProject, indent = false) => <ListItemButton
         key={t.id} {...linkProps(t.url, openIn)} onClick={() => onOpenThread(t)} sx={{gap: 1.5, pl: indent ? 4 : 2}}
@@ -494,6 +500,8 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
     return <List dense data-testid="your-move" sx={{bgcolor: "claude.surface", pb: "45dvh"}}>
         <YourMoveSections
             projects={active}
+            allProjects={projects}
+            focus={focus}
             threadLinkProps={t => linkProps(t.url, openIn)}
             openThread={t => {
                 const link = linkProps(t.url, openIn) as {href?: string, target?: string};
@@ -508,7 +516,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
         <ListSubheader sx={{bgcolor: "claude.surface", lineHeight: "32px", fontWeight: 600, color: "claude.ink", mt: 2, borderTop: 1, borderColor: "claude.link"}}>
             Projects
         </ListSubheader>
-        {active.map(projectBlock)}
+        {active.filter(focused).map(projectBlock)}
         {quiet.length > 0 && <>
             <ListItemButton onClick={() => setQuietOpen(o => !o)} sx={{bgcolor: "claude.fill", mt: 1}}>
                 <ListItemIcon sx={{minWidth: 28}}>{quietOpen ? <ExpandLess fontSize="small"/> : <ExpandMore fontSize="small"/>}</ListItemIcon>
@@ -532,6 +540,13 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
                 <ListItemIcon>{menu.project.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}</ListItemIcon>
                 {menu.project.hidden ? "Show this project again" : "Hide this project"}
             </MenuItem>}
+            {menu && focus.domains.filter(d => d.id !== domainOf(focus.domains, menu.project).id).map(d => <MenuItem key={d.id} onClick={() => {
+                onSetDomain(menu.project, d.id);
+                setMenu(undefined);
+            }}>
+                <ListItemIcon>{d.kind === "work" ? <Work fontSize="small"/> : <Home fontSize="small"/>}</ListItemIcon>
+                Move to {d.name}
+            </MenuItem>)}
         </Menu>
     </List>;
 }
@@ -720,6 +735,7 @@ export function ClaudeMap() {
     const demo = params.has("demo");
     const {projects, error, reload, setProjects} = useClaudeMap(demo);
     const where = useWhere(demo);
+    const focus = useFocus(demo);
     const [editingSpots, setEditingSpots] = React.useState(false);
     const [alertsOpen, setAlertsOpen] = React.useState(false);
     const colors = useClaudeColors();
@@ -956,6 +972,14 @@ export function ClaudeMap() {
         }
     };
 
+    /* Jon files a project under Work or Personal */
+    const setDomain = (project: ClaudeProject, domainId: string) => {
+        setProjects(ps => ps?.map(p => p.id === project.id ? {...p, domainId} : p));
+        if (!demo) {
+            ServerApi.setClaudeProjectDomain(project.id, domainId).catch(() => reload());
+        }
+    };
+
     const toggleHidden = (project: ClaudeProject) => {
         const hidden = !project.hidden;
         setProjects(ps => ps?.map(p => p.id === project.id ? {...p, hidden} : p));
@@ -1144,6 +1168,8 @@ export function ClaudeMap() {
                 onOpenThread={markOpened}
                 onOpenArtifact={markArtifactOpened}
                 onToggleHidden={toggleHidden}
+                onSetDomain={setDomain}
+                focus={focus}
                 onInterest={answerInterest}
                 onSetAside={setAside}
                 where={{
