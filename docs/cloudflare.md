@@ -191,6 +191,10 @@ GOOGLE_CLIENT_ID=dev
 GOOGLE_CLIENT_SECRET=dev
 ```
 
+To try the live screen (`/talk`) without spending on Claude, add `ANTHROPIC_API_KEY=anything` and
+`ANTHROPIC_BASE_URL=http://127.0.0.1:<port>` pointing at a stand-in that answers the Messages API. Never set
+`ANTHROPIC_BASE_URL` on the deployed Worker.
+
 Then `npm run worker:dev` and open `http://localhost:8787/auth/dev-login` to sign in without
 Google. Local KV needs no namespace id. To try the connector locally, point the MCP Inspector
 (`npx @modelcontextprotocol/inspector`) at `http://localhost:8787/mcp`. `DEV_LOGIN` only works on localhost and must never be set as a deployed secret.

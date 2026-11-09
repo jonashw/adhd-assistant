@@ -6,7 +6,8 @@ import { Env } from "./env";
    Hibernatable sockets let the object sleep between rings while the sockets stay open, and a "ping" from a tab is
    answered "pong" without waking it. There is one hub, since the app has one account. */
 
-export type LiveTopic = "maps" | "trail" | "claude" | "monologues";
+/* "talks" uses mapId for the talk's id */
+export type LiveTopic = "maps" | "trail" | "claude" | "monologues" | "talks";
 export type LiveRing = {topic: LiveTopic, mapId?: string, from?: string};
 
 export class LiveHub extends DurableObject<Env> {
@@ -89,6 +90,11 @@ export function ringsFor(method: string, pathname: string): LiveRing[] {
     }
     if (pathname.startsWith("/api/items/") || pathname.startsWith("/api/checklist/")) {
         return [{topic: "trail"}];
+    }
+    // a live talk: a new stretch shows grey at once (the read rings again when it lands)
+    const talk = /^\/api\/talks\/([^/]+)\//.exec(pathname);
+    if (talk) {
+        return [{topic: "talks", mapId: decodeURIComponent(talk[1])}];
     }
     if (pathname.startsWith("/api/claude-map/")) {
         // setting a thread aside also takes its flare down on the map

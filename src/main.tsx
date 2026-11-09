@@ -14,6 +14,7 @@ import { CrewPreview } from './CrewPreview';
 import { TemplatePicker } from './templates/TemplatePicker';
 import { ClaudeMap } from './ClaudeMap';
 import { Replay } from './Replay';
+import { LiveTalk } from './talk/LiveTalk';
 import { hideSplash } from './splash';
 import { ColorModeContext, useColorModeState } from './theme';
 import './theme.css';
@@ -49,6 +50,10 @@ const router = createBrowserRouter([
       {
         path: "/replay/:monologueId?",
         element: <Replay />
+      },
+      {
+        path: "/talk/:talkId?",
+        element: <LiveTalk />
       }
     ]
   },
