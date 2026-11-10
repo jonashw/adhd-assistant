@@ -8,7 +8,7 @@ import { checkIn, reportState, suggestPlace } from "./items";
 import { findPlaces, parsePlace, readPlace, whatsNextEverywhere } from "./places";
 import { LinkedItem, ThreadState, threadStates } from "../../src/TrailTypes";
 import { claudeAskKinds, claudeCiStates, claudePrStates, claudeThreadStates, delayClasses, interestGuesses, todoSizes } from "../../src/ClaudeMapTypes";
-import { syncProject } from "./claude";
+import { findClaudeThreads, syncProject } from "./claude";
 import { pendingUpdate, protocolVersion } from "./protocol";
 import { logMonologue, monologueMaxChars } from "./monologues";
 import { LiveRing, ring } from "./live";
@@ -45,13 +45,14 @@ Your thread's state shows up as a signal on his map, so he knows when you need h
 - Answer checklists: when you ask Jon a real question (not yes/no or one word), or he asks you one, call answer_checklist with the question and up to ${needsPerCall} short needs: what a full answer covers, the gaps in the asker's understanding. "finish" is a closed question to land; "expand" is an open interview (like "which apps do you love the feel of?") whose needs are facets to explore and may grow. After each of Jon's answers, mark what he covered, keep the still-open needs at the end of your reply and offer one to keep going on. Say "still open" and "covered", never "missing", "forgot" or "should"; no scores, percents or red. If Jon says a need doesn't matter, mark it set_aside without asking why. Covering everything never ends the talk: on an expand question only Jon decides he has dug deep enough. Never use it to mark your own answers.
 - Claude map: if this thread is in a Claude project and you can list the project's threads, call sync_project when you start work, at the start of every turn that brings Jon's answer, whenever you call check_in or report_state, and as the last step of every turn.
   - Call list_threads again just before each sync, and take the project's name from the newest message you got, not from when your session started: Jon renames projects and threads, and the map only learns a new name from a sync.
-  - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list.
+  - threads: send the whole list the first time, and whenever any thread's title or state in that fresh list differs from your last sync (a rename counts). Otherwise leave threads out; that means "unchanged" and saves writing the list. Give each thread its session_id exactly as list_threads gives it (cse_...): it is how a thread in another project finds and reaches it.
   - this_thread: your own thread id and card (headline, ask, progress, artifact, artifacts, topic, keywords), whenever any of them changed, which is usually every turn. Send the whole card; a field left out is cleared.
   - this_thread.state: in your last sync of a turn, the state you leave your own thread in: "done" if you resolve it this turn, "blocked" if you end waiting on Jon, "review_ready" if you hand him finished work. Claude's own list still shows you as working until your turn ends, so without this your badge stays a turn behind.
   - prs: the project's PR list (list_prs) when it changed since your last sync. Set each PR's thread_id to the thread whose session id ends the same way.
   - artifacts: the project's artifacts (list_project_artifacts) when they changed since your last sync. Separately, put every artifact or doc you made or updated in this thread in your card's artifacts, and the latest one in artifact too: Claude's list doesn't say which thread made what, so this is how the map knows.
   - short_name: only if the project instructions give one; leave it out otherwise, and the map shows the project's name.
   - If nothing changed at all, skip the call. A changed project name counts as a change.
+- Other projects: to read or ask something of a thread in another of Jon's projects, call find_thread with words from its title (or its project's name). It gives the thread's link and, once its project has synced them, its session id; remote_session_id is the form claude-code-remote's tools take. Read another project's thread only when Jon's request calls for it, ask it something only with his go-ahead, and leave its work to it.
 - Monologues: when Jon sends you dictation (spoken words, often several topics in a row) or asks you to log what he said, call log_monologue with his words exactly as he sent them, unedited, plus this thread's link or thread_id. The app turns it into a map he can replay. Don't log your own words or anything he pasted from elsewhere.`;
 
 const text = (value: unknown) => ({content: [{type: "text" as const, text: JSON.stringify(value, null, 2)}]});
@@ -153,7 +154,8 @@ function buildServer(env: Env, origin: string): McpServer {
                 title: z.string().min(1).max(300),
                 state: z.enum(claudeThreadStates).describe("The platform's state for it: working, blocked (needs Jon), review_ready, done, failed or stopped"),
                 created_at: z.string().max(40).optional(),
-                last_activity_at: z.string().max(40).optional()
+                last_activity_at: z.string().max(40).optional(),
+                session_id: z.string().min(1).max(100).optional().describe("The thread's session id exactly as list_threads gives it, like \"cse_...\": how a thread in another project finds and reaches it")
             })).max(500).optional().describe("Every thread, the first time and whenever a title or state changed; leave out when unchanged"),
             this_thread: z.object({
                 thread_id: z.string().min(1).max(100).describe("Your own thread's id"),
@@ -348,6 +350,16 @@ function buildServer(env: Env, origin: string): McpServer {
         inputSchema: {query: z.string().max(200).describe("A few words; empty lists the first places")},
         annotations: {readOnlyHint: true, openWorldHint: false}
     }, args => run(() => findPlaces(env, args.query)));
+
+    server.registerTool("find_thread", {
+        title: "Find a thread",
+        description: "Find a thread in any of Jon's Claude projects, as his Claude map has it, by words in its title or its project's name (a thread id or session id works too). Returns each match's project, thread id, title, state, link and, once its project has synced them, its session id: session_id as list_threads gives it, remote_session_id as claude-code-remote's tools take it (get_session reads it). listed false means its project's latest list didn't have it, so it may be archived. Read another project's thread only when Jon's request calls for it, and ask it something only with his go-ahead.",
+        inputSchema: {
+            query: z.string().max(200).describe("A few words from the thread's title or its project's name; empty lists the most recently active"),
+            project_id: z.string().max(100).optional().describe("Only this project's threads, like \"chan_...\"")
+        },
+        annotations: {readOnlyHint: true, openWorldHint: false}
+    }, args => run(() => findClaudeThreads(env, args.query, args.project_id)));
 
     server.registerTool("read_place", {
         title: "Read a place",

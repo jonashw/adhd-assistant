@@ -66,7 +66,7 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`, and `answer_checklist` (a question's needs, ticked off as Jon answers; PRD E10).
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`, `answer_checklist` (a question's needs, ticked off as Jon answers; PRD E10), and `find_thread` (a thread in any project, by title).
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
@@ -140,6 +140,16 @@ project 6, and New or Updated ones always show. "New" means it turned up after t
 last opened it. The thread card lists all of a thread's artifacts, the list view lists all of a project's under its
 threads, the Log shows new and updated ones, and the gear menu's **Show artifacts** takes them off the map on that
 device. Artifacts open in a browser tab even in desktop mode, since the claude:// links are only confirmed for threads.
+
+**Reaching other projects.** A thread can only list its own project's threads, and the platform's own tools
+(claude-code-remote's `get_session`, or a scheduled task bound to a thread) address a thread by its session id, not
+the `cmsg_` id the map keys on. So each sync carries every thread's `session_id` as `list_threads` gives it
+(`cse_...`, kept in `claude_threads.session_id`, migration 0029; protocol version 6), and `find_thread` looks a thread
+up across every project by words in its title or its project's name. It returns the id as listed and as
+`remote_session_id` (`session_...`), the form those tools take. The two forms share their suffix; that was seen on
+2026-11-10, not documented. A project's ids fill in with its first sync after the change. The connector tells
+threads to read another project's thread only when Jon's request calls for it, and to ask one something only with
+his go-ahead.
 
 **A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
 thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
