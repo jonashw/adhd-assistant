@@ -46,6 +46,15 @@ export const protocolChanges: ProtocolChange[] = [
             + "chain the steps after it with waits_on, so none of them sits in his Start here. Sending a to-do again with the "
             + "same text now updates its waits_on, waiting_for and check_back_on; send waiting_for \"\" when they come through. "
             + "If a to-do you added waits on an outside party today, fix it now."
+    },
+    {
+        version: 6,
+        on: "2026-11-10",
+        rule: "Session ids: if your sync_project tool takes a session_id for each thread (sessions started after this "
+            + "change see it), give every thread the session_id list_threads gives it (cse_...), and send the whole list "
+            + "once now so the map has them all. They let a thread in another of Jon's projects find yours with find_thread "
+            + "and reach it. To read or ask a thread in another project, find it with find_thread; read one only when "
+            + "Jon's request calls for it, and ask it something only with his go-ahead."
     }
 ];
 

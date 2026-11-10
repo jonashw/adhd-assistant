@@ -16,7 +16,9 @@ export type SnapshotThread = {
     title: string,
     state: ClaudeThreadState,
     created_at?: string,
-    last_activity_at?: string
+    last_activity_at?: string,
+    /* the platform's session id (cse_...): what its own tools take to read or reach this thread from another project */
+    session_id?: string
 };
 export type SnapshotArtifact = {
     title: string,
@@ -77,7 +79,8 @@ type ThreadRow = {
     artifact_title: string | null, artifact_url: string | null, topic: string | null, keywords: string | null,
     card_at: string | null, opened_at: string | null,
     set_aside_until: string | null, set_aside_by: "thread" | "jon" | null,
-    ask_where: string | null, ask_where_jon: string | null, ask_where_jon_for: string | null
+    ask_where: string | null, ask_where_jon: string | null, ask_where_jon_for: string | null,
+    session_id: string | null
 };
 type PrRow = {
     project_id: string, repo: string, number: number, thread_id: string | null, title: string,
@@ -179,6 +182,9 @@ export function checkSnapshot(input: Snapshot): Snapshot {
         if ((t.created_at !== undefined && !isTime(t.created_at)) || (t.last_activity_at !== undefined && !isTime(t.last_activity_at))) {
             fail(`Thread ${t.thread_id} has a time that isn't a date.`);
         }
+        if (t.session_id !== undefined && !idPattern.test(t.session_id)) {
+            fail(`Thread ${t.thread_id} has a session id that isn't valid.`);
+        }
     }
     return input;
 }
@@ -236,8 +242,8 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
         ).bind(snapshot.project_id, snapshot.project_name, snapshot.short_name ?? null, now, now),
         // a thread's state only moves forward in time: an older list can't undo a newer one
         ...(snapshot.threads ?? []).map(t => env.DB.prepare(
-            `INSERT INTO claude_threads (id, project_id, title, state, created_at, last_activity_at, listed_activity_at, first_seen_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `INSERT INTO claude_threads (id, project_id, title, state, created_at, last_activity_at, listed_activity_at, first_seen_at, last_seen_at, session_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT (id) DO UPDATE SET
                 project_id = excluded.project_id,
                 -- a rename doesn't move the platform's time, so a title only needs a list no older than the last one
@@ -246,8 +252,10 @@ export async function syncProject(env: Env, input: Snapshot): Promise<SyncResult
                 state = CASE WHEN ${newer} THEN excluded.state ELSE claude_threads.state END,
                 last_activity_at = CASE WHEN ${newer} THEN excluded.last_activity_at ELSE claude_threads.last_activity_at END,
                 created_at = COALESCE(claude_threads.created_at, excluded.created_at),
+                -- a thread keeps its session, so a list from a thread that didn't send one keeps the one on file
+                session_id = COALESCE(excluded.session_id, claude_threads.session_id),
                 last_seen_at = excluded.last_seen_at`
-        ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, t.last_activity_at ?? null, now, now)),
+        ).bind(t.thread_id, snapshot.project_id, t.title, t.state, t.created_at ?? null, t.last_activity_at ?? null, t.last_activity_at ?? null, now, now, t.session_id ?? null)),
         // a thread's word on its own state as its turn ends beats the platform's list, which lags behind by a turn
         ...(snapshot.this_thread?.state ? [env.DB.prepare(
             `UPDATE claude_threads SET state = ?, last_activity_at = ? WHERE id = ? AND project_id = ?`
@@ -445,6 +453,77 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
         if (projectArtifacts.length) project.artifacts = projectArtifacts;
         return project;
     });
+}
+
+/* ---- Finding a thread in any project ---- */
+
+export type FoundThread = {
+    project: string,
+    project_id: string,
+    thread_id: string,
+    title: string,
+    state: ClaudeThreadState,
+    last_activity_at?: string,
+    /* as list_threads gives it (cse_...); missing until its project syncs with session ids */
+    session_id?: string,
+    /* the same session as claude-code-remote's tools take it (get_session, list_events, create_trigger) */
+    remote_session_id?: string,
+    link: string,
+    /* false: its project's latest list didn't have it, so it may be archived */
+    listed: boolean
+};
+
+type FoundRow = {
+    id: string, project_id: string, title: string, state: ClaudeThreadState, last_activity_at: string | null,
+    last_seen_at: string, session_id: string | null, name: string, short_name: string | null, last_synced_at: string
+};
+
+/* The platform names one session two ways: cse_<id> in a project's thread list, session_<id> in claude-code-remote's
+   tools. Seen 2026-11-10 and documented nowhere, so the id as listed goes along with it. */
+export const remoteSessionOf = (id: string): string | undefined => /^cse_\w+$/.test(id) ? `session_${id.slice(4)}` : undefined;
+
+/* Threads in any of Jon's projects by words in their title or their project's name, for reaching one from
+   another project: best match first, then the most recently active. */
+export async function findClaudeThreads(env: Env, query: string, projectId?: string, limit = 15): Promise<FoundThread[]> {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const rows = (await env.DB.prepare(
+        `SELECT t.id, t.project_id, t.title, t.state, t.last_activity_at, t.last_seen_at, t.session_id,
+                p.name, p.short_name, p.last_synced_at
+         FROM claude_threads t JOIN claude_projects p ON p.id = t.project_id
+         WHERE ?1 IS NULL OR t.project_id = ?1
+         ORDER BY COALESCE(t.last_activity_at, t.last_seen_at) DESC`
+    ).bind(projectId ?? null).all<FoundRow>()).results;
+    return rows
+        .map(r => {
+            const title = r.title.toLowerCase();
+            // a thread's own ids count too, so either id finds its project and the other id
+            const haystack = `${title} ${r.name} ${r.short_name ?? ""} ${r.id} ${r.session_id ?? ""}`.toLowerCase();
+            const score = words.length === 0 ? 1
+                : words.every(w => haystack.includes(w)) ? words.filter(w => title.includes(w)).length + 1 : 0;
+            return {r, score};
+        })
+        .filter(m => m.score > 0)
+        // a stable sort, so equal scores stay most recently active first
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit)
+        .map(({r}) => {
+            const found: FoundThread = {
+                project: r.short_name ?? r.name,
+                project_id: r.project_id,
+                thread_id: r.id,
+                title: r.title,
+                state: r.state,
+                link: claudeThreadUrl(r.project_id, r.id),
+                listed: r.last_seen_at >= r.last_synced_at
+            };
+            if (r.last_activity_at) found.last_activity_at = r.last_activity_at;
+            if (r.session_id) {
+                found.session_id = r.session_id;
+                const remote = remoteSessionOf(r.session_id);
+                if (remote) found.remote_session_id = remote;
+            }
+            return found;
+        });
 }
 
 type TodoRow = {

@@ -9,7 +9,7 @@ ADHD Assist connector is connected (a `sync_project` tool): call `sync_project` 
 in any turn where Jon answers you (a reply, go-ahead, decision or review), whenever you call `check_in` or
 `report_state`, and once more as the last step of every turn. Pass this project's id
 and its current name (Jon renames projects, so take it from your newest message) and every one of its threads as a fresh `list_threads` call gives them (id, title, state, created and
-last-activity times). Send the whole list, not just your own thread, unless the connector's instructions say
+last-activity times, and its session id). Send the whole list, not just your own thread, unless the connector's instructions say
 it may be left out; and send your own glance card (`this_thread`, with every artifact you made or updated), the project's PRs and its
 artifacts as those instructions say. In the last sync of
 a turn, set `this_thread.state` to the state you leave your thread in (done when you resolve it), because the
