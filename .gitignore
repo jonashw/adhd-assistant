@@ -27,3 +27,8 @@ dist-ssr
 # Cloudflare
 .wrangler
 .dev.vars
+
+# Claude Code: per-machine settings. "Don't ask again" saves approved commands here verbatim,
+# including any token typed inline, so it must never be committed. Shared .claude/settings.json stays tracked.
+.claude/settings.local.json
+.claude/*.local.json
