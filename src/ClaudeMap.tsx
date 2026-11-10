@@ -9,7 +9,7 @@ import { ArrowBack, Check, CheckBox, CheckBoxOutlineBlank, Close, ExpandLess, Ex
 import { Description } from "@mui/icons-material";
 import {
     ClaudeArtifact, ClaudeBadgeKind, ClaudeProject, ClaudeThread, ClaudeTodo, InterestAnswer, artifactFlag, badgeFor, badgeOrder, byLatestChange, claudeBadges,
-    claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges
+    claudeSomedayDays, claudeStaleHours, glanceLine, isNewSince, quietBadges, ProjectReach, projectReaches, reachLabels
 } from "./ClaudeMapTypes";
 import { ClaudeThreadGlance, NewDot, PillChip, PrChip } from "./ClaudeThreadGlance";
 import { Pill, artifactLinkProps, artifactPill, pillColor } from "./claudeArtifacts";
@@ -405,7 +405,7 @@ type WhereProps = {
     onArrivalAlerts: () => void
 };
 
-function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
+function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact, onToggleHidden, onReach, onInterest, onSetAside, hiddenCount, showHidden, onShowHidden, where}: {
     where: WhereProps,
     onInterest: (todo: ClaudeTodo, answer: InterestAnswer | undefined) => void,
     onSetAside: (t: ClaudeThread, until: string | null) => void,
@@ -415,6 +415,7 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
     onOpenThread: (t?: ClaudeThread) => void,
     onOpenArtifact: (a: ClaudeArtifact) => void,
     onToggleHidden: (p: ClaudeProject) => void,
+    onReach: (p: ClaudeProject, reach: ProjectReach) => void,
     hiddenCount: number,
     showHidden: boolean,
     onShowHidden: (show: boolean) => void
@@ -470,6 +471,9 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
                 <Typography component="span" sx={{fontFamily: claudeStyle.font, fontWeight: 600, color: "claude.ink", flexGrow: 1}}>
                     {projectLabel(p)}
                 </Typography>
+                {p.reach !== "open" && <Typography component="span" variant="caption" title={reachLabels[p.reach].help}>
+                    {reachLabels[p.reach].label} ·
+                </Typography>}
                 <Typography component="span" variant="caption">synced {ago(p.lastSyncedAt)}</Typography>
                 <IconButton size="small" title="Open this project in Claude" {...linkProps(p.url, openIn)}><OpenInNew fontSize="small"/></IconButton>
                 <IconButton size="small" aria-label={`More for ${projectLabel(p)}`} onClick={e => setMenu({anchor: e.currentTarget, project: p})}>
@@ -532,6 +536,22 @@ function YourMoveList({projects, searching, openIn, onOpenThread, onOpenArtifact
                 <ListItemIcon>{menu.project.hidden ? <Visibility fontSize="small"/> : <VisibilityOff fontSize="small"/>}</ListItemIcon>
                 {menu.project.hidden ? "Show this project again" : "Hide this project"}
             </MenuItem>}
+            {/* Tell me when: the project's reach; the check shows which one it is now */}
+            {menu && <ListSubheader sx={{lineHeight: "32px", mt: 1}}>Tell me when</ListSubheader>}
+            {menu && projectReaches.map(reach => <MenuItem
+                key={reach}
+                selected={menu.project.reach === reach}
+                aria-checked={menu.project.reach === reach}
+                role="menuitemradio"
+                onClick={() => {
+                    onReach(menu.project, reach);
+                    setMenu(undefined);
+                }}
+            >
+                <ListItemIcon>{menu.project.reach === reach ? <Check fontSize="small"/> : null}</ListItemIcon>
+                <ListItemText primary={reachLabels[reach].label} secondary={reachLabels[reach].help}
+                    secondaryTypographyProps={{sx: {whiteSpace: "normal", maxWidth: 260}}}/>
+            </MenuItem>)}
         </Menu>
     </List>;
 }
@@ -964,6 +984,13 @@ export function ClaudeMap() {
         }
     };
 
+    const setReach = (project: ClaudeProject, reach: ProjectReach) => {
+        setProjects(ps => ps?.map(p => p.id === project.id ? {...p, reach} : p));
+        if (!demo) {
+            ServerApi.setClaudeProjectReach(project.id, reach).catch(() => reload());
+        }
+    };
+
     return <Box sx={{display: "flex", flexDirection: "column", height: "100dvh", bgcolor: "claude.fill"}}>
         <AppBar position="static" elevation={0} sx={{bgcolor: "claude.bar", color: "claude.barText", borderBottom: theme => theme.palette.mode === "dark" ? `1px solid ${theme.palette.divider}` : "none"}}>
             <Toolbar sx={{gap: 1}}>
@@ -1144,6 +1171,7 @@ export function ClaudeMap() {
                 onOpenThread={markOpened}
                 onOpenArtifact={markArtifactOpened}
                 onToggleHidden={toggleHidden}
+                onReach={setReach}
                 onInterest={answerInterest}
                 onSetAside={setAside}
                 where={{

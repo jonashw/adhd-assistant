@@ -34,6 +34,8 @@ const askText = (value?: string) => {
     return kind ? `${askLabels[kind]}: ${value.slice(kind.length + 2)}` : value;
 };
 
+const projectLabelOf = (p: ClaudeProject) => p.shortName ?? p.name;
+
 const prNumber = (pr?: string) => pr ? `#${pr.split("#").at(-1)}` : "PR";
 
 /* One line for an event, in plain words */
@@ -56,13 +58,15 @@ function describeEvent(e: ClaudeEvent): string {
         case "pr_ci": return `PR ${prNumber(e.pr)} checks: ${e.to}`;
         case "artifact_new": return `New artifact: ${e.to}`;
         case "artifact_updated": return `Artifact updated: ${e.to}`;
+        case "told": return `Told ${e.from}${e.to ? ` about ${e.to}` : ""}`;
     }
 }
 
 const kindLabels: Record<ClaudeEvent["kind"], string> = {
     project_new: "Project", project_renamed: "Rename", short_name: "Label", thread_new: "New",
     thread_renamed: "Rename", thread_state: "State", thread_unlisted: "Unlisted", ask: "Ask", reply: "Reply", set_aside: "Later",
-    pr_new: "PR", pr_state: "PR", pr_ci: "Checks", artifact_new: "Artifact", artifact_updated: "Artifact"
+    pr_new: "PR", pr_state: "PR", pr_ci: "Checks", artifact_new: "Artifact", artifact_updated: "Artifact",
+    told: "Told"
 };
 
 function describeSync(s: ClaudeSync): string {
@@ -271,6 +275,10 @@ function demoLog(projects: ClaudeProject[]): ClaudeLogEntry[] {
         });
         entries.push({type: "event", id: id++, at: at(30 + pi * 40), kind: "thread_renamed", projectId: p.id, threadId: p.threads[0]?.id, from: "Old working title", to: p.threads[0]?.title, sync});
     });
+    if (projects.length > 1 && projects[0].threads[0]) {
+        entries.push({type: "event", id: id++, at: at(12), kind: "told", projectId: projects[0].id, threadId: projects[0].threads[0].id,
+            from: projectLabelOf(projects[1]), to: "Garden › Raised beds: the cedar quote is in", sync: "", by: projects[0].threads[0].id});
+    }
     entries.push({type: "event", id: id++, at: at(400), kind: "project_renamed", projectId: projects[0]?.id ?? "", from: "Yard", to: projects[0]?.name, sync: "".padEnd(64, "0")});
     return entries.sort((a, b) => b.at.localeCompare(a.at));
 }

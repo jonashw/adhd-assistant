@@ -16,7 +16,7 @@ export function demoClaudeMap(tick = 0, now = Date.now()): ClaudeProject[] {
         openedAt: openedMinutesAgo === undefined ? undefined : at(openedMinutesAgo)
     });
     const project = (id: string, name: string, shortName: string | undefined, syncedMinutesAgo: number, threads: ClaudeThread[], artifacts?: ClaudeArtifact[]): ClaudeProject => ({
-        id, name, shortName, url: claudeProjectUrl(id), hidden: false,
+        id, name, shortName, url: claudeProjectUrl(id), hidden: false, reach: "open",
         firstSeenAt: at(5000), lastSyncedAt: at(syncedMinutesAgo), threads: threads.map(t => artifacts ? {
             ...t, artifactIds: artifacts.filter(a => a.threadIds.includes(t.id)).map(a => a.id)
         } : t), artifacts

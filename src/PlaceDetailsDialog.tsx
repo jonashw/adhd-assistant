@@ -12,6 +12,7 @@ import { NoteBody } from "./NoteBody";
 import { GraphRepositoryContext } from "./GraphRepositoryContext";
 import { ServerApi } from "./ServerApi";
 import { ClaudeChecklist } from "./ClaudeChecklist";
+import { PlaceListener } from "./ClaudeMapTypes";
 
 const kindNames: {[kind in LinkedItem["kind"]]: string} = {
     "claude.thread": "Claude thread",
@@ -88,6 +89,34 @@ function LinkedItems({noteId, graph}: {noteId: string, graph: MindMapGraphData})
             </Stack>
         </Box>
     );
+}
+
+/* Tell me when: who outside this place's own threads hears when it changes, in a line each, with a way to stop it.
+   Shows nothing when nobody does, which is most places. */
+function Listeners({mapId, noteId}: {mapId: string, noteId: string}) {
+    const [listeners, setListeners] = React.useState<(PlaceListener & {stopped: boolean})[]>([]);
+    const [busy, setBusy] = React.useState(false);
+    const [error, setError] = React.useState<string>();
+    const load = React.useCallback(() => {
+        ServerApi.placeListeners(mapId, noteId).then(setListeners).catch(() => setListeners([]));
+    }, [mapId, noteId]);
+    React.useEffect(load, [load]);
+    if (listeners.length === 0) {
+        return null;
+    }
+    const set = (l: PlaceListener, listening: boolean) => {
+        setBusy(true);
+        setError(undefined);
+        ServerApi.setPlaceListening(mapId, noteId, l.key, listening).then(load)
+            .catch((e: Error) => setError(e.message)).finally(() => setBusy(false));
+    };
+    return <Box data-testid="place-listeners" sx={{mt: 1}}>
+        {error && <Alert severity="warning">{error}</Alert>}
+        {listeners.map(l => <Stack key={l.key} direction="row" alignItems="center" gap={1}>
+            <Typography variant="body2" color={l.stopped ? "text.secondary" : undefined} sx={{flex: 1}}>{l.line}</Typography>
+            <Button size="small" disabled={busy} onClick={() => set(l, l.stopped)}>{l.stopped ? "Let it hear again" : "Stop telling"}</Button>
+        </Stack>)}
+    </Box>;
 }
 
 /* A place's flag, what it waits on, and the two things the ranking reads: small and interest */
@@ -169,6 +198,7 @@ export function PlaceDetailsDialog({node, graph, onChange, onClose}: {
                     </Box>
 
                     {nav.linksSupported && <LinkedItems noteId={node.id} graph={graph}/>}
+                    {nav.linksSupported && status?.mode === "server" && <Listeners mapId={nav.mapId} noteId={node.id}/>}
 
                     <Box>
                         <Typography variant="overline">Waiting on</Typography>

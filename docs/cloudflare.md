@@ -66,7 +66,7 @@ Nothing secret is copied or pasted: Claude registers itself and sends you to the
    `https://<your worker host>/mcp`. Claude opens the consent page; sign in with Google if asked and
    press Allow. The app's home screen lists connections under **Connected apps**, each with Revoke.
 
-The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`, `answer_checklist` (a question's needs, ticked off as Jon answers; PRD E10), and `find_thread` (a thread in any project, by title).
+The connector's tools: `check_in`, `report_state`, `find_places`, `read_place`, `suggest_place`, `whats_next`, `sync_project`, `log_monologue`, the to-do tools `add_checklist_items`, `list_checklist_items` and `complete_checklist_item`, `answer_checklist` (a question's needs, ticked off as Jon answers; PRD E10), `find_thread` (a thread in any project, by title), and the Tell me when tools `report_tell` and `add_watch`.
 It can't change places, statuses or links. When no place fits, a thread suggests new names under the
 closest place, and Jon charts the suggestion from What's next. Its instructions ask each thread to check in when work
 starts and to report `waiting`, `working`, `done` or `failed` as its state changes; a project's own
@@ -150,6 +150,23 @@ up across every project by words in its title or its project's name. It returns 
 2026-11-10, not documented. A project's ids fill in with its first sync after the change. The connector tells
 threads to read another project's thread only when Jon's request calls for it, and to ask one something only with
 his go-ahead.
+
+**Tell me when.** Threads in different projects tell each other when a place on Jon's map changes (`worker/src/tells.ts`,
+migration 0030, protocol version 7; spec: the "Connecting without merging" section of the AA "Merging or connecting my
+Claude projects"). Places hold the meaning; most listening needs no rows: a place's listeners are the other projects
+whose threads check in there, as their place or through `also_at`. Explicit `watches` rows are only for exceptions (a
+whole area, a few words, or something Jon asked for in words, added with `add_watch`); a `jon` row is for Keep my place
+to read and is never sent anywhere. Matching goes by the sender's places first, and their ancestors up to the region
+under HOME for area watches; words are a fallback for a thread with no place. A match comes back in the `check_in` or
+`sync_project` reply as `related`: the listening project, whom to ask (its best working thread with a session id, or
+its coordinator, found through `get_session`'s `parent_session_id`), the place, why, and `ask_allowed`. The thread asks
+over the tested route (a scheduled task bound to that session, fired once, then disabled, never deleted) and says what
+it did with `report_tell`. Every offer is a row in `tells`, which keeps it to one ask per watch per sending thread per
+24 hours, holds back at 80 sent an hour (the account allows 100 fires), and backs the Told chip on the Log. Each
+project's reach (`claude_projects.reach`: open, receive, walled; Open by default) is switched only by Jon, from the
+project's ⋯ menu on Your move (`POST /api/claude-map/projects/:id/reach`); Receive only listens but never tells,
+Walled does neither. A place's card lists who hears about it and has **Stop telling** (`watch_stops` for a derived
+listener, `stopped_at` for a watch).
 
 **A thread's own state.** Claude's thread list only shows a thread as done (or waiting) after its turn ends, so a
 thread's last sync of a turn always lists itself as working. To keep its badge from lagging a turn behind, that
