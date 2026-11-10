@@ -8,6 +8,7 @@ import { addLink, forgetItem, placeItem, removeLink } from "./items";
 import { handleConnections, providerFor } from "./connector";
 import { getMedia, uploadMedia } from "./media";
 import { getClaudeSnapshot, listClaudeLog, listClaudeMap, markArtifactOpened, markThreadOpened, setProjectHidden, setThreadAside } from "./claude";
+import { listenersAt, setListening, setProjectReach } from "./tells";
 import { getMonologue, listMonologues, rereadMonologue } from "./monologues";
 import { removeChecklistItem, setChecklistDone, setChecklistInterest } from "./checklist";
 import { openLive, ring, ringsFor } from "./live";
@@ -113,6 +114,29 @@ async function handleApi(request: Request, env: Env, url: URL, ctx: ExecutionCon
     if (hideMatch && request.method === "POST") {
         await setProjectHidden(env, decodeURIComponent(hideMatch[1]), hideMatch[2] === "hide");
         return new Response(null, {status: 204});
+    }
+    // Tell me when: a project's reach is Jon's switch, here and nowhere else (no connector tool reaches it)
+    const reachMatch = /^\/api\/claude-map\/projects\/([^/]+)\/reach$/.exec(url.pathname);
+    if (reachMatch && request.method === "POST") {
+        const body = await request.json().catch(() => ({})) as {reach?: unknown};
+        await setProjectReach(env, decodeURIComponent(reachMatch[1]), body.reach);
+        return new Response(null, {status: 204});
+    }
+    // who else hears when a place changes, and Jon stopping one of them
+    const listenersMatch = /^\/api\/maps\/([^/]+)\/places\/([^/]+)\/listeners$/.exec(url.pathname);
+    if (listenersMatch) {
+        const place = {mapId: decodeURIComponent(listenersMatch[1]), noteId: decodeURIComponent(listenersMatch[2])};
+        if (request.method === "GET") {
+            return json(await listenersAt(env, place));
+        }
+        if (request.method === "POST") {
+            const body = await request.json().catch(() => ({})) as {key?: unknown, listening?: unknown};
+            if (typeof body.key !== "string") {
+                throw new HttpError(422, "Say which listener, by its key.");
+            }
+            await setListening(env, place, body.key, body.listening === true);
+            return new Response(null, {status: 204});
+        }
     }
     const openedMatch = /^\/api\/claude-map\/threads\/([^/]+)\/opened$/.exec(url.pathname);
     if (openedMatch && request.method === "POST") {

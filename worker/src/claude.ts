@@ -3,7 +3,7 @@ import { HttpError } from "./http";
 import { resumeAnswered, setItemsAside } from "./items";
 import { spotNameMax } from "../../src/spots";
 import {
-    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
+    ClaudeArtifact, ClaudeAskKind, ClaudeCard, ClaudeCiState, ClaudeEventKind, ClaudeLogEntry, ClaudePr, ClaudePrState, ClaudeProject, ClaudeThreadState, ProjectReach, ClaudeTodo, DelayClass, InterestAnswer, InterestGuess, TodoSize,
     claudeAskKinds, claudeCiStates, claudePrStates, claudeProjectUrl, claudeThreadStates, claudeThreadUrl
 } from "../../src/ClaudeMapTypes";
 
@@ -64,7 +64,7 @@ export type Snapshot = {
 
 type ProjectRow = {
     id: string, name: string, short_name: string | null, hidden: number, first_seen_at: string, last_synced_at: string,
-    artifacts_since: string | null
+    artifacts_since: string | null, reach: ProjectReach | null
 };
 type ArtifactRow = {
     id: number, project_id: string, url: string, title: string, updated_at: string | null,
@@ -419,6 +419,7 @@ export async function listClaudeMap(env: Env): Promise<ClaudeProject[]> {
             hidden: p.hidden === 1,
             firstSeenAt: p.first_seen_at,
             lastSyncedAt: p.last_synced_at,
+            reach: p.reach ?? "open",
             threads: threadRows.filter(t => t.project_id === p.id).map(t => {
                 const thread: ClaudeProject["threads"][number] = {
                     id: t.id,

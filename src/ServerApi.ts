@@ -1,5 +1,5 @@
 import { MindMapGraphDataRecord } from "./MindMap";
-import { ClaudeLogEntry, ClaudeProject } from "./ClaudeMapTypes";
+import { ClaudeLogEntry, ClaudeProject, PlaceListener, ProjectReach } from "./ClaudeMapTypes";
 import { Spot, Whereabouts } from "./spots";
 import { announceFromResponse, liveTabHeader, liveTabId } from "./live";
 
@@ -94,6 +94,14 @@ export const ServerApi = {
     claudeSync: (hash: string) => request<unknown>(`/api/claude-map/syncs/${encodeURIComponent(hash)}`),
     setClaudeProjectHidden: (id: string, hidden: boolean) =>
         request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/${hidden ? "hide" : "show"}`, {method: "POST"}),
+    /* Tell me when: a project's reach (open, receive, walled), and who hears about a place */
+    setClaudeProjectReach: (id: string, reach: ProjectReach) =>
+        request<void>(`/api/claude-map/projects/${encodeURIComponent(id)}/reach`, {method: "POST", body: JSON.stringify({reach})}),
+    placeListeners: (mapId: string, noteId: string) =>
+        request<(PlaceListener & {stopped: boolean})[]>(`/api/maps/${encodeURIComponent(mapId)}/places/${encodeURIComponent(noteId)}/listeners`),
+    setPlaceListening: (mapId: string, noteId: string, key: string, listening: boolean) =>
+        request<void>(`/api/maps/${encodeURIComponent(mapId)}/places/${encodeURIComponent(noteId)}/listeners`,
+            {method: "POST", body: JSON.stringify({key, listening})}),
     setChecklistInterest: (id: string, answer: "up" | "down" | undefined) =>
         request<void>(`/api/checklist/${encodeURIComponent(id)}/interest/${answer ?? "clear"}`, {method: "POST"}),
     markClaudeArtifactOpened: (id: number) =>

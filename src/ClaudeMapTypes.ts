@@ -131,7 +131,35 @@ export type ClaudeProject = {
     artifactsSince?: string,
     threads: ClaudeThread[],
     /* everything the project's threads published, newest first */
-    artifacts?: ClaudeArtifact[]
+    artifacts?: ClaudeArtifact[],
+    /* how far Tell me when reaches this project; Jon switches it on the Claude map */
+    reach: ProjectReach
+};
+
+/* Tell me when, per project. Open: it listens, hears and tells. Receive only: it listens and hears, but its own changes
+   never reach anyone. Walled: none of these. Only Jon switches it, on the Claude map; no thread or connector call can. */
+export const projectReaches = ["open", "receive", "walled"] as const;
+export type ProjectReach = typeof projectReaches[number];
+export const reachLabels: Record<ProjectReach, {label: string, help: string}> = {
+    open: {label: "Open", help: "Hears about its places and tells other projects about its own changes"},
+    receive: {label: "Receive only", help: "Hears about its places; nothing of its own goes out"},
+    walled: {label: "Walled", help: "Hears nothing and tells nothing"}
+};
+
+/* Someone outside a place's own threads who hears when it changes, as a place's card shows it */
+export type PlaceListener = {
+    /* "place:<project>" for a project that hears because its threads check in here; "watch:<id>" for a watch */
+    key: string,
+    kind: "derived" | "watch",
+    /* who hears: a project, one thread, or Jon */
+    listener: "project" | "thread" | "jon",
+    projectId?: string,
+    /* the project's name, or the thread's title */
+    name: string,
+    /* what Jon reads on the card, in a line */
+    line: string,
+    /* for a watch on an area: the place it covers, when that isn't this one */
+    from?: string
 };
 
 /* An artifact or doc a project's threads published. Claude lists these per project with no thread, so
@@ -238,7 +266,9 @@ export function glanceLine(thread: ClaudeThread): string | undefined {
    Times are when the map heard of it, which can trail the change itself until a thread in the project syncs. */
 export const claudeEventKinds = [
     "project_new", "project_renamed", "short_name", "thread_new", "thread_renamed", "thread_state",
-    "thread_unlisted", "ask", "reply", "set_aside", "pr_new", "pr_state", "pr_ci", "artifact_new", "artifact_updated"
+    "thread_unlisted", "ask", "reply", "set_aside", "pr_new", "pr_state", "pr_ci", "artifact_new", "artifact_updated",
+    // Tell me when: a thread told another project about a change (from = who heard, to = what about)
+    "told"
 ] as const;
 export type ClaudeEventKind = typeof claudeEventKinds[number];
 export type ClaudeEvent = {
