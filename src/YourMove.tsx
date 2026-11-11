@@ -350,6 +350,11 @@ export function YourMoveSections({projects, threadLinkProps, openThread, onOpenT
     const start = ready.slice(0, 1 + alternates);
     const rest = ready.slice(1 + alternates);
     return <Box data-testid="your-move-sections">
+        {/* our name for the method (instead of GTD): what waits on Jon, arranged around him by Leverage and where he is */}
+        <Typography variant="overline" component="h2" data-testid="attention-field"
+            sx={{display: "block", px: 2, pt: 1, lineHeight: 1.6, color: "claude.inkSoft", letterSpacing: "0.08em"}}>
+            Your attention field
+        </Typography>
         <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1} sx={{px: 2, pt: 1}}>
             {picker}
             <ToggleButtonGroup size="small" exclusive value={why ? "why" : "list"} onChange={(_, v) => v && setWhy(v === "why")}>
